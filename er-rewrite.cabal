@@ -1,0 +1,24 @@
+Name:                er-rewrite
+Version:             0.1
+Synopsis:            Combinators for rewriting arbitrary syntax trees that have scoping.
+Description:	     Monad Transformer and Combinators for rewriting syntax trees.
+Category:            Language
+License:             BSD3
+License-file:        LICENSE
+Author:              Andy Gill
+Maintainer:          Andy Gill <andygill@ku.edu>
+Build-Depends:       base
+Stability:	     alpha
+build-type: 	     Simple
+Cabal-Version:       >= 1.2
+
+Library
+  Build-Depends:        base, network
+  Exposed-modules:
+      Language.ER.Rewrite
+
+--Executable test
+--  Main-Is:        Main.hs
+--  Hs-Source-Dirs: ., test
+--  buildable: False
+
