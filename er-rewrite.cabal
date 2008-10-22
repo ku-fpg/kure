@@ -1,4 +1,4 @@
-Name:                er-rewrite
+Name:                kre-engine
 Version:             0.1
 Synopsis:            Combinators for rewriting arbitrary syntax trees that have scoping.
 Description:	     Monad Transformer and Combinators for rewriting syntax trees.
@@ -13,7 +13,7 @@ build-type: 	     Simple
 Cabal-Version:       >= 1.2
 
 Library
-  Build-Depends:        base, network
+  Build-Depends:        base, containers 
   Exposed-modules:
       Language.ER.Rewrite
 
