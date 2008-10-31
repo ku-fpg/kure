@@ -256,7 +256,6 @@ data SubstOrder = Prefix Bool -- recurse on the result of any rewrite
 		       	      -- dig down a specific path
 		deriving (Eq, Ord, Show)
 
-
 data SubstEnv i = X
 
 type SubstRewrite m i d s  = SubstOrder -> SubstEnv i -> Rewrite m i d s
