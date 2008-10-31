@@ -1,4 +1,4 @@
-Name:                kre-engine
+Name:                kure
 Version:             0.1
 Synopsis:            Combinators for rewriting arbitrary syntax trees that have scoping.
 Description:	     Monad Transformer and Combinators for rewriting syntax trees.
@@ -15,10 +15,10 @@ Cabal-Version:       >= 1.2
 Library
   Build-Depends:        base, containers 
   Exposed-modules:
-      Language.ER.Rewrite
+      Language.KURE.Rewrite
 
---Executable test
---  Main-Is:        Main.hs
---  Hs-Source-Dirs: ., test
---  buildable: False
+Executable test
+  Main-Is:        Main.hs
+  Hs-Source-Dirs: ., test
+  buildable: True
 

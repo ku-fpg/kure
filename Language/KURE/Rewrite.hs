@@ -1,6 +1,6 @@
 {-# LANGUAGE ExistentialQuantification, TypeFamilies #-}
 -- |
--- Module: Language.ER.Rewrite 
+-- Module: Language.KURE.Rewrite 
 -- Copyright: (c) 2006-2008 Andy Gill
 -- License: BSD3
 --
@@ -9,7 +9,7 @@
 -- Portability: ghc
 --
 
-module Language.ER.Rewrite 
+module Language.KURE.Rewrite 
        ( Rewrite			-- syn
        , RewriteM			-- abstract
        , runRewrite
@@ -30,6 +30,8 @@ module Language.ER.Rewrite
        , bindingsM
        , addBindingsM
        , liftBindingsM
+       , Node(..) 
+       , Subst(..)
        ) where
 
 import Control.Monad
@@ -256,8 +258,6 @@ data SubstOrder = Prefix Bool -- recurse on the result of any rewrite
 		       	      -- dig down a specific path
 		deriving (Eq, Ord, Show)
 
-data SubstEnv i = X
-
 type SubstRewrite m i d s  = SubstOrder -> SubstEnv i -> Rewrite m i d s
 type SubstRewriteM m i d s = SubstOrder -> SubstEnv i -> RewriteM m i d s
 
@@ -273,9 +273,11 @@ substRewrite order env =
     substInside = rewrite (\ s -> substOver (substInsideNode s) order env)
 
 class Subst s where
+  data SubstEnv s 
   -- split the tree into sub-components, that can be themselves walked
   substInsideNode :: s -> Node s
   
+-- class Subst' s where
   -- a local rewrite, based on *this* node
   thisSubstRewrite :: SubstEnv i -> Rewrite m i d s
 
@@ -317,6 +319,7 @@ depth (node :* _) = depth node + 1
 
 infixl 3 :., :* --,:**
 
+{-
 data Exp = Var String | App Exp Exp | Lam String Exp
 
 instance Subst Exp where {}
@@ -331,7 +334,7 @@ foo :: Exp -> Node Exp
 foo (Var exp)   = cons Var :. exp
 foo (App e1 e2) = cons App :. e1 :. e1
 --foo (Lam n e)   =  cons Lam :. n  :** (Binding  e
-
+-}
 ------------------------------------------------------------------------------
 
 class (Monoid dec) => Decs dec where
