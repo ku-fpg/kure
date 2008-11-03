@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, TypeFamilies #-}
+{-# LANGUAGE ExistentialQuantification, TypeFamilies, Rank2Types, MultiParamTypeClasses  #-}
 -- |
 -- Module: Language.KURE.Rewrite 
 -- Copyright: (c) 2006-2008 Andy Gill
@@ -106,6 +106,19 @@ rewrite action = Rewrite $ \ exp path dec -> do
     RewriteSuccessM exp info dec -> return $ RewriteSuccess exp info dec
     RewriteFailureM msg		 -> return $ RewriteFailure msg
     RewriteReturnM exp	         -> return $ RewriteSuccess exp (anonInfo path) mempty
+
+
+-- precondition, if RewriteM returns, it returns with the same value as given.
+-- one way of knowning this is if the only things that could change the structure
+-- are sub-calls to RewriteM.
+
+rewriteWithId :: (Monad m,Info info,Monoid dec) => (exp -> RewriteM m info dec exp) -> Rewrite m info dec exp
+rewriteWithId action = Rewrite $ \ exp path dec -> do
+  r <- runRewriteM_ (action exp) path dec
+  case r of
+    RewriteSuccessM exp info dec -> return $ RewriteSuccess exp info dec
+    RewriteFailureM msg		 -> return $ RewriteFailure msg
+    RewriteReturnM _exp	         -> return $ RewriteReturnM exp	-- assert: _exp == exp
 
 -- The simple form, unability to rewrite in localize as an Null
 -- exposing interface, perhaps the bindings listing will change
@@ -258,8 +271,8 @@ data SubstOrder = Prefix Bool -- recurse on the result of any rewrite
 		       	      -- dig down a specific path
 		deriving (Eq, Ord, Show)
 
-type SubstRewrite m i d s  = SubstOrder -> SubstEnv i -> Rewrite m i d s
-type SubstRewriteM m i d s = SubstOrder -> SubstEnv i -> RewriteM m i d s
+type SubstRewrite m i d e  = SubstOrder -> SubstEnv e -> Rewrite m i d e
+type SubstRewriteM m i d e = SubstOrder -> SubstEnv e -> RewriteM m i d e
 
 substRewrite :: (Decs d,Subst s,Monad m,Info i) => SubstRewrite m i d s
 substRewrite order env =
@@ -270,38 +283,164 @@ substRewrite order env =
        Here         -> thisSubstRewrite env
        Path {}	    -> substInside
   where
-    substInside = rewrite (\ s -> substOver (substInsideNode s) order env)
+    substInside = undefined -- rewrite (\ s -> substOver (substInsideNode s) order env)
 
-class Subst s where
-  data SubstEnv s 
+
+
+class Subst e where
+  data SubstEnv e 
   -- split the tree into sub-components, that can be themselves walked
-  substInsideNode :: s -> Node s
+  substInsideNode :: e -> Node e
   
 -- class Subst' s where
   -- a local rewrite, based on *this* node
-  thisSubstRewrite :: SubstEnv i -> Rewrite m i d s
+  thisSubstRewrite :: SubstEnv e -> Rewrite m i d e
 
-substOver :: (Decs d,Subst e,Monad m,Info i) => Node e -> SubstRewriteM m i d e
-substOver node = substOver' (depth node) node
-  where
-    substOver' :: (Decs d,Monad m,Info i) => Int -> Node e -> SubstRewriteM m i d e
-    substOver' n (Cons a)      order env = return a
-    substOver' n (node :. arg) order env = do
-      f <- substOver' (pred n) node order env
-      return (f arg)
-    substOver' n (node :* arg) order env = do
-      f <- substOver' (pred n) node order env
-      arg' <- substOn n arg order env
-      return (f arg')
+--substOver :: (Decs d,Subst e,Monad m,Info i) => Node e -> SubstRewriteM m i d e
+--substOver node = substOver' (depth node) node
 
-    substOn :: (Decs d,Subst e,Monad m,Info i) => Int -> e -> SubstRewriteM m i d e
-    substOn _ e (Here {})      env = return e
-    substOn i e (Path j order) env 
+--substOver' :: (Decs d,Subst e,Monad m,Info i) => Int -> Node e -> SubstRewriteM m i d e
+substOver' :: (Decs d,Monad m,Info i) => Int -> Node e -> SubstOrder -> SubstEnv e 
+           -> (forall b e . SubstEnv e -> SubstEnv (b -> e))
+           -> RewriteM m i d e
+substOver' n (Cons a)      order env abc = return a
+substOver' n (node :. arg) order env abc = do 
+  f <- substOver' (pred n) node order (abc env) abc
+  return (f arg)
+{-
+substOver' n (node :* arg) order env = do
+  f <- substOver' (pred n) node order env
+--  arg' <- substOn n arg order env
+--  return (f arg')
+  return undefined
+-}
+
+substOverX ::  (Decs d,Monad m,Info i) =>
+               ( forall b. Int -> Node (b -> e) -> RewriteM m i d (b -> e) )
+           ->  Int
+           ->  Node e
+           -> RewriteM m i d e              
+substOverX fn n (Cons a)       = return a
+substOverX fn n (node :. arg)  = do  
+  f <- fn (pred n) node  
+  undefined
+{-
+  return (f undefined) --  arg)
+-}
+
+substOn :: (Decs d,Subst e,Monad m,Info i) => Int -> e -> SubstRewriteM m i d e
+substOn _ e (Here {})      env = return e
+substOn i e (Path j order) env 
         | i == j                       = apply (substRewrite order env) e
         | otherwise                    = return e
-    substOn i e order          env     = apply (substRewrite order env) e
+substOn i e order          env     = apply (substRewrite order env) e
 
 -------------------------------------------------------------------------------
+
+class XX exp where
+  type Generic exp
+
+  children :: (Info info, Monad m, Decs dec) => Rewrite m info dec (Generic exp) -> Rewrite m info dec exp
+
+  -- everything follows from these
+  project :: (Monad m) => Generic exp -> m exp
+  inject  :: exp -> Generic exp
+
+extract  :: (XX exp,Info info, Monad m, Decs dec) => Rewrite m info dec (Generic exp) -> Rewrite m info dec exp	-- at *this* type
+extract rr = rewrite $ \ e -> do
+            e' <- apply rr (inject e)
+            project e'
+
+-- promote a rewrite into a generic rewrite
+-- other types are fails.
+package  :: (XX exp,Info info, Monad m, Decs dec) => Rewrite m info dec exp -> Rewrite m info dec (Generic exp)
+package rr = rewrite $ \ e -> do
+               e' <- project e
+               r <- apply rr e'
+               return (inject r)
+
+--fmap2 :: (a -> b) -> (b -> a) -> Rewrite m info dec a -> Rewrite m info dec b
+--fmap2 ::
+
+applyG :: (XX exp,Monad m,Decs dec,Info info) => Rewrite m info dec (Generic exp) -> exp -> RewriteM m info dec exp
+applyG exp = apply (extract exp)
+{-
+class XX exp where
+  type GenericRewrite exp
+
+  children :: (Info info, Monad m, Decs dec) => (GenericRewrite exp) -> Rewrite m info dec exp
+
+  extract  :: (Info info, Monad m, Decs dec) => (GenericRewrite exp) -> Rewrite m info dec exp	-- at this type
+  package  :: (Info info, Monad m, Decs dec) => Rewrite m info dec exp -> GenericRewrite exp	-- build a 
+
+  apply   
+--  promote :: Rewrite m info dec exp -> 
+
+
+class (XX exp) => YY rrs exp where
+   mkGenericRewrite :: rrs -> GenericRewrite exp
+
+{-
+`-- This rewrites all the *children* of any exp node.
+children :: (XX exp) => Rewrite m info dec (GenericRewrite exp) -> Rewrite m info dec exp
+children = undefined
+-}
+
+{- 
+ - Want some way of joining various things into a GenericRewrite exp
+ -}
+
+
+--data Rewrites m info dec = Rewrites
+--    (Rewrite m info dec Exp)
+--    (Rewrite m info dec Root)
+-}
+
+data Generics
+	= GExp Exp
+	| GRoot Root
+
+{-
+data Rewrites = Rewrites
+    (forall m info dec . (Info info, Monad m, Decs dec) => Rewrite m info dec Exp)
+    (forall m info dec . (Info info, Monad m, Decs dec) => Rewrite m info dec Root)
+
+--idGenericRewrite :: GenericRewrite a	--
+idGenericRewrite = Rewrites (nullRewrite) (nullRewrite)
+
+
+--joinCO :: (forall m info dec . Rewrite m info dec Exp) -> (GenericRewrite b) -> GenericRewrite c
+--joinCO (Rewrites 
+-}
+
+data Exp = Exp Int Exp Root
+
+instance XX Exp where
+  type Generic Exp = Generics
+
+  children gen = rewrite $ \ (Exp i exp root) -> do
+                exp'  <- applyG gen exp
+                root' <- applyG gen root
+                return (Exp i exp' root')
+
+  inject = GExp
+
+  project (GExp e) = return e
+  project _        = fail "project of non-GExp"
+
+data Root = Root Exp
+
+instance XX Root where
+  type Generic Root = Generics
+{-
+  children (Rewrites rrExp rrRoot) = rewrite $ \ (Root exp) -> do
+                exp'  <- apply rrExp exp
+                return (Root exp')
+-}
+
+{- class SubTypes exp where
+  :: Rewrite Generic -> GenericRewrite exp
+ -}
 
 -------------------------------------------------------------------------------
 
@@ -346,8 +485,19 @@ class (Monoid dec) => Decs dec where
   lookupDecs :: Key dec -> dec -> Dec dec
   addDec     :: Key dec -> Dec dec -> dec -> dec
 
+instance Decs () where {}
+
 
 class (Monoid info) => Info info where
   type InfoElem info 
   unitInfo :: Path -> InfoElem info -> info
   anonInfo :: Path -> info
+
+instance Info () where {}
+
+--bottomup :: (XX s, Info info, Monad m, Decs dec) =>
+--            Rewrite m info dec s -> Rewrite m info dec s
+bottomup s = children (package (bottomup s)) >&> s
+
+all s = children (package s)
+
