@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, TypeFamilies, Rank2Types, MultiParamTypeClasses  #-}
+{-# LANGUAGE ExistentialQuantification, TypeFamilies, Rank2Types, MultiParamTypeClasses #-}
 -- |
 -- Module: Language.KURE.Rewrite 
 -- Copyright: (c) 2006-2008 Andy Gill
@@ -118,7 +118,7 @@ rewriteWithId action = Rewrite $ \ exp path dec -> do
   case r of
     RewriteSuccessM exp info dec -> return $ RewriteSuccess exp info dec
     RewriteFailureM msg		 -> return $ RewriteFailure msg
-    RewriteReturnM _exp	         -> return $ RewriteReturnM exp	-- assert: _exp == exp
+    RewriteReturnM _exp	         -> return $ RewriteChangeless  -- assert: _exp == exp
 
 -- The simple form, unability to rewrite in localize as an Null
 -- exposing interface, perhaps the bindings listing will change
@@ -287,6 +287,7 @@ substRewrite order env =
 
 
 
+
 class Subst e where
   data SubstEnv e 
   -- split the tree into sub-components, that can be themselves walked
@@ -300,6 +301,7 @@ class Subst e where
 --substOver node = substOver' (depth node) node
 
 --substOver' :: (Decs d,Subst e,Monad m,Info i) => Int -> Node e -> SubstRewriteM m i d e
+{-
 substOver' :: (Decs d,Monad m,Info i) => Int -> Node e -> SubstOrder -> SubstEnv e 
            -> (forall b e . SubstEnv e -> SubstEnv (b -> e))
            -> RewriteM m i d e
@@ -307,6 +309,8 @@ substOver' n (Cons a)      order env abc = return a
 substOver' n (node :. arg) order env abc = do 
   f <- substOver' (pred n) node order (abc env) abc
   return (f arg)
+
+-}
 {-
 substOver' n (node :* arg) order env = do
   f <- substOver' (pred n) node order env
@@ -314,7 +318,7 @@ substOver' n (node :* arg) order env = do
 --  return (f arg')
   return undefined
 -}
-
+{-
 substOverX ::  (Decs d,Monad m,Info i) =>
                ( forall b. Int -> Node (b -> e) -> RewriteM m i d (b -> e) )
            ->  Int
@@ -324,6 +328,7 @@ substOverX fn n (Cons a)       = return a
 substOverX fn n (node :. arg)  = do  
   f <- fn (pred n) node  
   undefined
+-}
 {-
   return (f undefined) --  arg)
 -}
@@ -345,6 +350,17 @@ class XX exp where
   -- everything follows from these
   project :: (Monad m) => Generic exp -> m exp
   inject  :: exp -> Generic exp
+
+instance XX b => XX (a -> b) where
+    type Generic (a -> b) = Generic b
+
+{-
+--    project :: (Monad m) => Generic b -> m (a -> b)
+    project g = project (const g)
+
+--    inject  :: (a -> b) -> Generic b
+--    inject f = \ b -> e	-- const
+-}
 
 extract  :: (XX exp,Info info, Monad m, Decs dec) => Rewrite m info dec (Generic exp) -> Rewrite m info dec exp	-- at *this* type
 extract rr = rewrite $ \ e -> do
@@ -418,16 +434,43 @@ data Exp = Exp Int Exp Root
 instance XX Exp where
   type Generic Exp = Generics
 
-  children gen = rewrite $ \ (Exp i exp root) -> do
+  children gen = rewrite $ \ (Exp i exp root) -> undefined
+
+
+{-  ff $ 
+                p Exp
+                 <-< 1
+                 <*< exp
+                 <*< root
+-}
+{-
                 exp'  <- applyG gen exp
                 root' <- applyG gen root
                 return (Exp i exp' root')
+-}
 
   inject = GExp
 
   project (GExp e) = return e
   project _        = fail "project of non-GExp"
 
+{-
+infixl 3 <-<, <*<
+
+ff :: MM m info dec a -> RewriteM m info dec a
+ff (MM a _ _) = a
+
+p :: (Monad m, Monoid info, Decs dec) => a -> MM m info dec a
+p x = MM (return x) 0
+
+(<-<) :: (Monad m, Monoid info, Decs dec) => MM m info dec (a -> b) -> a -> MM m info dec b
+(<-<) (MM f i) arg = MM (liftM (\ r -> r arg) f) (succ i)
+
+(<*<) :: (Monad m, Monoid info, Decs dec) => MM m info dec (a -> b) -> a -> MM m info dec b
+(<*<) (MM f i) arg = MM (do r <- f
+                            applyG gen
+liftM (\ r -> r arg) f) (succ i)
+-}
 data Root = Root Exp
 
 instance XX Root where
@@ -441,19 +484,69 @@ instance XX Root where
 {- class SubTypes exp where
   :: Rewrite Generic -> GenericRewrite exp
  -}
+{-
+class HasResult a where
+  type Result a
+
+instance HasResult (a -> b) where
+  type Result (a -> b) = Result b
+
+-}
+
+-------------------------------------------------------------------------------
+{-
+data MM m info dec r a = MM 
+    ((forall e . (XX a, Generic (Result a) ~ Generic e) => Rewrite m info dec (Generic e)) -> RewriteM m info dec a) 
+    Int 
+-}
+
+{-
+instance (Monad m,Monoid info,Decs dec) => Functor (MM m info dec) where
+  fmap f (MM a i) = MM (liftM f a) i
+
+instance (Monad m,Monoid info,Decs dec) => Applicative (MM m info dec) where
+  pure a = MM (return a) i
+  (MM f1 i) 
+-}
+
 
 -------------------------------------------------------------------------------
 
+
+
+{-
+foo2 :: (Decs d,Monad m,Info i) 
+     => (
+     -> Node e e
+     -> RewriteM m i d e
+foo2 gen n = foo n
+  where 
+-}
+
+foo :: (Decs d,Monad m,Info i,XX e) 
+    => (forall m info dec f . (Info info, Monad m, Decs dec) => Rewrite m info dec (Generic e))
+    -> Node e -> RewriteM m i d e
+foo gen (Cons a) = return a
+foo gen (fn :. b) = do
+  f <- foo gen fn
+  return (f b)
+foo gen (fn :* b) = do
+  f <- foo gen fn
+  b <- applyG gen b
+  return (f b)
+
+
 data Node a = Cons a
-            | forall b .              (Node (b -> a)) :. b
-            | forall b . (Subst b) => (Node (b -> a)) :* b
+            | forall b .  (Node (b -> a)) :. b
+            | forall b . (XX b,Generic b ~ Generic a) => (Node (b -> a)) :* b
 --            | forall b . (Subst b) => (Node (b -> a)) :** Scoped b
 
+{-
 depth :: Node a -> Int
 depth (Cons a)    = 0
 depth (node :. _) = depth node + 1
 depth (node :* _) = depth node + 1
-
+-}
 -- data Scoped b = Scoped b (
 
 infixl 3 :., :* --,:**
