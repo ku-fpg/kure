@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, TypeFamilies, Rank2Types, MultiParamTypeClasses #-}
+{-# LANGUAGE ExistentialQuantification, TypeFamilies, Rank2Types, MultiParamTypeClasses, FlexibleContexts  #-}
 -- |
 -- Module: Language.KURE.Rewrite 
 -- Copyright: (c) 2006-2008 Andy Gill
@@ -30,7 +30,7 @@ module Language.KURE.Rewrite
        , bindingsM
        , addBindingsM
        , liftBindingsM
-       , Node(..) 
+--       , Node(..) 
        , Subst(..)
        ) where
 
@@ -93,6 +93,9 @@ apply (Rewrite action) exp = RewriteM $ \ path decs -> do
     RewriteFailure msg		-> return $ RewriteFailureM msg
     RewriteChangeless           -> return $ RewriteReturnM exp	-- original exp
 
+
+apply' :: (Monad m) => Rewrite m info (Context exp) exp -> exp -> RewriteM m info (Context exp) exp
+apply' = apply
 -- This promotes a monadic action into a Rewrite. Any non-failure is turned into
 -- succeess, with a location tag.
 
@@ -255,7 +258,7 @@ info i rr =  \ exp -> RewriteM $ \ path decs -> do
 bindingsM :: (Monad m,Info info) =>  RewriteM m info dec dec
 bindingsM = RewriteM $ \ path dec -> return $ RewriteReturnM dec
 
-addBindingsM :: (Decs dec,Monad m,Info info) =>  dec -> RewriteM m info dec a -> RewriteM m info dec a
+addBindingsM :: (Decs dec, dec ~ Context a,Monad m,Info info) =>  dec -> RewriteM m info (Context a) a -> RewriteM m info (Context a) a
 addBindingsM decs m = RewriteM $ \ path dec -> runRewriteM_ m path (decs `mappend` dec)
 
 -- This dec *must* have a new name.
@@ -291,7 +294,7 @@ substRewrite order env =
 class Subst e where
   data SubstEnv e 
   -- split the tree into sub-components, that can be themselves walked
-  substInsideNode :: e -> Node e
+  substInsideNode :: e -> Cons e
   
 -- class Subst' s where
   -- a local rewrite, based on *this* node
@@ -342,231 +345,100 @@ substOn i e order          env     = apply (substRewrite order env) e
 
 -------------------------------------------------------------------------------
 
-class XX exp where
+class Term exp where
   type Generic exp
+  type Context exp
+--  type TermInfo exp
 
-  children :: (Info info, Monad m, Decs dec) => Rewrite m info dec (Generic exp) -> Rewrite m info dec exp
+  explodeCons :: exp -> Cons exp
 
   -- everything follows from these
   project :: (Monad m) => Generic exp -> m exp
   inject  :: exp -> Generic exp
 
-instance XX b => XX (a -> b) where
+instance Term b => Term (a -> b) where
     type Generic (a -> b) = Generic b
+    type Context (a -> b) = Context b
 
-{-
---    project :: (Monad m) => Generic b -> m (a -> b)
-    project g = project (const g)
-
---    inject  :: (a -> b) -> Generic b
---    inject f = \ b -> e	-- const
--}
-
-extract  :: (XX exp,Info info, Monad m, Decs dec) => Rewrite m info dec (Generic exp) -> Rewrite m info dec exp	-- at *this* type
+extract  :: (Term exp,Info info, Monad m, Decs dec, dec ~ Context exp) => Rewrite m info dec (Generic exp) -> Rewrite m info dec exp	-- at *this* type
 extract rr = rewrite $ \ e -> do
             e' <- apply rr (inject e)
             project e'
 
 -- promote a rewrite into a generic rewrite
 -- other types are fails.
-package  :: (XX exp,Info info, Monad m, Decs dec) => Rewrite m info dec exp -> Rewrite m info dec (Generic exp)
+package  :: (Term exp,Info info, Monad m, Decs dec) => Rewrite m info dec exp -> Rewrite m info dec (Generic exp)
 package rr = rewrite $ \ e -> do
                e' <- project e
                r <- apply rr e'
                return (inject r)
 
---fmap2 :: (a -> b) -> (b -> a) -> Rewrite m info dec a -> Rewrite m info dec b
---fmap2 ::
-
-applyG :: (XX exp,Monad m,Decs dec,Info info) => Rewrite m info dec (Generic exp) -> exp -> RewriteM m info dec exp
+applyG :: (Term exp,Monad m,Decs dec,dec ~ Context exp,Info info) => Rewrite m info dec (Generic exp) -> exp -> RewriteM m info dec exp
 applyG exp = apply (extract exp)
-{-
-class XX exp where
-  type GenericRewrite exp
 
-  children :: (Info info, Monad m, Decs dec) => (GenericRewrite exp) -> Rewrite m info dec exp
-
-  extract  :: (Info info, Monad m, Decs dec) => (GenericRewrite exp) -> Rewrite m info dec exp	-- at this type
-  package  :: (Info info, Monad m, Decs dec) => Rewrite m info dec exp -> GenericRewrite exp	-- build a 
-
-  apply   
---  promote :: Rewrite m info dec exp -> 
-
-
-class (XX exp) => YY rrs exp where
-   mkGenericRewrite :: rrs -> GenericRewrite exp
-
-{-
-`-- This rewrites all the *children* of any exp node.
-children :: (XX exp) => Rewrite m info dec (GenericRewrite exp) -> Rewrite m info dec exp
-children = undefined
--}
-
-{- 
- - Want some way of joining various things into a GenericRewrite exp
- -}
-
-
---data Rewrites m info dec = Rewrites
---    (Rewrite m info dec Exp)
---    (Rewrite m info dec Root)
--}
+------------------------------------------------------------------------------
 
 data Generics
 	= GExp Exp
 	| GRoot Root
 
-{-
-data Rewrites = Rewrites
-    (forall m info dec . (Info info, Monad m, Decs dec) => Rewrite m info dec Exp)
-    (forall m info dec . (Info info, Monad m, Decs dec) => Rewrite m info dec Root)
-
---idGenericRewrite :: GenericRewrite a	--
-idGenericRewrite = Rewrites (nullRewrite) (nullRewrite)
-
-
---joinCO :: (forall m info dec . Rewrite m info dec Exp) -> (GenericRewrite b) -> GenericRewrite c
---joinCO (Rewrites 
--}
-
 data Exp = Exp Int Exp Root
 
-instance XX Exp where
+instance Term Exp where
   type Generic Exp = Generics
+  type Context Exp = ()
 
-  children gen = rewrite $ \ (Exp i exp root) -> undefined
-
-
-{-  ff $ 
-                p Exp
-                 <-< 1
-                 <*< exp
-                 <*< root
--}
-{-
-                exp'  <- applyG gen exp
-                root' <- applyG gen root
-                return (Exp i exp' root')
--}
+  explodeCons (Exp n e r) = Cons Exp :. n :* e :** (Scoped () r)
 
   inject = GExp
 
   project (GExp e) = return e
   project _        = fail "project of non-GExp"
 
-{-
-infixl 3 <-<, <*<
-
-ff :: MM m info dec a -> RewriteM m info dec a
-ff (MM a _ _) = a
-
-p :: (Monad m, Monoid info, Decs dec) => a -> MM m info dec a
-p x = MM (return x) 0
-
-(<-<) :: (Monad m, Monoid info, Decs dec) => MM m info dec (a -> b) -> a -> MM m info dec b
-(<-<) (MM f i) arg = MM (liftM (\ r -> r arg) f) (succ i)
-
-(<*<) :: (Monad m, Monoid info, Decs dec) => MM m info dec (a -> b) -> a -> MM m info dec b
-(<*<) (MM f i) arg = MM (do r <- f
-                            applyG gen
-liftM (\ r -> r arg) f) (succ i)
--}
 data Root = Root Exp
 
-instance XX Root where
+instance Term Root where
   type Generic Root = Generics
-{-
-  children (Rewrites rrExp rrRoot) = rewrite $ \ (Root exp) -> do
-                exp'  <- apply rrExp exp
-                return (Root exp')
--}
+  type Context Root = ()
 
-{- class SubTypes exp where
-  :: Rewrite Generic -> GenericRewrite exp
- -}
-{-
-class HasResult a where
-  type Result a
+  explodeCons (Root e) = Cons Root :* e 
 
-instance HasResult (a -> b) where
-  type Result (a -> b) = Result b
+  inject = GRoot
 
--}
+  project (GRoot e) = return e
+  project _         = fail "project of non-GRoot"
 
 -------------------------------------------------------------------------------
-{-
-data MM m info dec r a = MM 
-    ((forall e . (XX a, Generic (Result a) ~ Generic e) => Rewrite m info dec (Generic e)) -> RewriteM m info dec a) 
-    Int 
--}
+-- Rename to Shape
+data Cons a = Cons a
+            | forall b .  (Cons (b -> a)) :. b
+            | forall b . (Term b,Generic b ~ Generic a, Context b ~ Context a) => (Cons (b -> a)) :* b
+            | forall b . (Term b,Generic b ~ Generic a,Context b ~ Context a,Decs (Context b)) => (Cons (b -> a)) :** Scoped b
 
-{-
-instance (Monad m,Monoid info,Decs dec) => Functor (MM m info dec) where
-  fmap f (MM a i) = MM (liftM f a) i
+data Scoped b = Scoped (Context b) b
 
-instance (Monad m,Monoid info,Decs dec) => Applicative (MM m info dec) where
-  pure a = MM (return a) i
-  (MM f1 i) 
--}
+all :: (Term exp,Info info, Monad m, Decs dec, dec ~ Context exp) => Rewrite m info (Context exp) (Generic exp) -> Rewrite m info (Context exp) exp
+all rr = rewriteWithId $ \ e -> liftM fst $ rewriteChildren rr (explodeCons e)
 
+rewriteChildren :: (Decs d,Monad m,Info i,Term e, d ~ Context e) 
+    => (Rewrite m i d (Generic e))
+    -> Cons e 
+    -> RewriteM m i d (e,Int)
+rewriteChildren gen (Cons a) = return (a,0)
+rewriteChildren gen (fn :. b) = do
+  (f,n) <- rewriteChildren gen fn
+  return (f b,succ n)
+rewriteChildren gen (fn :* b) = do
+  (f,n) <- rewriteChildren gen fn 
+  b <- addPathM n $ apply (extract gen) b
+  return (f b,succ n)
+rewriteChildren gen (fn :** (Scoped dec b)) = do
+  (f,n) <- rewriteChildren gen fn 
+  b <- addPathM n $ addBindingsM dec $ apply' (extract gen) b
+  return (f b,succ n)
 
--------------------------------------------------------------------------------
+infixl 3 :., :*, :**
 
-
-
-{-
-foo2 :: (Decs d,Monad m,Info i) 
-     => (
-     -> Node e e
-     -> RewriteM m i d e
-foo2 gen n = foo n
-  where 
--}
-
-foo :: (Decs d,Monad m,Info i,XX e) 
-    => (forall m info dec f . (Info info, Monad m, Decs dec) => Rewrite m info dec (Generic e))
-    -> Node e -> RewriteM m i d e
-foo gen (Cons a) = return a
-foo gen (fn :. b) = do
-  f <- foo gen fn
-  return (f b)
-foo gen (fn :* b) = do
-  f <- foo gen fn
-  b <- applyG gen b
-  return (f b)
-
-
-data Node a = Cons a
-            | forall b .  (Node (b -> a)) :. b
-            | forall b . (XX b,Generic b ~ Generic a) => (Node (b -> a)) :* b
---            | forall b . (Subst b) => (Node (b -> a)) :** Scoped b
-
-{-
-depth :: Node a -> Int
-depth (Cons a)    = 0
-depth (node :. _) = depth node + 1
-depth (node :* _) = depth node + 1
--}
--- data Scoped b = Scoped b (
-
-infixl 3 :., :* --,:**
-
-{-
-data Exp = Var String | App Exp Exp | Lam String Exp
-
-instance Subst Exp where {}
-
-cons :: a -> Node a
-cons = Cons
-
---tree :: Node a -> Tree ()
---tree (
-
-foo :: Exp -> Node Exp
-foo (Var exp)   = cons Var :. exp
-foo (App e1 e2) = cons App :. e1 :. e1
---foo (Lam n e)   =  cons Lam :. n  :** (Binding  e
--}
 ------------------------------------------------------------------------------
 
 class (Monoid dec) => Decs dec where
@@ -588,9 +460,9 @@ class (Monoid info) => Info info where
 
 instance Info () where {}
 
---bottomup :: (XX s, Info info, Monad m, Decs dec) =>
---            Rewrite m info dec s -> Rewrite m info dec s
-bottomup s = children (package (bottomup s)) >&> s
+--bottomup :: (Term s, Info info, Monad m, Decs dec) =>
+--            Rewrite m info dec (Generic s) -> Rewrite m info dec (Generic s)
+bottomup s = package (Language.KURE.Rewrite.all (bottomup s) >&> extract s)
 
-all s = children (package s)
+-- all s = children (package s)
 
