@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, TypeFamilies, Rank2Types, MultiParamTypeClasses, FlexibleContexts  #-}
+{-# LANGUAGE ExistentialQuantification, TypeFamilies, Rank2Types, MultiParamTypeClasses, FlexibleContexts, GADTs #-}
 -- |
 -- Module: Language.KURE.Rewrite 
 -- Copyright: (c) 2006-2008 Andy Gill
@@ -25,7 +25,7 @@ module Language.KURE.Rewrite
        , cutM
        , getPathM
        , addPathM
-       , addPath
+--       , addPath
        , Path
        , bindingsM
        , addBindingsM
@@ -55,27 +55,34 @@ type Path = [Int]
 --    * succeed (something changed)
 --    * fail
 --    * changeless (nothing failed, nothing changed)
+-- This intentionally an exported synonim.
 
-newtype Rewrite m info dec exp = 
-    Rewrite { unRewrite :: exp -> Path -> dec -> m (RewriteStatus info dec exp) }
+type Rewrite m info dec exp = Translate m info dec exp exp
 
--- A rewrite where we have already provided the input expression,
--- can return an identity 
+-- | A strategy can either
+--    * succeed (something changed)
+--    * fail
+--  A endomorphic translate may also be changeless.
+
+newtype Translate m info dec exp1 exp2 =
+    Rewrite { unRewrite :: exp1 -> Path -> dec -> m (RewriteStatus info dec exp1 exp2) }
 
 data RewriteM m info dec exp = 
-   RewriteM { runRewriteM_ :: Path -> dec -> m (RewriteStatusM info dec exp) }
+   RewriteM { runRewriteM :: Path -> dec -> m (RewriteStatusM info dec exp) }
 
 -- Three modes
 --   * success, with changes, and perhaps new scoping bindings.
 --   * success, with no location (yet)
 --   * failure (exception, like pattern match failure)
 
-data RewriteStatus info dec exp 
-     = RewriteSuccess exp info dec
-       		      	  		-- always at least 1 info,
-                                        -- decs are only *new* decs
-     | RewriteFailure String		-- a real failure
-     | RewriteChangeless		-- nothing changed
+data RewriteStatus info dec exp1 exp2 where
+ 	-- always at least 1 info,
+        -- decs are only *new* decs
+    RewriteSuccess :: exp2 -> info -> dec -> RewriteStatus info dec exp1 exp2
+	-- a real failure
+    RewriteFailure :: String -> RewriteStatus info dec exp1 exp2
+	-- nothing changed
+    RewriteChangeless :: (exp1 ~ exp2) => RewriteStatus info dec exp1 exp2
 
 data RewriteStatusM info dec exp
      = RewriteSuccessM exp info dec
@@ -84,44 +91,49 @@ data RewriteStatusM info dec exp
      | RewriteReturnM exp		-- unmarked success
      | RewriteFailureM String		-- a real failure
 
+-- not possible to have empty info
+data Info2 info 
+    = Info2 info Path [Info2 info]
+    | ManyInfo2 (Info2 info) (Info2 info)
 
-apply :: (Monad m) => Rewrite m info dec exp -> exp -> RewriteM m info dec exp
+-- This needs to be called out as a function to allow the GADT's to typecheck.
+statusToStatusM :: exp1 -> RewriteStatus info dec exp1 exp2 -> RewriteStatusM info dec exp2
+statusToStatusM exp1 (RewriteSuccess exp info dec) = RewriteSuccessM exp info dec
+statusToStatusM exp1 (RewriteFailure msg)          = RewriteFailureM msg
+statusToStatusM exp1 (RewriteChangeless)           = RewriteReturnM exp1
+
+apply :: (Monad m) => Translate m info dec exp1 exp2 -> exp1 -> RewriteM m info dec exp2
 apply (Rewrite action) exp = RewriteM $ \ path decs -> do
   r <- action exp path decs
-  case r of
-    RewriteSuccess exp info dec -> return $ RewriteSuccessM exp info dec
-    RewriteFailure msg		-> return $ RewriteFailureM msg
-    RewriteChangeless           -> return $ RewriteReturnM exp	-- original exp
+  return (statusToStatusM exp r)
 
-
-apply' :: (Monad m) => Rewrite m info (Context exp) exp -> exp -> RewriteM m info (Context exp) exp
-apply' = apply
 -- This promotes a monadic action into a Rewrite. Any non-failure is turned into
 -- succeess, with a location tag.
 
 -- so: rewrite $ \ (Add (Val x) (Val y)) -> return (Var (x + y))
 -- is marked as a rewritten
 
-rewrite :: (Monad m,Info info,Monoid dec) => (exp -> RewriteM m info dec exp) -> Rewrite m info dec exp
+rewrite :: (Monad m,Info info,Monoid dec) => (exp1 -> RewriteM m info dec exp2) -> Translate m info dec exp1 exp2
 rewrite action = Rewrite $ \ exp path dec -> do
-  r <- runRewriteM_ (action exp) path dec
+  r <- runRewriteM (action exp) path dec
   case r of
     RewriteSuccessM exp info dec -> return $ RewriteSuccess exp info dec
     RewriteFailureM msg		 -> return $ RewriteFailure msg
     RewriteReturnM exp	         -> return $ RewriteSuccess exp (anonInfo path) mempty
 
-
 -- precondition, if RewriteM returns, it returns with the same value as given.
 -- one way of knowning this is if the only things that could change the structure
 -- are sub-calls to RewriteM.
 
+-- rebuild??
+
 rewriteWithId :: (Monad m,Info info,Monoid dec) => (exp -> RewriteM m info dec exp) -> Rewrite m info dec exp
 rewriteWithId action = Rewrite $ \ exp path dec -> do
-  r <- runRewriteM_ (action exp) path dec
+  r <- runRewriteM (action exp) path dec
   case r of
     RewriteSuccessM exp info dec -> return $ RewriteSuccess exp info dec
     RewriteFailureM msg		 -> return $ RewriteFailure msg
-    RewriteReturnM _exp	         -> return $ RewriteChangeless  -- assert: _exp == exp
+    RewriteReturnM _exp	         -> return $ RewriteChangeless -- assert: _exp == exp, *type* enforced by GADTs
 
 -- The simple form, unability to rewrite in localize as an Null
 -- exposing interface, perhaps the bindings listing will change
@@ -132,7 +144,7 @@ runRewrite :: (Decs dec,Monad m,Monoid info) =>  Rewrite m info dec exp
 	   -> exp 
 	   -> m (exp,info,dec)
 runRewrite rr path decs exp = do
-  res <- runRewriteM_ (apply rr exp) path decs
+  res <- runRewriteM (apply rr exp) path decs
   case res of
      RewriteSuccessM exp' is ds -> return (exp',is,ds)
      RewriteReturnM exp             -> return (exp,mempty,mempty)
@@ -148,7 +160,7 @@ instance (Decs dec,Monad m,Monoid info) => Monad (RewriteM m info dec) where
    	     	      		 r <- m path dec
 				 case r of
 				   RewriteSuccessM r is ds -> do
-				     r' <- runRewriteM_ (k r) path (ds `mappend` dec)
+				     r' <- runRewriteM (k r) path (ds `mappend` dec)
 				     return $ 
 				      case r' of
 				       RewriteSuccessM e' is' ds'
@@ -158,7 +170,7 @@ instance (Decs dec,Monad m,Monoid info) => Monad (RewriteM m info dec) where
 				       RewriteReturnM e' -> RewriteSuccessM e' is ds
 				       RewriteFailureM msg -> RewriteFailureM msg
 				   RewriteReturnM r -> do
-				     r' <- runRewriteM_ (k r) path dec
+				     r' <- runRewriteM (k r) path dec
 				     return $
 				      case r' of
 				       RewriteSuccessM e' is' ds'
@@ -191,9 +203,10 @@ testSuccessM (RewriteM m) = RewriteM $ \ path dec -> do
 messageM :: (Decs dec,Monad m,Info info) => InfoElem info -> RewriteM m info dec ()
 messageM info = RewriteM $ \ path dec -> return $ RewriteSuccessM () (unitInfo path info) mempty
 
-(>?>) :: (Decs dec,Monad m,Info info) =>  Rewrite m info dec s  
-      -> (Rewrite m info dec s,Rewrite m info dec s) 
-      -> Rewrite m info dec s
+(>?>) :: (Decs dec,Monad m,Info info) 
+      =>  Translate m info dec s1 s2
+      -> (Translate m info dec s2 s3,Translate m info dec s2 s3)
+      -> Translate m info dec s1 s3
 pred >?> (success,failure) = rewrite $ \ src -> do
      	 (inter,has_trans) <- testSuccessM (apply pred src)
 	 if has_trans 
@@ -203,7 +216,7 @@ pred >?> (success,failure) = rewrite $ \ src -> do
 
 -- | do the first rewrite, and the second.
 
-(>+>) :: (Decs dec,Monad m,Info info) =>  Rewrite m info dec s -> Rewrite m info dec s -> Rewrite m info dec s
+(>+>) :: (Decs dec,Monad m,Info info) =>  Translate m info dec s1 s2 -> Translate m info dec s2 s3 -> Translate m info dec s1 s3
 before >+> after = before >?> (after,after)
 
 -- | do the first rewrite, then second iff the first changed something.
@@ -240,9 +253,11 @@ getPathM = RewriteM $ \ path _ -> return $ RewriteSuccessM path mempty mempty
 addPathM :: (Decs dec,Monad m,Info info) =>  Int -> RewriteM m info dec s -> RewriteM m info dec s
 addPathM ix (RewriteM m) = RewriteM $ \ path dec -> m (path ++ [ix]) dec
 
-addPath :: (Decs dec,Monad m,Info info) =>  Int -> Rewrite m info dec s -> Rewrite m info dec s
-addPath ix rr = rewrite $ \ exp -> addPathM ix (apply rr exp)
 
+
+--addPath :: (Decs dec,Monad m,Info info) =>  Int -> Rewrite m info dec s -> Rewrite m info dec s
+--addPath ix rr = rewrite $ \ exp -> addPathM ix (apply rr exp)
+ 
 {-
 -- scoped messages
 info :: (Monad m,Info info) =>  (s -> s -> info) -> Rewrite m info dec s -> Rewrite m info dec s 
@@ -259,7 +274,7 @@ bindingsM :: (Monad m,Info info) =>  RewriteM m info dec dec
 bindingsM = RewriteM $ \ path dec -> return $ RewriteReturnM dec
 
 addBindingsM :: (Decs dec, dec ~ Context a,Monad m,Info info) =>  dec -> RewriteM m info (Context a) a -> RewriteM m info (Context a) a
-addBindingsM decs m = RewriteM $ \ path dec -> runRewriteM_ m path (decs `mappend` dec)
+addBindingsM decs m = RewriteM $ \ path dec -> runRewriteM m path (decs `mappend` dec)
 
 -- This dec *must* have a new name.
 liftBindingsM :: (Monad m,Info info) =>  dec -> RewriteM m info dec ()
@@ -348,7 +363,7 @@ substOn i e order          env     = apply (substRewrite order env) e
 class Term exp where
   type Generic exp
   type Context exp
---  type TermInfo exp
+  type TermInfo exp
 
   explodeCons :: exp -> Cons exp
 
@@ -388,7 +403,10 @@ instance Term Exp where
   type Generic Exp = Generics
   type Context Exp = ()
 
-  explodeCons (Exp n e r) = Cons Exp :. n :* e :** (Scoped () r)
+  explodeCons (Exp n e r) = Cons Exp 
+                            :. n 
+                            :* e 
+                            :** (Scoped () r)
 
   inject = GExp
 
@@ -417,7 +435,9 @@ data Cons a = Cons a
 
 data Scoped b = Scoped (Context b) b
 
-all :: (Term exp,Info info, Monad m, Decs dec, dec ~ Context exp) => Rewrite m info (Context exp) (Generic exp) -> Rewrite m info (Context exp) exp
+all :: (Term exp,Info info, Monad m, Decs dec, dec ~ Context exp) 
+       => Rewrite m info (Context exp) (Generic exp) 
+       -> Rewrite m info (Context exp) exp
 all rr = rewriteWithId $ \ e -> liftM fst $ rewriteChildren rr (explodeCons e)
 
 rewriteChildren :: (Decs d,Monad m,Info i,Term e, d ~ Context e) 
@@ -434,7 +454,7 @@ rewriteChildren gen (fn :* b) = do
   return (f b,succ n)
 rewriteChildren gen (fn :** (Scoped dec b)) = do
   (f,n) <- rewriteChildren gen fn 
-  b <- addPathM n $ addBindingsM dec $ apply' (extract gen) b
+  b <- addPathM n $ addBindingsM dec $ apply (extract gen) b
   return (f b,succ n)
 
 infixl 3 :., :*, :**
