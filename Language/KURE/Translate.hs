@@ -77,10 +77,10 @@ class (Monoid dec) => Decs dec where
   type Key dec
   type Dec dec
   lookupDecs :: Key dec -> dec -> Dec dec
-  addDec     :: Key dec -> Dec dec -> dec -> dec
-  
+  unitDec    :: Key dec -> Dec dec -> dec
+
 instance Decs () where
   type Key () = ()
   type Dec () = ()
   lookupDecs () () = ()
-  addDec () () () = ()
+  unitDec () () = ()
