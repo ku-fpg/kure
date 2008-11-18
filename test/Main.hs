@@ -2,8 +2,10 @@
 
 module Main where
 
-
 import Language.KURE.Rewrite 
+import Language.KURE.Translate
+import Language.KURE.Combinators
+import Language.KURE.Term
 
 main  = print "Hello"
 
@@ -12,11 +14,26 @@ data Exp = Lam Name Exp
          | App Exp Exp
          | Var Name
 
-data Decs = Decs
+data Decs = Decs [(Name,Exp)]
 
-data MySubstEnv i = MySubstEnv { me :: forall m . Rewrite m i Decs Exp }
+-- Exp is its own Generic.
 
-instance Subst Exp where
-  substInsideNode (Var name) = Cons Var :. name
+instance Term Exp where
+  type Generic Exp = Exp
+  type Context Exp = ()
 
---  thisSubstRewrite :: SubstEnv i -> Rewrite m i d s  
+  walkCons (Lam n e) = walkOver $ cons Lam
+	`keep` n
+	`rec` e
+  walkCons (App e1 e2) = walkOver $ cons App
+	`keep` e1
+	`keep` e2
+  walkCons (Var v) = walkOver $ cons Var
+	`keep` v
+
+  inject    = id
+  project e = return e
+
+-- subst :: (Monad m) => Var -> Rewrite m Context 
+-- subst v = undefined
+

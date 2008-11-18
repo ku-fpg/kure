@@ -15,7 +15,7 @@ Cabal-Version:       >= 1.2
 Library
   Build-Depends:        base, containers 
   Exposed-modules:
-      Language.KURE.Rewrite
+       Language.KURE.Rewrite, Language.KURE.Translate,  Language.KURE.Combinators, Language.KURE.Term
 
 Executable test
   Main-Is:        Main.hs
