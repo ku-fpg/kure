@@ -37,7 +37,6 @@ package rr = translateWith id $ \ e -> do
                r <- apply rr e'
                return (inject r)
 
-
 ------------------------------------------------------------------------------
 
 data X m dec exp a = X Int  (Rewrite m dec (Generic exp) -> (RewriteM m dec a))
@@ -60,7 +59,6 @@ rec (X i m) e = X (succ i) $ \ env -> do
 	v <- m env
 	a <- addPathM i (apply (extract env) e)
 	return (v a)
-
 
 keep :: (Monad m,Monoid dec) => X m dec exp (e1 -> e2) -> e1 -> X m dec exp e2
 keep (X i m) a = X (succ i) $ \ env -> do
