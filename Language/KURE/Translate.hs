@@ -44,9 +44,12 @@ rebuild = Translate
 translate :: (Monoid dec, Monad m) => (exp1 -> RewriteM m dec exp2) -> Translate m dec exp1 exp2
 translate = translateWith $ \ r ->
 	case r of
-	  RewriteReturnM e -> RewriteSuccessM e mempty
+	  RewriteReturnM e -> RewriteSuccessM e mempty  -- mark any valid return as a success
 	  _ -> r
-	
+
+rewrite :: (Monoid dec, Monad m) => (exp1 -> RewriteM m dec exp1) -> Rewrite m dec exp1
+rewrite = translate
+
 translateWith 
 	:: (Monoid dec, Monad m) 
 	=> (RewriteStatusM dec exp2 -> RewriteStatusM dec exp2) 
@@ -73,14 +76,34 @@ idRewrite =  Translate $ \ e -> RewriteM $ \ _ _ -> return $ RewriteReturnM e
 failTranslate :: (Monad m) => String -> Translate m dec a b
 failTranslate msg = Translate $ \ e -> RewriteM $ \ _ _ -> return $ RewriteFailureM msg
 
+failRewrite :: (Monad m) => String -> Rewrite m dec a
+failRewrite = failTranslate
+
 class (Monoid dec) => Decs dec where
   type Key dec
   type Dec dec
-  lookupDecs :: Key dec -> dec -> Dec dec
+  lookupDecs :: Key dec -> dec -> Maybe (Dec dec)
   unitDec    :: Key dec -> Dec dec -> dec
 
 instance Decs () where
   type Key () = ()
   type Dec () = ()
-  lookupDecs () () = ()
+  lookupDecs () () = Just ()
   unitDec () () = ()
+
+-----
+
+-- should really use the getDecM method, somehow
+getDecs :: (Monad m) => (dec -> Rewrite m dec a) -> Rewrite m dec a
+getDecs f = Translate $ \ e -> RewriteM $ \ path dec -> do
+	runRewriteM (apply (f dec) e) path dec
+
+updateDecs :: (Monad m) => (dec -> dec) -> Rewrite m dec a -> Rewrite m dec a
+updateDecs f rr = Translate $ \ e -> RewriteM $ \ path dec -> do
+	runRewriteM (apply rr e) path (f dec)
+	
+getPath :: (Monad m)  => (Path -> Rewrite m dec a) -> Rewrite m dec a
+getPath f = Translate $ \ e -> RewriteM $ \ path dec -> do
+	runRewriteM (apply (f path) e) path dec
+
+

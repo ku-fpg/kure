@@ -20,18 +20,23 @@ class Term exp where
   project :: (Monad m) => Generic exp -> m exp
   inject  :: exp -> Generic exp
 
-class (Monoid dec,Term exp) => Walker dec exp where
-  walkCons :: (Monad m,Monoid dec) => exp -> Rewrite m dec (Generic exp) -> RewriteM m dec exp
+class (Monad m,Monoid dec,Term exp) => Walker m dec exp where
+  walkCons :: (Monad m,Monoid dec) => exp -> Rewrite m dec (Generic exp)       -> RewriteM m dec exp
+  joinCons :: (Monad m,Monoid dec) => exp -> Translate m dec (Generic exp) res -> RewriteM m dec res
+
+class (Monoid dec,Monad m,Term exp) => Walker' m dec exp where
+  allR :: Rewrite m dec (Generic exp) -> Rewrite m dec exp
+  allU :: (Monoid result) => Translate m dec (Generic exp) result -> Translate m dec exp result
 
 ------------------------------------------------------------------------------
 
-extract  :: (Walker dec exp, Monad m, Monoid dec) => Rewrite m dec (Generic exp) -> Rewrite m dec exp	-- at *this* type
+extract  :: (Walker m dec exp, Monoid dec) => Rewrite m dec (Generic exp) -> Rewrite m dec exp	-- at *this* type
 extract rr = translateWith id $ \ e -> do
             e' <- apply rr (inject e)
             project e'
 
 -- promote a rewrite into a generic rewrite; other types are fails.
-package  :: (Walker dec exp, Monad m, Monoid dec) => Rewrite m dec exp -> Rewrite m dec (Generic exp)
+package  :: (Walker m dec exp, Monoid dec) => Rewrite m dec exp -> Rewrite m dec (Generic exp)
 package rr = translateWith id $ \ e -> do
                e' <- project e
                r <- apply rr e'
@@ -49,9 +54,9 @@ walkOver (X _ m) = m
 cons :: (Monad m,Monoid dec) => a -> X m dec exp a 
 cons a = X 0 (\ _ -> return a)
 
-infixl 3 `rec`, `keep`
+infixl 3 `rec`, `keep`, `recWith`
 
-rec 	:: (Monad m, Monoid dec, Generic exp ~ Generic e1, Walker dec exp, Walker dec e1) 
+rec 	:: (Monoid dec, Generic exp ~ Generic e1, Walker m dec exp, Walker m dec e1) 
 	=> X m dec exp (e1 -> e2) 
 	-> e1
 	-> X m dec exp e2
@@ -60,12 +65,21 @@ rec (X i m) e = X (succ i) $ \ env -> do
 	a <- addPathM i (apply (extract env) e)
 	return (v a)
 
+recWith :: (Monad m, Monoid dec, Generic exp ~ Generic e1, Walker m dec exp, Walker m dec e1) 
+	=> X m dec exp (e1 -> e2) 
+	-> ((e1 -> RewriteM m dec e1) -> RewriteM m dec e1)
+	-> X m dec exp e2
+recWith (X i m) f = X (succ i) $ \ env -> do 	
+	v <- m env
+	a <- addPathM i (f (apply (extract env)))
+	return (v a)
+
 keep :: (Monad m,Monoid dec) => X m dec exp (e1 -> e2) -> e1 -> X m dec exp e2
 keep (X i m) a = X (succ i) $ \ env -> do
 	v <- m env
 	return (v a)
 
-all :: (Walker dec exp, Monad m) 
+all :: (Walker m dec exp) 
        => Rewrite m dec (Generic exp) 
        -> Rewrite m dec exp
 all rr = translateWith id $ \ e -> walkCons e rr

@@ -52,4 +52,9 @@ unchangedRewrite rr = rr .+ failTranslate "unchanged"
 
 reader :: (Decs dec, Monad m) => (a -> Translate m dec a b) -> Translate m dec a b
 reader fn = translateWith id $ \ expA -> apply (fn expA) expA
-	
+
+accept :: (Decs dec, Monad m) => (a -> Bool) -> Rewrite m dec a
+accept fn = translateWith id $ \ expA -> if fn expA 
+					 then return expA
+					 else fail "accept failed"
+					

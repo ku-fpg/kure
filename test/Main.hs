@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, Rank2Types, TypeFamilies, MultiParamTypeClasses, FlexibleContexts #-}
+{-# LANGUAGE ExistentialQuantification, Rank2Types, TypeFamilies, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances #-}
 
 module Main where
 
@@ -7,6 +7,7 @@ import Language.KURE.Translate
 import Language.KURE.Combinators
 import Language.KURE.Term as T
 import Data.Monoid
+import Control.Monad
 
 main  = print "Hello"
 
@@ -15,10 +16,74 @@ data Exp = Lam Name Exp
          | App Exp Exp
          | Var Name
 
-data Decx = Decx [(Name,Bind)]
+data DecX = DecX [(Name,Maybe Exp)]
+instance Monoid DecX where {}
+
+------------------------------------------------------------------------
+
+appR :: (Monoid dec, Monad m) => Rewrite m dec Exp -> Rewrite m dec Exp -> Rewrite m dec Exp
+appR rr1 rr2 = rebuild (\ e -> case e of
+		App e1 e2 -> do
+				e1' <- apply rr1 e1
+				e2' <- apply rr2 e2
+				return $ App e1' e2'
+		_ -> fail "appR")
+
+appU :: (Monoid dec, Monad m,Monoid res) => Translate m dec Exp res -> Translate m dec Exp res -> Translate m dec Exp res
+appU rr1 rr2 = translate (\ e -> case e of
+		App e1 e2 -> do
+				e1' <- apply rr1 e1
+				e2' <- apply rr2 e2
+				return $ mappend e1' e2'
+		_ -> fail "appU")
+
+lamR :: (Monad m,ExpDec dec) => Rewrite m dec Exp -> Rewrite m dec Exp
+lamR rr = rebuild (\ e -> case e of
+		Lam n e1 -> do env <- getDecsM
+			       case addVarBind n env of 
+				 Nothing   -> fail "lamR: binding failure"
+				 Just env' -> do 
+			       		e1' <- setDecsM env $ apply rr e1
+			       		return $ Lam n e1'
+		_ -> fail "lamR")
+
+lamU :: (Monad m,ExpDec dec) => Translate m dec Exp ret -> Translate m dec Exp ret
+lamU rr = translate (\ e -> case e of
+		Lam n e1 -> do env <- getDecsM
+			       case addVarBind n env of 
+				 Nothing   -> fail "lamU: binding failure"
+				 Just env' -> do 
+			       		e1' <- setDecsM env $ apply rr e1
+			       		return $ e1'
+		_ -> fail "lamR")
+
+varR :: (Decs dec, Monad m) => Rewrite m dec Exp
+varR = accept (\ e -> case e of
+		    Var _ -> True
+		    _ -> False)
+
+varU :: (Decs dec, Monad m,Monoid ret) => Translate m dec Exp ret
+varU = translate (\ e -> case e of
+		    Var _ -> return mempty
+		    _ -> fail "varU")
+
+class (Monoid dec) => ExpDec dec where
+  addVarBind :: Name -> dec -> Maybe dec 
+
+instance (Monad m,Decs dec,ExpDec dec) => Walker' m dec Exp where
+   allR rr = appR rr rr <+ lamR rr <+ varR
+   allU rr = appU rr rr <+ lamU rr <+ varU
+
+------------------------------------------------------------------------
+------------------------------------------------------------------------
+------------------------------------------------------------------------
+------------------------------------------------------------------------
+------------------------------------------------------------------------
+
+
+
 data Bind = LAM
 
-instance Monoid Decx where {}
 
 -- Exp is its own Generic.
 instance Term Exp where
@@ -27,18 +92,30 @@ instance Term Exp where
   project e = return e
 
 -- I'm reinventing generics here!
-instance Walker Decx Exp where
-{-
+instance (Monad m) => Walker m () Exp where
   walkCons (Lam n e) = walkOver $ cons Lam
 	`keep` n
-	`recWith` Scope (unitDec n LAM) e
- -}
+	`rec` e
   walkCons (App e1 e2) = walkOver $ cons App
 	`rec` e1
 	`rec` e2
   walkCons (Var v) = walkOver $ cons Var
 	`keep` v
 
+instance (NameSupply m) => Walker m DecX Exp where
+  walkCons (Lam n e) = \ env -> do
+	n' <- liftQ newName
+	flip walkOver env $ cons Lam
+          `keep` n'
+	  `recWith` (\ app -> updateDecsM (\ dec -> dec) $ app e)
+	
+  walkCons (App e1 e2) = walkOver $ cons App
+	`rec` e1
+	`rec` e2
+  walkCons (Var v) = walkOver $ cons Var
+	`keep` v
+
+--	Scope (unitDec n LAM) e
 -- subst :: (Monad m) => Var -> Rewrite m Context 
 -- subst v = undefined
 
@@ -56,19 +133,89 @@ class Monad m => NameSupply m where
 freeExp :: Exp -> [Name]
 freeExp = undefined
 
-subst :: (Decs dec, NameSupply m, Walker dec Exp) => Name -> Exp -> Rewrite m dec Exp
-subst n e =
-	translate (\ e' -> case e' of
-	     Var n'    | n == n'     -> return e
- 	     Lam n' e2 | n == n'     -> return e'  -- could be id here??
- 	     Lam n' e2 | n' `elem` freeExp e -> do
-			n'' <- liftQ newName
-			e3 <- apply (subst n' (Var n'') >-> subst n e) e2
-			return $ Lam n'' e3
-	     _ -> fail "") <+
-	T.all (subst n e)  <+ idRewrite
+subst :: (Decs dec, NameSupply m, Walker m dec Exp) => Name -> Exp -> Rewrite m dec Exp
+subst n e = 
+	rewrite rrRule1 <+
+	accept  isRule2 <+
+	accept  isRule3 <+
+	rewrite rrRule4 <+
+	rewrite rrRule5 <+
+	T.all (subst n e)	-- rule 6
+  where
+	rrRule1 (Var n') | n == n' = return e
+	rrRule1 _                  = fail "rule 1"
+	
+	isRule2 (Var n') = n /= n'
+	isRule2 _        = False
+		
+	isRule3 (Lam n' e') = n == n'
+	isRule3 _           = False
 
-eval :: (Decs dec, NameSupply m, Walker dec Exp) => Rewrite m dec Exp
+	rrRule4 (Lam n' e') 
+	   | n `notElem` freeExp e' || n' `notElem` freeExp e
+	   = liftM (Lam n') $ apply (subst n e) e'
+	rrRule4 _ = fail "rule 4"
+	
+	rrRule5 (Lam n' e') 
+	   | n `elem` freeExp e' && n' `elem` freeExp e
+	   = do n'' <- liftQ newName
+		liftM (Lam n'') $ apply (subst n' (Var n'') >-> subst n e) e'
+
+{-
+clashQ :: Translate m dec Exp a
+clashQ = reader (\ e -> case e of
+	    Lam v1 e2 -> environment (\ env -> 
+			     
+	    _ -> error "clashQ fail"
+-}
+    
+
+-- assumes all bindings are unique.
+{-
+instance Decs DecX where
+  type Key DecX = Name
+  type Dec DecX = Maybe Exp
+  lookupDecs nm (DecX decx) = lookup nm decx
+  unitDec nm val = DecX [(nm,val)]
+-}
+
+instance ExpDec DecX where
+   addVarBind nm (DecX dec) = case lookup nm dec of
+			   Nothing -> return $ DecX ((nm,Nothing) : dec)
+			   Just env -> fail "binding name clash"
+			
+subst' :: (ExpDec dec, Decs dec, NameSupply m, Walker m dec Exp) => Rewrite m dec Exp -> Rewrite m dec Exp
+subst' rr =
+	rr <+ -- rule 1 and 2 (subst' rr) <+
+	lamR (subst' rr) <+
+	appR (subst' rr) (subst' rr)
+  where
+	n = undefined
+	e = undefined
+{-
+	rrRule1 (Var n') | n == n' = return e
+	rrRule1 _                  = fail "rule 1"
+	
+	isRule2 (Var n') = n /= n'
+	isRule2 _        = False
+-}
+		
+	isRule3 (Lam n' e') = n == n'
+	isRule3 _           = False
+
+	rrRule4 (Lam n' e') 
+	   | n `notElem` freeExp e' || n' `notElem` freeExp e
+	   = liftM (Lam n') $ apply (subst n e) e'
+	rrRule4 _ = fail "rule 4"
+	
+	rrRule5 (Lam n' e') 
+	   | n `elem` freeExp e' && n' `elem` freeExp e
+	   = do n'' <- liftQ newName
+		liftM (Lam n'') $ apply (subst n' (Var n'') >-> subst n e) e'
+
+
+
+eval :: (Decs dec, NameSupply m, Walker m dec Exp) => Rewrite m dec Exp
 eval = 
     translate (\ e' -> case e' of
 	(App (Lam v e1) e2) -> apply (subst v e2) e1  -- beta reduction

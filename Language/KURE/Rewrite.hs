@@ -109,3 +109,16 @@ getPathM = RewriteM $ \ path _ -> return $ RewriteReturnM path
 
 addPathM :: (Monad m) =>  Int -> RewriteM m dec s -> RewriteM m dec s
 addPathM ix (RewriteM m) = RewriteM $ \ path dec -> m (path ++ [ix]) dec
+
+----------------------
+
+getDecsM :: (Monad m) => RewriteM m dec dec
+getDecsM = RewriteM $ \ _ dec -> return $ RewriteReturnM dec
+
+setDecsM :: (Monad m) => dec -> RewriteM m dec s -> RewriteM m dec s
+setDecsM dec (RewriteM m) = RewriteM $ \ path _dec -> m path dec
+
+updateDecsM :: (Monad m) => (dec -> dec) -> RewriteM m dec s -> RewriteM m dec s
+updateDecsM f (RewriteM m) = RewriteM $ \ path dec -> m path (f dec)
+
+
