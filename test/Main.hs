@@ -20,22 +20,26 @@ data DecX = DecX [(Name,Maybe Exp)]
 instance Monoid DecX where {}
 
 ------------------------------------------------------------------------
+-- First we have the monadic walkers
+appM 	:: (Monoid dec, Monad m)
+     	=> (a1 -> a2 -> res)
+     	-> Translate m dec Exp a1 
+	-> Translate m dec Exp a2 
+	-> Exp -> RewriteM m dec res
+appM f rr1 rr2 (App e1 e2) = do e1' <- apply rr1 e1
+			        e2' <- apply rr2 e2
+			        return $ f e1' e2'
+appM f rr1 rr2 _ = fail "appM"
+
 
 appR :: (Monoid dec, Monad m) => Rewrite m dec Exp -> Rewrite m dec Exp -> Rewrite m dec Exp
-appR rr1 rr2 = rebuild (\ e -> case e of
-		App e1 e2 -> do
-				e1' <- apply rr1 e1
-				e2' <- apply rr2 e2
-				return $ App e1' e2'
-		_ -> fail "appR")
+appR rr1 rr2 = rebuild (appM App rr1 rr2)
+
+appQ :: (Monad m, Monoid dec) => Rewrite m dec Exp
+appQ = appR idR idR
 
 appU :: (Monoid dec, Monad m,Monoid res) => Translate m dec Exp res -> Translate m dec Exp res -> Translate m dec Exp res
-appU rr1 rr2 = translate (\ e -> case e of
-		App e1 e2 -> do
-				e1' <- apply rr1 e1
-				e2' <- apply rr2 e2
-				return $ mappend e1' e2'
-		_ -> fail "appU")
+appU rr1 rr2 = translate (appM (\ a b -> a `mappend` b) rr1 rr2)
 
 lamR :: (Monad m,ExpDec dec) => Rewrite m dec Exp -> Rewrite m dec Exp
 lamR rr = rebuild (\ e -> case e of

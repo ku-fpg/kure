@@ -70,8 +70,11 @@ runRewrite rr path decs exp = do
      RewriteReturnM exp             -> return (exp,mempty)
      RewriteFailureM msg        -> fail msg
 
-idRewrite :: (Decs dec,Monad m) =>  Rewrite m dec exp
+idRewrite :: (Monad m) =>  Rewrite m dec exp
 idRewrite =  Translate $ \ e -> RewriteM $ \ _ _ -> return $ RewriteReturnM e
+
+idR :: (Monad m) =>  Rewrite m dec exp
+idR = idRewrite
 
 failTranslate :: (Monad m) => String -> Translate m dec a b
 failTranslate msg = Translate $ \ e -> RewriteM $ \ _ _ -> return $ RewriteFailureM msg
