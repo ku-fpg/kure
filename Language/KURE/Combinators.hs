@@ -2,6 +2,8 @@ module Language.KURE.Combinators where
 	
 import Language.KURE.Translate	
 import Language.KURE.Rewrite as M	
+import Data.Monoid
+
 
 infixl 3 <+, >->, .+, !->
 
@@ -22,13 +24,14 @@ testSuccessM (RewriteM m) = RewriteM $ \ path dec -> do
 
 -- like catch, do the first, and if it fails, then do the second	
 (<+) :: (Decs dec, Monad m) => Translate m dec a b -> Translate m dec a b -> Translate m dec a b
-(<+) rr1 rr2 = translateWith id $ \ e -> apply rr1 e `M.catch` apply rr2 e
+(<+) rr1 rr2 = translateWith id $ \ dec e -> apply rr1 dec e `M.catch` apply rr2 dec e
 
 -- If the first one worked, then do to the second after the first.
 (>->) :: (Decs dec, Monad m) => Translate m dec a b -> Translate m dec b c -> Translate m dec a c
-(>->) rr1 rr2 = translateWith id $ \ e -> do
-	r <- apply rr1 e
-	apply rr2 r
+(>->) rr1 rr2 = translateWith id $ \ dec e -> do
+	r <- apply rr1 dec e
+        -- TODO: Key point, pull dec from result above, merge with dec below.
+	apply rr2 dec r
 
 -- if the first rewrite is *id*, then do the second one.
 (.+) :: (Decs dec, Monad m) => Rewrite m dec a -> Rewrite m dec a -> Rewrite m dec a
@@ -39,8 +42,9 @@ testSuccessM (RewriteM m) = RewriteM $ \ path dec -> do
 (!->) a b = a `wasId` (\ i -> if i then idRewrite else b)
 
 wasId :: (Decs dec, Monad m) => Rewrite m dec a -> (Bool -> Rewrite m dec a) -> Rewrite m dec a
-wasId rr fn = translateWith id $ \ e -> do
-	apply rr e `catchId` \ i e' -> apply (fn i) e'
+wasId rr fn = translateWith id $ \ dec e -> do
+	-- TODO: check the order of mappend again.
+	apply rr dec e `catchId` \ i dec' e' -> apply (fn i) (dec `mappend` dec') e'
 
 -- Turn fail into an id
 catchRewrite :: (Decs dec,Monad m) => Rewrite m dec a -> Rewrite m dec a
@@ -51,10 +55,10 @@ unchangedRewrite :: (Decs dec,Monad m) => Rewrite m dec a -> Rewrite m dec a
 unchangedRewrite rr = rr .+ failTranslate "unchanged"
 
 reader :: (Decs dec, Monad m) => (a -> Translate m dec a b) -> Translate m dec a b
-reader fn = translateWith id $ \ expA -> apply (fn expA) expA
+reader fn = translateWith id $ \ dec expA -> apply (fn expA) dec expA
 
 accept :: (Decs dec, Monad m) => (a -> Bool) -> Rewrite m dec a
-accept fn = translateWith id $ \ expA -> if fn expA 
-					 then return expA
-					 else fail "accept failed"
+accept fn = translateWith id $ \ dec expA -> if fn expA 
+				 	     then return expA
+					     else fail "accept failed"
 					

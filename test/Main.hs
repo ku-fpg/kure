@@ -20,29 +20,33 @@ data DecX = DecX [(Name,Maybe Exp)]
 instance Monoid DecX where {}
 
 ------------------------------------------------------------------------
+
+
+class (Monoid dec) => ExpDec dec where
+  addVarBind :: Name -> dec -> Maybe dec 
+
+------------------------------------------------------------------------
 -- First we have the monadic walkers
 appM 	:: (Monoid dec, Monad m)
      	=> (a1 -> a2 -> res)
      	-> Translate m dec Exp a1 
 	-> Translate m dec Exp a2 
-	-> Exp -> RewriteM m dec res
-appM f rr1 rr2 (App e1 e2) = do e1' <- applyN 1 rr1 e1
-			        e2' <- applyN 2 rr2 e2
-			        return $ f e1' e2'
-appM f rr1 rr2 _ = fail "appM"
+	-> dec -> Exp -> RewriteM m dec res
+appM f rr1 rr2 dec (App e1 e2) = do e1' <- apply rr1 dec e1
+			            e2' <- apply rr2 dec e2
+			            return $ f e1' e2'
+appM f rr1 rr2 _ _ = fail "appM"
 
 lamM :: (ExpDec dec, Monoid dec, Monad m)
      	=> (Name -> a1 -> res)
      	-> Translate m dec Exp a1 
-	-> Exp -> RewriteM m dec res
-lamM f rr1 (Lam n e1) = do 
-	env <- getDecsM
-	case addVarBind n env of 
+	-> dec -> Exp -> RewriteM m dec res
+lamM f rr1 dec (Lam n e1) = do 
+	case addVarBind n dec of 
 	  Nothing   -> fail "lamR: binding failure"
 	  Just env' -> do 
-		e1' <- setDecsM env $ applyN 1 rr1 e1
+		e1' <- apply rr1 env' e1
 		return $ f n e1'		    
-
 ---
 
 appR :: (Monoid dec, Monad m) => Rewrite m dec Exp -> Rewrite m dec Exp -> Rewrite m dec Exp
@@ -76,17 +80,21 @@ lamU :: (Monoid dec, Monad m, ExpDec dec) => Translate m dec Exp res -> Translat
 lamU rr = translate (lamM (\ a b -> b) rr)
 
 varU :: (Decs dec, Monad m,Monoid ret) => Translate m dec Exp ret
-varU = varR >-> translate (\ _ -> return mempty)
+varU = varR >-> translate (\ _ _ -> return mempty)
 
 ---
+{-
 
-class (Monoid dec) => ExpDec dec where
-  addVarBind :: Name -> dec -> Maybe dec 
-
-instance (Monad m,Decs dec,ExpDec dec) => Walker' m dec Exp where
+instance (Term Exp,Monad m,Decs dec,ExpDec dec) => Walker' m dec Exp where
    allR rr = appR rr rr <+ lamR rr <+ varR
-   allU rr = appU rr rr <+ lamU rr <+ varU
+   allU rr = appU grr grr <+ lamU grr <+ varU
+      where grr = extract rr
 
+-}
+
+{-
+
+------------------------------------------------------------------------
 ------------------------------------------------------------------------
 
 
@@ -244,4 +252,4 @@ eval =
 	_ -> fail "") <+
     T.all eval
 
-
+-}

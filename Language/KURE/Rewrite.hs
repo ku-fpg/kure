@@ -29,7 +29,7 @@ type Path = [Int]
 ------------------------------------------------------------------------------
 
 data RewriteM m dec exp = 
-   RewriteM { runRewriteM :: Path -> dec -> m (RewriteStatusM dec exp) }
+   RewriteM { runRewriteM :: m (RewriteStatusM dec exp) }
 
 data RewriteStatusM dec exp
      = RewriteSuccessM exp dec
@@ -44,7 +44,8 @@ data RewriteStatusM dec exp
 -- C1 (e1) => C1 (C2 (e2)) => C1 (C2 (C3 (e3))) -- will require mergeing??
 
 instance (Monoid dec,Monad m) => Monad (RewriteM m dec) where
-   return exp = RewriteM $ \ _path _dec -> return $ RewriteReturnM exp
+   return exp = RewriteM $ return $ RewriteReturnM exp
+{-
    (RewriteM m) >>= k = RewriteM $ \ path dec -> do
    	     	      		 r <- m path dec
 				 case r of
@@ -68,26 +69,28 @@ instance (Monoid dec,Monad m) => Monad (RewriteM m dec) where
 				       RewriteFailureM msg -> RewriteFailureM msg
 				   RewriteFailureM msg -> return $ RewriteFailureM msg
    fail msg = RewriteM $ \ _ _ -> return $ RewriteFailureM msg
+-}
 
 liftQ :: (Monad m) =>  m a -> RewriteM m dec a   
-liftQ m = RewriteM $ \ _ _ -> do r <- m
+liftQ m = RewriteM $          do r <- m
       	  	       	         return $ RewriteReturnM r
 
 catch :: (Monad m) => RewriteM m dec a -> RewriteM m dec a -> RewriteM m dec a
-catch (RewriteM m1) (RewriteM m2) = RewriteM $ \ path dec -> do
-	r <- m1 path dec
+catch (RewriteM m1) (RewriteM m2) = RewriteM $ do
+	r <- m1 
 	case r of
 	  RewriteSuccessM _ _  -> return r
 	  RewriteReturnM _     -> return r 
-	  RewriteFailureM msg  -> m2 path dec
+	  RewriteFailureM msg  -> m2
 	
-catchId :: (Monoid dec,Monad m) => RewriteM m dec a -> (Bool -> a -> RewriteM m dec a) -> RewriteM m dec a
-catchId (RewriteM m1) k = RewriteM $ \ path dec -> do
-	r <- m1 path dec
+catchId :: (Monoid dec,Monad m) => RewriteM m dec a -> (Bool -> dec -> a -> RewriteM m dec a) -> RewriteM m dec a
+catchId (RewriteM m1) k = RewriteM $ do
+	r <- m1 
 	case r of
-	  RewriteSuccessM a dec1 -> addDecs dec1 $ runRewriteM (k False a) path dec
-	  RewriteReturnM a     -> runRewriteM (k True a) path dec
-	  RewriteFailureM msg  -> return r -- and still fail 
+	  RewriteSuccessM a dec1 -> runRewriteM (k False dec1 a)
+	  RewriteReturnM a       -> runRewriteM (k True mempty a)
+	  RewriteFailureM msg    -> return r -- and still fail 
+{-
   where
       addDecs dec1 m = do
 	 r' <- m
@@ -95,6 +98,7 @@ catchId (RewriteM m1) k = RewriteM $ \ path dec -> do
 	    RewriteSuccessM e dec2 -> return $ RewriteSuccessM e (dec1 `mappend` dec2)
 	    RewriteReturnM e       -> return $ RewriteReturnM e
 	    RewriteFailureM msg    -> return $ RewriteFailureM msg
+-}
 
 instance (Monoid dec,Monad m) => Functor (RewriteM m dec) where
   fmap f m = liftM f m
@@ -104,17 +108,17 @@ updateStatus
 	=> (RewriteStatusM dec e -> RewriteStatusM dec e) 
 	-> RewriteM m dec e
 	-> RewriteM m dec e
-updateStatus f m = RewriteM $ \ path dec -> do
-	r <- runRewriteM m path dec
+updateStatus f m = RewriteM $ do
+	r <- runRewriteM m 
 	return (f r)
 
 ----------------------
-
+{-
 getPathM :: (Monad m) => RewriteM m dec Path
-getPathM = RewriteM $ \ path _ -> return $ RewriteReturnM path
+getPathM = RewriteM $ return $ RewriteReturnM path
 
 addPathM :: (Monad m) =>  Int -> RewriteM m dec s -> RewriteM m dec s
-addPathM ix (RewriteM m) = RewriteM $ \ path dec -> m (path ++ [ix]) dec
+addPathM ix (RewriteM m) = RewriteM $ m (path ++ [ix]) dec
 
 ----------------------
 
@@ -122,9 +126,10 @@ getDecsM :: (Monad m) => RewriteM m dec dec
 getDecsM = RewriteM $ \ _ dec -> return $ RewriteReturnM dec
 
 setDecsM :: (Monad m) => dec -> RewriteM m dec s -> RewriteM m dec s
-setDecsM dec (RewriteM m) = RewriteM $ \ path _dec -> m path dec
+setDecsM dec (RewriteM m) = RewriteM $ m path dec
 
 updateDecsM :: (Monad m) => (dec -> dec) -> RewriteM m dec s -> RewriteM m dec s
-updateDecsM f (RewriteM m) = RewriteM $ \ path dec -> m path (f dec)
+updateDecsM f (RewriteM m) = RewriteM $ m path (f dec)
+-}
 
 

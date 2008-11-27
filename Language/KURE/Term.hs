@@ -31,15 +31,15 @@ class (Monoid dec,Monad m,Term exp) => Walker' m dec exp where
 ------------------------------------------------------------------------------
 
 extract  :: (Walker m dec exp, Monoid dec) => Rewrite m dec (Generic exp) -> Rewrite m dec exp	-- at *this* type
-extract rr = translateWith id $ \ e -> do
-            e' <- apply rr (inject e)
+extract rr = translateWith id $ \ dec e -> do
+            e' <- apply rr dec (inject e)
             project e'
 
 -- promote a rewrite into a generic rewrite; other types are fails.
 package  :: (Walker m dec exp, Monoid dec) => Rewrite m dec exp -> Rewrite m dec (Generic exp)
-package rr = translateWith id $ \ e -> do
+package rr = translateWith id $ \ dec e -> do
                e' <- project e
-               r <- apply rr e'
+               r <- apply rr dec e'
                return (inject r)
 
 ------------------------------------------------------------------------------
@@ -54,8 +54,8 @@ walkOver (X _ m) = m
 cons :: (Monad m,Monoid dec) => a -> X m dec exp a 
 cons a = X 0 (\ _ -> return a)
 
-infixl 3 `rec`, `keep`, `recWith`
-
+-- infixl 3 `rec`, `keep`, `recWith`
+{-
 rec 	:: (Monoid dec, Generic exp ~ Generic e1, Walker m dec exp, Walker m dec e1) 
 	=> X m dec exp (e1 -> e2) 
 	-> e1
@@ -83,6 +83,7 @@ all :: (Walker m dec exp)
        => Rewrite m dec (Generic exp) 
        -> Rewrite m dec exp
 all rr = translateWith id $ \ e -> walkCons e rr
+-}
 
 ------------------------------------------------------------------------------
 {-
