@@ -30,6 +30,8 @@ import Data.Tree
 
 import Language.KURE.Rewrite
 
+-- TODO: make the path explicit inside the Rewrite, and take it out of the monad.
+
 newtype Translate m dec exp1 exp2 =
     Translate { applyTranslate :: exp1 -> RewriteM m dec exp2 }
 
@@ -101,12 +103,16 @@ getDecs :: (Monad m) => (dec -> Rewrite m dec a) -> Rewrite m dec a
 getDecs f = Translate $ \ e -> RewriteM $ \ path dec -> do
 	runRewriteM (apply (f dec) e) path dec
 
-updateDecs :: (Monad m) => (dec -> dec) -> Rewrite m dec a -> Rewrite m dec a
-updateDecs f rr = Translate $ \ e -> RewriteM $ \ path dec -> do
-	runRewriteM (apply rr e) path (f dec)
-	
+-- Going meta on us; .
+updateDecs :: (Monoid dec,Monad m) => Rewrite m dec dec -> Rewrite m dec a -> Rewrite m dec a
+updateDecs decRR rr = Translate $ \ e -> do
+	dec <- getDecsM
+	dec' <- apply decRR dec
+	setDecsM  dec' $ apply rr e
+
 getPath :: (Monad m)  => (Path -> Rewrite m dec a) -> Rewrite m dec a
 getPath f = Translate $ \ e -> RewriteM $ \ path dec -> do
 	runRewriteM (apply (f path) e) path dec
 
-
+applyN :: (Monad m) => Int -> Translate m dec exp1 exp2 -> exp1 -> RewriteM m dec exp2
+applyN n rr e = addPathM n $ apply rr e

@@ -8,6 +8,7 @@
 -- Stability: unstable
 -- Portability: ghc
 --
+-- TODO: rename as RewriteM
 
 module Language.KURE.Rewrite where
 -- 	, Language.KURE.Translate.catch
@@ -37,6 +38,11 @@ data RewriteStatusM dec exp
      | RewriteReturnM exp		-- unmarked success
      | RewriteFailureM String		-- a real failure
 
+-- TWO possible ways of thinking about rewriting:
+
+-- C1 (e1) => C2 (C1 (e2)) => C3 (C2 (C1 (e3))) -- matches the *writer* like status
+-- C1 (e1) => C1 (C2 (e2)) => C1 (C2 (C3 (e3))) -- will require mergeing??
+
 instance (Monoid dec,Monad m) => Monad (RewriteM m dec) where
    return exp = RewriteM $ \ _path _dec -> return $ RewriteReturnM exp
    (RewriteM m) >>= k = RewriteM $ \ path dec -> do
@@ -48,7 +54,7 @@ instance (Monoid dec,Monad m) => Monad (RewriteM m dec) where
 				      case r' of
 				       RewriteSuccessM e' ds'
 				       		         -> RewriteSuccessM e' 
-							    		   (ds `mappend` ds')
+							    		   (ds' `mappend` ds)
 				       RewriteReturnM e' -> RewriteSuccessM e' ds
 				       RewriteFailureM msg -> RewriteFailureM msg
 				   RewriteReturnM r -> do
