@@ -11,32 +11,23 @@ import Data.Monoid
 
 class Term exp where
   type Generic exp
---  type Context exp  -- fixed for this *type* of term
 
---  explodeCons :: exp -> Shape exp
-
-
-  -- everything follows from these
   project :: (Monad m) => Generic exp -> m exp
   inject  :: exp -> Generic exp
 
-class (Monad m,Monoid dec,Term exp) => Walker m dec exp where
-  walkCons :: (Monad m,Monoid dec) => exp -> Rewrite m dec (Generic exp)       -> RewriteM m dec exp
-  joinCons :: (Monad m,Monoid dec) => exp -> Translate m dec (Generic exp) res -> RewriteM m dec res
-
-class (Monoid dec,Monad m,Term exp) => Walker' m dec exp where
+class (Monoid dec,Monad m,Term exp) => Walker m dec exp where
   allR :: Rewrite m dec (Generic exp) -> Rewrite m dec exp
   allU :: (Monoid result) => Translate m dec (Generic exp) result -> Translate m dec exp result
 
 ------------------------------------------------------------------------------
 
-extract  :: (Walker m dec exp, Monoid dec) => Rewrite m dec (Generic exp) -> Rewrite m dec exp	-- at *this* type
+extract  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec (Generic exp) -> Rewrite m dec exp	-- at *this* type
 extract rr = translateWith id $ \ dec e -> do
             e' <- apply rr dec (inject e)
             project e'
 
 -- promote a rewrite into a generic rewrite; other types are fails.
-package  :: (Walker m dec exp, Monoid dec) => Rewrite m dec exp -> Rewrite m dec (Generic exp)
+package  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec exp -> Rewrite m dec (Generic exp)
 package rr = translateWith id $ \ dec e -> do
                e' <- project e
                r <- apply rr dec e'
@@ -83,6 +74,37 @@ all :: (Walker m dec exp)
        => Rewrite m dec (Generic exp) 
        -> Rewrite m dec exp
 all rr = translateWith id $ \ e -> walkCons e rr
+
+
+-- I'm reinventing generics here!
+instance (Monad m) => Walker m () Exp where
+  walkCons (Lam n e) = walkOver $ cons Lam
+	`keep` n
+	`rec` e
+  walkCons (App e1 e2) = walkOver $ cons App
+	`rec` e1
+	`rec` e2
+  walkCons (Var v) = walkOver $ cons Var
+	`keep` v
+
+instance (NameSupply m) => Walker m DecX Exp where
+  walkCons (Lam n e) = \ env -> do
+	n' <- liftQ newName
+	flip walkOver env $ cons Lam
+          `keep` n'
+	  `recWith` (\ app -> updateDecsM (\ dec -> dec) $ app e)
+	
+  walkCons (App e1 e2) = walkOver $ cons App
+	`rec` e1
+	`rec` e2
+  walkCons (Var v) = walkOver $ cons Var
+	`keep` v
+
+--	Scope (unitDec n LAM) e
+-- subst :: (Monad m) => Var -> Rewrite m Context 
+-- subst v = undefined
+
+
 -}
 
 ------------------------------------------------------------------------------

@@ -20,7 +20,11 @@ data DecX = DecX [(Name,Maybe Exp)]
 instance Monoid DecX where {}
 
 ------------------------------------------------------------------------
-
+-- Exp is its own Generic.
+instance Term Exp where
+  type Generic Exp = Exp
+  inject    = id
+  project e = return e
 
 class (Monoid dec) => ExpDec dec where
   addVarBind :: Name -> dec -> Maybe dec 
@@ -83,14 +87,10 @@ varU :: (Decs dec, Monad m,Monoid ret) => Translate m dec Exp ret
 varU = varR >-> translate (\ _ _ -> return mempty)
 
 ---
-{-
 
-instance (Term Exp,Monad m,Decs dec,ExpDec dec) => Walker' m dec Exp where
+instance (Monad m,Decs dec,ExpDec dec) => Walker m dec Exp where
    allR rr = appR rr rr <+ lamR rr <+ varR
-   allU rr = appU grr grr <+ lamU grr <+ varU
-      where grr = extract rr
-
--}
+   allU rr = appU rr rr <+ lamU rr <+ varU
 
 {-
 
@@ -108,11 +108,6 @@ instance (Term Exp,Monad m,Decs dec,ExpDec dec) => Walker' m dec Exp where
 data Bind = LAM
 
 
--- Exp is its own Generic.
-instance Term Exp where
-  type Generic Exp = Exp
-  inject    = id
-  project e = return e
 
 -- I'm reinventing generics here!
 instance (Monad m) => Walker m () Exp where
