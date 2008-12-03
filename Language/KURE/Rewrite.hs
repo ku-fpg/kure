@@ -45,12 +45,11 @@ data RewriteStatusM dec exp
 
 instance (Monoid dec,Monad m) => Monad (RewriteM m dec) where
    return exp = RewriteM $ return $ RewriteReturnM exp
-{-
-   (RewriteM m) >>= k = RewriteM $ \ path dec -> do
-   	     	      		 r <- m path dec
+   (RewriteM m) >>= k = RewriteM $ do
+   	     	      		 r <- m
 				 case r of
 				   RewriteSuccessM r ds -> do
-				     r' <- runRewriteM (k r) path (ds `mappend` dec)
+				     r' <- runRewriteM (k r)
 				     return $ 
 				      case r' of
 				       RewriteSuccessM e' ds'
@@ -59,7 +58,7 @@ instance (Monoid dec,Monad m) => Monad (RewriteM m dec) where
 				       RewriteReturnM e' -> RewriteSuccessM e' ds
 				       RewriteFailureM msg -> RewriteFailureM msg
 				   RewriteReturnM r -> do
-				     r' <- runRewriteM (k r) path dec
+				     r' <- runRewriteM (k r)
 				     return $
 				      case r' of
 				       RewriteSuccessM e' ds'
@@ -68,8 +67,7 @@ instance (Monoid dec,Monad m) => Monad (RewriteM m dec) where
 				       RewriteReturnM e' -> RewriteReturnM e'
 				       RewriteFailureM msg -> RewriteFailureM msg
 				   RewriteFailureM msg -> return $ RewriteFailureM msg
-   fail msg = RewriteM $ \ _ _ -> return $ RewriteFailureM msg
--}
+   fail msg = RewriteM $ return $ RewriteFailureM msg
 
 liftQ :: (Monad m) =>  m a -> RewriteM m dec a   
 liftQ m = RewriteM $          do r <- m

@@ -8,16 +8,14 @@ import Language.KURE.Combinators
 import Language.KURE.Term as T
 import Data.Monoid
 import Control.Monad
-
-main  = print "Hello"
+import Data.List
 
 type Name = String
 data Exp = Lam Name Exp
          | App Exp Exp
          | Var Name
+   deriving Show
 
-data DecX = DecX [(Name,Maybe Exp)]
-instance Monoid DecX where {}
 
 ------------------------------------------------------------------------
 -- Exp is its own Generic.
@@ -27,7 +25,8 @@ instance Term Exp where
   project e = return e
 
 class (Monoid dec) => ExpDec dec where
-  addVarBind :: Name -> dec -> Maybe dec 
+  addVarBind :: Name -> dec -> Maybe dec
+  lookupVarBind :: Name -> dec -> Maybe (Maybe Exp)
 
 ------------------------------------------------------------------------
 -- First we have the monadic walkers
@@ -59,7 +58,7 @@ appR rr1 rr2 = rebuild (appM App rr1 rr2)
 lamR :: (Monad m,ExpDec dec) => Rewrite m dec Exp -> Rewrite m dec Exp
 lamR rr = rebuild (lamM Lam rr)
 
-varR :: (Decs dec, Monad m) => Rewrite m dec Exp
+varR :: (Monoid dec, Monad m) => Rewrite m dec Exp
 varR = accept (\ e -> case e of
 		    Var _ -> True
 		    _ -> False)
@@ -72,8 +71,13 @@ appG = appR idR idR
 lamG :: (Monad m,ExpDec dec) => Rewrite m dec Exp
 lamG = lamR idR
 
-varG :: (Decs dec, Monad m) => Rewrite m dec Exp
+varG :: (Monoid dec, Monad m) => Rewrite m dec Exp
 varG = varR
+
+---
+
+varP :: (Monad m, Monoid dec) => (Name -> Translate m dec Exp res) -> Translate m dec Exp res
+varP f = varG >-> reader (\ (Var v) -> f v)
 
 ---
 
@@ -83,59 +87,79 @@ appU rr1 rr2 = translate (appM (\ a b -> a `mappend` b) rr1 rr2)
 lamU :: (Monoid dec, Monad m, ExpDec dec) => Translate m dec Exp res -> Translate m dec Exp res
 lamU rr = translate (lamM (\ a b -> b) rr)
 
-varU :: (Decs dec, Monad m,Monoid ret) => Translate m dec Exp ret
+varU :: (Monoid dec, Monad m,Monoid ret) => Translate m dec Exp ret
 varU = varR >-> translate (\ _ _ -> return mempty)
 
 ---
 
-instance (Monad m,Decs dec,ExpDec dec) => Walker m dec Exp where
+instance (Monad m,Monoid dec,ExpDec dec) => Walker m dec Exp where
    allR rr = appR rr rr <+ lamR rr <+ varR
    allU rr = appU rr rr <+ lamU rr <+ varU
 
+--------
 {-
+freeVar :: (ExpDec dec) => dec -> Name -> Bool
+freeVar env nm = case lookupVarBind nm 
+-}
 
-------------------------------------------------------------------------
-------------------------------------------------------------------------
+freeExp :: (Walker m dec Exp,ExpDec dec) => Translate m dec Exp [Name]
+freeExp = mapDecs clear frees >-> mapTranslate (Data.List.nub)
+   where
+	clear _ = return $ mempty
+	varFree = varG >-> translate (\ env (Var v) -> 
+			case lookupVarBind v env of
+		 	  Nothing -> return [v]
+			  Just _ -> return []) 
+	frees = varFree <+ allU frees
+
+----
+
+data DecX = DecX [(Name,Maybe Exp)]
+
+instance Monoid DecX where
+  mempty = DecX []
+  mappend (DecX ab) (DecX cd) = DecX $ ab ++ cd
+
+instance ExpDec DecX where 
+   addVarBind v (DecX bds) = Just $  DecX ((v,Nothing) : bds)
+   lookupVarBind v (DecX bds) = lookup v bds 
+
+--  addVarBind :: Name -> dec -> Maybe dec
+--  lookupVarBind :: Name -> dec -> Maybe Name
+
+----
 
 
+e1 = Var "x"
+e2 = Var "y"
+e3 = Lam "x" e1
+e4 = Lam "x" e2
+e5 = App e1 e2
+e6 = App e3 e4
+e7 = App e4 e6
 
+main = do
+	let es1 = [e1,e2,e3,e4,e5,e6,e7]
+	sequence_ [ print e | e <- es1]
 
-------------------------------------------------------------------------
-------------------------------------------------------------------------
-------------------------------------------------------------------------
-------------------------------------------------------------------------
-
-data Bind = LAM
-
-
-
--- I'm reinventing generics here!
-instance (Monad m) => Walker m () Exp where
-  walkCons (Lam n e) = walkOver $ cons Lam
-	`keep` n
-	`rec` e
-  walkCons (App e1 e2) = walkOver $ cons App
-	`rec` e1
-	`rec` e2
-  walkCons (Var v) = walkOver $ cons Var
-	`keep` v
-
-instance (NameSupply m) => Walker m DecX Exp where
-  walkCons (Lam n e) = \ env -> do
-	n' <- liftQ newName
-	flip walkOver env $ cons Lam
-          `keep` n'
-	  `recWith` (\ app -> updateDecsM (\ dec -> dec) $ app e)
+	let frees :: Exp -> IO [Name]
+	    frees exp = do (fs,b) <- runRewrite freeExp (mempty :: DecX) exp
+			   return fs
+	e_frees <- mapM frees es1
+	sequence_ [ print e | e <- e_frees]
 	
-  walkCons (App e1 e2) = walkOver $ cons App
-	`rec` e1
-	`rec` e2
-  walkCons (Var v) = walkOver $ cons Var
-	`keep` v
 
---	Scope (unitDec n LAM) e
--- subst :: (Monad m) => Var -> Rewrite m Context 
--- subst v = undefined
+{-
+freeExp = (varG >-> 
+	   varG >-> (translate $ \ env (Var v) -> return [v])
+	<+ 
+	translate $ \ env (Lam v e) -> 
+
+	lamU freeExp >-> 
+	<+ varU freeExp freeExp
+    
+-}	
+	
 
 {-
 freeExp :: Translate m Decx Exp [Name]
@@ -144,14 +168,14 @@ freeExp = translate fn
 	fn (Lam n e)   = apply freeExp e >=> (remove n)
 	fn (App e1 e2) = all freeExp 
 -}
-
+{-
 class Monad m => NameSupply m where
    newName :: m Name
 
 freeExp :: Exp -> [Name]
 freeExp = undefined
 
-subst :: (Decs dec, NameSupply m, Walker m dec Exp) => Name -> Exp -> Rewrite m dec Exp
+subst :: (Monoid dec, NameSupply m, Walker m dec Exp) => Name -> Exp -> Rewrite m dec Exp
 subst n e = 
 	rewrite rrRule1 <+
 	accept  isRule2 <+
@@ -190,10 +214,10 @@ clashQ = reader (\ e -> case e of
 
 -- assumes all bindings are unique.
 {-
-instance Decs DecX where
+instance Monoid DecX where
   type Key DecX = Name
   type Dec DecX = Maybe Exp
-  lookupDecs nm (DecX decx) = lookup nm decx
+  lookupMonoid nm (DecX decx) = lookup nm decx
   unitDec nm val = DecX [(nm,val)]
 -}
 
@@ -202,8 +226,8 @@ instance ExpDec DecX where
 			   Nothing -> return $ DecX ((nm,Nothing) : dec)
 			   Just env -> fail "binding name clash"
 {-			
-subst' :: (ExpDec dec, Decs dec, NameSupply m, Walker m dec Exp) => Name -> Exp -> Rewrite m dec Exp
-subst' n exp = updateDecs rrEnv >-> sub 
+subst' :: (ExpDec dec, Monoid dec, NameSupply m, Walker m dec Exp) => Name -> Exp -> Rewrite m dec Exp
+subst' n exp = updateMonoid rrEnv >-> sub 
   where
 	rrEnv = idR
 
@@ -240,7 +264,8 @@ inlineN n (Var n') | n == n' =
 		liftM (Lam n'') $ apply (subst n' (Var n'') >-> subst n e) e'
 -}
 
-eval :: (Decs dec, NameSupply m, Walker m dec Exp) => Rewrite m dec Exp
+
+eval :: (Monoid dec, NameSupply m, Walker m dec Exp) => Rewrite m dec Exp
 eval = 
     translate (\ e' -> case e' of
 	(App (Lam v e1) e2) -> apply (subst v e2) e1  -- beta reduction

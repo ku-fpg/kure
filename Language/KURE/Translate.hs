@@ -59,11 +59,11 @@ translateWith
 	-> Translate m dec exp1 exp2
 translateWith f rr = Translate $ \ d e -> updateStatus f (rr d e)
 
-runRewrite :: (Decs dec,Monad m) 
-	   => Rewrite m dec exp 
+runRewrite :: (Monoid dec,Monad m) 
+	   => Translate m dec exp res
 	   -> dec 
 	   -> exp 
-	   -> m (exp,dec)
+	   -> m (res,dec)
 runRewrite rr decs exp = do
   res <- runRewriteM (apply rr decs exp)
   case res of
@@ -82,7 +82,7 @@ failTranslate msg = Translate $ \ dec e -> RewriteM $ return $ RewriteFailureM m
 
 failRewrite :: (Monad m) => String -> Rewrite m dec a
 failRewrite = failTranslate
-
+{-
 class (Monoid dec) => Decs dec where
   type Key dec
   type Dec dec
@@ -94,21 +94,26 @@ instance Decs () where
   type Dec () = ()
   lookupDecs () () = Just ()
   unitDec () () = ()
-
+-}
 -----
 
 -- should really use the getDecM method, somehow
 getDecs :: (Monad m) => (dec -> Rewrite m dec a) -> Rewrite m dec a
 getDecs f = Translate $ \ dec e -> RewriteM $ runRewriteM (apply (f dec) dec e) 
 
-{-
--- Going meta on us; .
-updateDecs :: (Monoid dec,Monad m) => Rewrite m dec dec -> Rewrite m dec a -> Rewrite m dec a
-updateDecs decRR rr = Translate $ \ e -> do
-	dec <- getDecsM
-	dec' <- apply decRR dec
-	setDecsM  dec' $ apply rr e
+-- Going meta on us; 
+mapDecs :: (Monoid dec,Monad m) => (dec -> RewriteM m dec dec) -> Translate m dec a r -> Translate m dec a r
+mapDecs f_env rr = Translate $ \ env e -> do
+	env' <- f_env env
+	apply rr env' e
 
+-- mapRewrite :: 
+
+mapTranslate :: (Monad m,Monoid dec) => (a -> b) -> Translate m dec a b
+mapTranslate f = translate $ \ env a -> return (f a)
+
+
+{-
 getPath :: (Monad m)  => (Path -> Rewrite m dec a) -> Rewrite m dec a
 getPath f = Translate $ \ e -> RewriteM $ \ path dec -> do
 	runRewriteM (apply (f path) e) path dec
