@@ -22,7 +22,8 @@ module Language.KURE.Translate
 	, failT
 	, getDecsT
 	, mapDecsT
-	, mapT
+	, pureT
+	, concatT
 	) where
 		
 
@@ -92,7 +93,10 @@ mapDecsT f_env rr = Translate $ \ env e -> do
 	env' <- f_env env
 	apply rr env' e
 
+pureT :: (Monad m,Monoid dec) => (a -> b) -> Translate m dec a b
+pureT f = translate $ \ env a -> return (f a)
 
-mapT :: (Monad m,Monoid dec) => (a -> b) -> Translate m dec a b
-mapT f = translate $ \ env a -> return (f a)
-
+concatT :: (Monad m,Monoid dec,Monoid r) => [Translate m dec a r] -> Translate m dec a r
+concatT ts = Translate $ \ dec e -> do
+	rs <- sequence [ apply t dec e | t <- ts ]
+	return (mconcat rs)

@@ -27,6 +27,7 @@ tryR s = s <+ idR
 repeatR :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec a
 repeatR s = tryR (s >-> repeatR s) 
 
+
 -- if the first rewrite is *id*, then do the second one.
 (.+) :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec a -> Rewrite m dec a
 (.+) a b = a `wasId` (\ i -> if i then b else idR)
@@ -46,7 +47,8 @@ accept :: (Monoid dec, Monad m) => (a -> Bool) -> Rewrite m dec a
 accept fn = translateWith id $ \ dec expA -> if fn expA 
 				 	     then return expA
 					    else fail "accept failed"
-		
+
+
 --------------------------------------------------------------------------------
 
 -- internal to this module.
