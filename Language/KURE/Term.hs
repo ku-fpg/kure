@@ -1,4 +1,4 @@
-{-# LANGUAGE ExistentialQuantification, TypeFamilies, Rank2Types, MultiParamTypeClasses, FlexibleContexts, GADTs, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
 
 -- | This module supports the generic walking of 'Term's. 
 
@@ -10,8 +10,9 @@ module Language.KURE.Term
 	, promote
 	) where
 	
+import Language.KURE.RewriteMonad as M	
 import Language.KURE.Translate	
-import Language.KURE.Rewrite as M	
+import Language.KURE.Rewrite
 import Language.KURE.Combinators -- perhaps
 
 import Control.Monad
@@ -68,67 +69,9 @@ promote rr = translateWith id $ \ dec e -> do
 
 -------------------------------------------------------------------------------
 
---topdown :: (Walker m dec exp) => (forall exp' . ( 	Generic exp' ~ Generic exp) => Rewrite m dec exp' -> Rewrite m dec exp') -> Rewrite m dec exp -> Rewrite m dec exp
---topdown :: (Walker m dec exp) => Rewrite m dec (Generic exp) -> Rewrite m dec exp
---topdown s = extract s >-> allX (topdown' s)
+topdownR  s = s >-> allR (topdownR s)
+bottomupR s = allR (bottomupR s) >-> s
+alltdR    s = s <+ allR (alltdR s)
+downupR   s = s >-> allR (downupR s) >-> s
+innermost s = bottomupR (tryR s)  
 
---topdown' :: (Walker m dec exp, Generic exp ~ Generic exp') => (foreach exp' . Rewrite m dec (Generic exp') -> Rewrite m dec (Generic exp)
---topdown' s = allX s
--- promote (topdown s)
-
--- topdown s = allR' (topdown s)
-
-data Exp = Exp
-
-data EXP = EXP
-
-instance Term Exp where 
-	type Generic Exp = EXP
-
-instance Term EXP where 
-	type Generic EXP = EXP
-	
-instance (Monad m,Monoid dec) => Walker m dec Exp where {}
-
--- topdown :: (Monoid dec,Monad m, a ~ EXP, a ~ Generic Exp, Generic Exp ~ EXP,Walker m dec Exp) => Rewrite m dec a -> Rewrite m dec a
---- topdown ::  (Monoid dec, Monad m, IsGeneric e) => Translate m dec e e -> Translate m dec e e
-topdown' :: (Walker m dec e, e ~ Generic e) => Translate m dec e e -> Translate m dec e e
-topdown' s = s >-> allR (topdown' s) -- undefined -- promote (extract s >-> topdown' s)
-
-topdown :: (Walker m dec e, e ~ Generic e, e ~ Generic e', Term e') => Translate m dec e e -> Translate m dec e' e'
-topdown s = extract (topdown' s)
-
---topdown' :: (Monoid dec,Monad m, a ~ Exp, aa ~ EXP, Walker m dec Exp) => Rewrite m dec aa -> Rewrite m dec a 
---topdown' :: (Monoid dec,Monad m, aa ~ Generic a, Walker m dec a) => Rewrite m dec aa -> Rewrite m dec a 
---topdown' s = undefined -- allX (topdown s)
-
-{-
-
-topdownR' :: (Walker m dec exp) 
- 	=> Rewrite m dec (Generic exp) 
-	-> Rewrite m dec (Generic exp) 
-	-> Rewrite m dec (Generic exp)
-topdownR' s r = s >-> promote (allR (topdownR r))
-
-jig :: (Walker m dec exp1, Walker m dec exp2, Generic exp1 ~ Generic exp2) => Rewrite m dec (Generic exp1) -> Rewrite m dec (Generic exp')
-jig = undefined
-
-topdownR :: (Walker m dec exp) => Rewrite m dec (Generic exp) -> Rewrite m dec (Generic exp)
-topdownR s = undefined -- extract (topdownR' (extract s) s)
---  where
---	ex = extract
-
--- topdownR2 :: (Rewrite m dec (Generic exp) -> Rewrite m dec (Generic exp)
-
-
---	extract s >-> allR (undefined s)
-{-
-f :: (Walker m dec exp1, Walker m dec exp2, Generic exp1 ~ Generic exp2)
-	=> Rewrite m dec (Generic exp2)
-	-> Rewrite m dec (Generic exp1)
-f s = promote (topdownR s)
--}
--- promote (allR (topdownR s))
-
-
--}

@@ -2,10 +2,9 @@
 
 module Main where
 
-import Language.KURE.Rewrite 
-import Language.KURE.Translate
-import Language.KURE.Combinators
+import Language.KURE
 import Language.KURE.Term as T
+
 import Data.Monoid
 import Control.Monad
 import Data.List
@@ -103,7 +102,7 @@ freeVar env nm = case lookupVarBind nm
 -}
 
 freeExp :: (Walker m dec Exp,ExpDec dec) => Translate m dec Exp [Name]
-freeExp = mapDecs clear frees >-> mapTranslate (Data.List.nub)
+freeExp = mapDecsT clear frees >-> mapT (Data.List.nub)
    where
 	clear _ = return $ mempty
 	varFree = varG >-> translate (\ env (Var v) -> 
@@ -143,7 +142,7 @@ main = do
 	sequence_ [ print e | e <- es1]
 
 	let frees :: Exp -> IO [Name]
-	    frees exp = do (fs,b) <- runRewrite freeExp (mempty :: DecX) exp
+	    frees exp = do (fs,b) <- runTranslate freeExp (mempty :: DecX) exp
 			   return fs
 	e_frees <- mapM frees es1
 	sequence_ [ print e | e <- e_frees]

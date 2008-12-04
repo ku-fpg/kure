@@ -1,7 +1,14 @@
 Name:                kure
 Version:             0.1
-Synopsis:            Combinators for rewriting arbitrary syntax trees that have scoping.
-Description:	     Monad Transformer and Combinators for rewriting syntax trees.
+Synopsis:            Combinators for rewriting syntax trees.
+Description:	     KURE is a DSL for building rewriting DSLs.
+ 					 KURE shares combinator names and concepts with Stratego, but unlike Stratego, KURE is strongly typed.
+
+                     KURE contains two primary innovations.
+					 Firstly, the use of type families to provide a lightweight generic traversal mechanism,
+					 allowing the rewriting of mutually recursive data-structures inside a unified framework.
+					 Secondly, the use of overloading to provide context sensitive rewrites, allowing for things like
+					 scoping to be abstracted into the basic syntax walking functions.
 Category:            Language
 License:             BSD3
 License-file:        LICENSE
@@ -15,7 +22,12 @@ Cabal-Version:       >= 1.2
 Library
   Build-Depends:        base, containers 
   Exposed-modules:
-       Language.KURE.Rewrite, Language.KURE.Translate,  Language.KURE.Combinators, Language.KURE.Term
+       Language.KURE,
+       Language.KURE.RewriteMonad, 
+       Language.KURE.Translate,
+       Language.KURE.Rewrite,
+       Language.KURE.Combinators,
+       Language.KURE.Term
 
 Executable test
   Main-Is:        Main.hs
