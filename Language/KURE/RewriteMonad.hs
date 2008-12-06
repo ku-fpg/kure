@@ -95,20 +95,20 @@ catchM (RewriteM m1) m2 = RewriteM $ do
 -- except that the second computation can see if the first computation was an identity or not.
 -- Used to spot when a rewrite succeeded, but was uneffective.
 
-chainM :: (Monoid dec,Monad m) => RewriteM m dec a -> (Bool -> dec -> a -> RewriteM m dec a) -> RewriteM m dec a
+chainM :: (Monoid dec,Monad m) => RewriteM m dec a -> (Bool -> dec -> a -> RewriteM m dec b) -> RewriteM m dec b
 chainM (RewriteM m1) k = RewriteM $ do
 	r <- m1 
 	case r of
 	  RewriteSuccessM a dec1 -> runRewriteM (k False dec1 a)
 	  RewriteReturnM a       -> runRewriteM (k True mempty a)
-	  RewriteFailureM msg    -> return r -- and still fail 
+	  RewriteFailureM msg    -> return $ RewriteFailureM msg -- and still fail 
  
 -- | 'updateStatus' updates the result status of the argument's computation.
 updateStatus 
 	:: (Monad m, Monoid dec)
-	=> (RewriteStatusM dec e -> RewriteStatusM dec e) 
+	=> (RewriteStatusM dec e -> RewriteStatusM dec' e) 
 	-> RewriteM m dec e
-	-> RewriteM m dec e
+	-> RewriteM m dec' e
 updateStatus f m = RewriteM $ do
 	r <- runRewriteM m 
 	return (f r)

@@ -17,9 +17,8 @@ data Exp = Lam Name Exp
 
 
 ------------------------------------------------------------------------
--- Exp is its own Generic.
 instance Term Exp where
-  type Generic Exp = Exp
+  type Generic Exp = Exp  -- Exp is its own Generic root.
   inject    = id
   project e = return e
 
@@ -101,8 +100,10 @@ freeVar :: (ExpDec dec) => dec -> Name -> Bool
 freeVar env nm = case lookupVarBind nm 
 -}
 
+-- Perhaps should not be exported here as a trans?
+
 freeExp :: (Walker m dec Exp,ExpDec dec) => Translate m dec Exp [Name]
-freeExp = mapDecsT clear frees >-> mapT (Data.List.nub)
+freeExp = mapDecsT clear frees >-> pureT (Data.List.nub)
    where
 	clear _ = return $ mempty
 	varFree = varG >-> translate (\ env (Var v) -> 

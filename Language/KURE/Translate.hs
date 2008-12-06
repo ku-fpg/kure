@@ -10,20 +10,14 @@
 -- 'Translate' is the main abstraction inside KURE, and represents a rewriting from a source to a target
 -- of a possibly different type.
 --
--- 'Rewrite' (defined in Language.KURE.Translate) is a synonoym for a 'Translate' with the same source and target type.
+-- Rewrite (defined in 'Language.KURE.Rewrite') is a synonoym for a 'Translate' with the same source and target type.
 
 module Language.KURE.Translate 
 	( Translate
 	, apply
 	, runTranslate
 	, translate
-	, translateWith
-	, translateWithId
-	, failT
-	, getDecsT
-	, mapDecsT
-	, pureT
-	, concatT
+	, translateTransparently
 	) where
 		
 
@@ -34,16 +28,17 @@ import Data.Tree
 
 import Language.KURE.RewriteMonad
 
--- abstract
+-- | 'Translate' is a translation or strategy that translates between @exp1@ and @exp2@, with the posiblity of failure,
+-- and remembers identity translations.
+
 newtype Translate m dec exp1 exp2 =
     Translate { applyTranslate :: dec -> exp1 -> RewriteM m dec exp2 }
 
--- | 'apply' directly applies a translate to arguments.
+-- | 'apply' directly applies a 'Translate' value to an argument.
 apply :: Translate m dec exp1 exp2 -> dec -> exp1 -> RewriteM m dec exp2
 apply = applyTranslate
 
-
--- | 'translateWith' is our primitve way of building a Translate. It requires the invoker to declare what is
+-- INTERNAL: 'translateWith' is our primitive way of building a Translate. It requires the invoker to declare what is
 -- going to happen with the status, typically to handle identity matching.
 translateWith 
 	:: (Monoid dec, Monad m) 
@@ -52,51 +47,39 @@ translateWith
 	-> Translate m dec exp1 exp2
 translateWith f rr = Translate $ \ d e -> updateStatus f (rr d e)
 
--- 'translate' is the standard way of building a 'Translate', where if the translation is successful it 
--- is marked as non-identity.
-
+-- | 'translate' is the standard way of building a 'Translate', where if the translation is successful it 
+-- is automatically marked as a non-identity translation. 
+--
+-- @translate $ \ _ e -> return e@ /is not/ an identity rewrite. 
 translate :: (Monoid dec, Monad m) => (dec -> exp1 -> RewriteM m dec exp2) -> Translate m dec exp1 exp2
 translate = translateWith $ \ r ->
 	case r of
 	  RewriteReturnM e -> RewriteSuccessM e mempty  -- mark any valid return as a success
 	  _ -> r
 
-translateWithId
+-- | 'translateTransparently' builds a composite 'Translate', where the @id@ status of the rewrite
+-- is determined by the internals calls to apply.
+--
+-- @translateTransparently $ \ _ e -> return e@ /is/ an identity rewrite. 
+
+translateTransparently
 	:: (Monoid dec, Monad m) 
 	=> (dec -> exp1 -> RewriteM m dec exp2) 
 	-> Translate m dec exp1 exp2
-translateWithId = translateWith id
+translateTransparently = translateWith id
 
+-- | 'runTranslate' executes the translation, returning either a failure message,
+-- or a success and the new parts of the environment.
 
 runTranslate :: (Monoid dec,Monad m) 
 	   => Translate m dec exp res
 	   -> dec 
 	   -> exp 
-	   -> m (res,dec)
+	   -> m (Either String (res,dec))
 runTranslate rr decs exp = do
   res <- runRewriteM (apply rr decs exp)
   case res of
-     RewriteSuccessM exp' ds -> return (exp',ds)
-     RewriteReturnM exp'     -> return (exp',mempty)
-     RewriteFailureM msg     -> fail msg
+     RewriteSuccessM exp' ds -> return (Right (exp',ds))
+     RewriteReturnM exp'     -> return (Right (exp',mempty))
+     RewriteFailureM msg     -> return (Left msg)
 
-failT :: (Monad m) => String -> Translate m dec a b
-failT msg = Translate $ \ dec e -> failM msg
-
-
-getDecsT :: (Monad m) => (dec -> Translate m dec a b) -> Translate m dec a b
-getDecsT f = Translate $ \ dec e -> apply (f dec) dec e
-
--- Going meta on us; 
-mapDecsT :: (Monoid dec,Monad m) => (dec -> RewriteM m dec dec) -> Translate m dec a r -> Translate m dec a r
-mapDecsT f_env rr = Translate $ \ env e -> do
-	env' <- f_env env
-	apply rr env' e
-
-pureT :: (Monad m,Monoid dec) => (a -> b) -> Translate m dec a b
-pureT f = translate $ \ env a -> return (f a)
-
-concatT :: (Monad m,Monoid dec,Monoid r) => [Translate m dec a r] -> Translate m dec a r
-concatT ts = Translate $ \ dec e -> do
-	rs <- sequence [ apply t dec e | t <- ts ]
-	return (mconcat rs)

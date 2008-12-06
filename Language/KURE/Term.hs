@@ -54,7 +54,7 @@ class (Monoid dec,Monad m,Term exp) => Walker m dec exp where
 -- | 'extract' converts a 'Rewrite' over a 'Generic' into a rewrite over a specific expression type. 
 
 extract  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec (Generic exp) -> Rewrite m dec exp	-- at *this* type
-extract rr = translateWith id $ \ dec e -> do
+extract rr = rewriteTransparently $ \ dec e -> do
             e' <- apply rr dec (inject e)
             project e'
 
@@ -62,7 +62,7 @@ extract rr = translateWith id $ \ dec e -> do
 -- 'try' can be used to convert a failure-by-default promotion into a 'id-by-default' promotion.
 
 promote  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec exp -> Rewrite m dec (Generic exp)
-promote rr = translateWith id $ \ dec e -> do
+promote rr = rewriteTransparently $ \ dec e -> do
                e' <- project e
                r <- apply rr dec e'
                return (inject r)
@@ -77,7 +77,7 @@ topdownR  s = s >-> allR (topdownR s)
 bottomupR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec e -> Rewrite m dec e
 bottomupR s = allR (bottomupR s) >-> s
 
--- apply a rewrite in a top down manner, stopping after a successful rewrite.
+-- apply a rewrite in a top down manner, prunning at successful rewrites.
 alltdR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec e -> Rewrite m dec e
 alltdR    s = s <+ allR (alltdR s)
 
