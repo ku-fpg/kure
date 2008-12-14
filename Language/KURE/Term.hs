@@ -37,10 +37,14 @@ class Term exp where
   type Generic exp
 
   -- | 'project' projects into a 'Generic' exp, to get the exp inside, or fail.
+  -- TODO: rename as select
   project :: (Monad m) => Generic exp -> m exp
 
   -- | 'inject' injects an exp into a 'Generic' exp.
   inject  :: exp -> Generic exp
+
+
+
 
 -- | 'Walker' captures how we walk over @exp@, using a specific @m@ and @dec@.
 class (Monoid dec,Monad m,Term exp) => Walker m dec exp where
@@ -54,7 +58,7 @@ class (Monoid dec,Monad m,Term exp) => Walker m dec exp where
 -- | 'extract' converts a 'Rewrite' over a 'Generic' into a rewrite over a specific expression type. 
 
 extract  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec (Generic exp) -> Rewrite m dec exp	-- at *this* type
-extract rr = rewriteTransparently $ \ dec e -> do
+extract rr = rewrite $ \ dec e -> do
             e' <- apply rr dec (inject e)
             project e'
 
@@ -62,7 +66,7 @@ extract rr = rewriteTransparently $ \ dec e -> do
 -- 'try' can be used to convert a failure-by-default promotion into a 'id-by-default' promotion.
 
 promote  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec exp -> Rewrite m dec (Generic exp)
-promote rr = rewriteTransparently $ \ dec e -> do
+promote rr = rewrite $ \ dec e -> do
                e' <- project e
                r <- apply rr dec e'
                return (inject r)

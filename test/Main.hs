@@ -51,17 +51,18 @@ lamM f rr1 dec (Lam n e1) = do
 ---
 
 appR :: (Monoid dec, Monad m) => Rewrite m dec Exp -> Rewrite m dec Exp -> Rewrite m dec Exp
-appR rr1 rr2 = rebuild (appM App rr1 rr2)
+appR rr1 rr2 = translate (appM App rr1 rr2)
 
 lamR :: (Monad m,ExpDec dec) => Rewrite m dec Exp -> Rewrite m dec Exp
-lamR rr = rebuild (lamM Lam rr)
+lamR rr = translate (lamM Lam rr)
 
 varR :: (Monoid dec, Monad m) => Rewrite m dec Exp
-varR = accept (\ e -> case e of
+varR = acceptR (\ e -> case e of
 		    Var _ -> True
 		    _ -> False)
 
 ---
+-- Then the guards
 
 appG :: (Monad m, Monoid dec) => Rewrite m dec Exp
 appG = appR idR idR
@@ -75,7 +76,7 @@ varG = varR
 ---
 
 varP :: (Monad m, Monoid dec) => (Name -> Translate m dec Exp res) -> Translate m dec Exp res
-varP f = varG >-> reader (\ (Var v) -> f v)
+varP f = varG >-> readerT (\ (Var v) -> f v)
 
 ---
 
@@ -105,7 +106,7 @@ freeVar env nm = case lookupVarBind nm
 freeExp :: (Walker m dec Exp,ExpDec dec) => Translate m dec Exp [Name]
 freeExp = mapDecsT clear frees >-> pureT (Data.List.nub)
    where
-	clear _ = return $ mempty
+	clear _ = mempty
 	varFree = varG >-> translate (\ env (Var v) -> 
 			case lookupVarBind v env of
 		 	  Nothing -> return [v]
@@ -143,7 +144,7 @@ main = do
 	sequence_ [ print e | e <- es1]
 
 	let frees :: Exp -> IO [Name]
-	    frees exp = do (fs,b) <- runTranslate freeExp (mempty :: DecX) exp
+	    frees exp = do Right (fs,b) <- runTranslate freeExp (mempty :: DecX) exp
 			   return fs
 	e_frees <- mapM frees es1
 	sequence_ [ print e | e <- e_frees]

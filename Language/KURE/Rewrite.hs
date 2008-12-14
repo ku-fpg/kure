@@ -14,7 +14,6 @@
 module Language.KURE.Rewrite 
 	( Rewrite
 	, rewrite
-	, rewriteTransparently
 	, runRewrite
 	) where
 
@@ -34,14 +33,6 @@ type Rewrite m dec exp = Translate m dec exp exp
 
 rewrite :: (Monoid dec, Monad m) => (dec -> exp1 -> RewriteM m dec exp1) -> Rewrite m dec exp1
 rewrite = translate
-
--- | 'rewriteTransparently' builds a composite 'Rewrite', where the @id@ status of the rewrite
--- is determined by the internals calls to apply.
---
--- @rewriteTransparently $ \ _ e -> return e@ /is/ an identity rewrite. 
-
-rewriteTransparently :: (Monoid dec, Monad m) => (dec -> exp1 -> RewriteM m dec exp1) -> Rewrite m dec exp1
-rewriteTransparently = translateTransparently
 
 -- | 'runRewrite' executes the rewrite, returning either a failure message,
 -- or a success and the new parts of the environment.

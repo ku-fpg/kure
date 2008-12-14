@@ -17,11 +17,11 @@ module Language.KURE.Translate
 	, apply
 	, runTranslate
 	, translate
-	, translateTransparently
 	) where
 		
-
 import Control.Monad
+import Control.Category
+import Control.Arrow
 import Data.Monoid
 import Control.Applicative hiding (many)
 import Data.Tree
@@ -32,41 +32,21 @@ import Language.KURE.RewriteMonad
 -- and remembers identity translations.
 
 newtype Translate m dec exp1 exp2 =
-    Translate { applyTranslate :: dec -> exp1 -> RewriteM m dec exp2 }
+    Translate { applyTranslate :: dec -> exp1 -> RewriteM m dec exp2}
 
 -- | 'apply' directly applies a 'Translate' value to an argument.
 apply :: Translate m dec exp1 exp2 -> dec -> exp1 -> RewriteM m dec exp2
 apply = applyTranslate
 
--- INTERNAL: 'translateWith' is our primitive way of building a Translate. It requires the invoker to declare what is
--- going to happen with the status, typically to handle identity matching.
-translateWith 
-	:: (Monoid dec, Monad m) 
-	=> (RewriteStatusM dec exp2 -> RewriteStatusM dec exp2) 
-	-> (dec -> exp1 -> RewriteM m dec exp2) 
-	-> Translate m dec exp1 exp2
-translateWith f rr = Translate $ \ d e -> updateStatus f (rr d e)
-
 -- | 'translate' is the standard way of building a 'Translate', where if the translation is successful it 
 -- is automatically marked as a non-identity translation. 
 --
--- @translate $ \ _ e -> return e@ /is not/ an identity rewrite. 
+-- Note: @translate $ \ _ e -> return e@ /is not/ an identity rewrite, but a succesfull rewrite that
+-- returns its provided argument.
+
 translate :: (Monoid dec, Monad m) => (dec -> exp1 -> RewriteM m dec exp2) -> Translate m dec exp1 exp2
-translate = translateWith $ \ r ->
-	case r of
-	  RewriteReturnM e -> RewriteSuccessM e mempty  -- mark any valid return as a success
-	  _ -> r
+translate = Translate
 
--- | 'translateTransparently' builds a composite 'Translate', where the @id@ status of the rewrite
--- is determined by the internals calls to apply.
---
--- @translateTransparently $ \ _ e -> return e@ /is/ an identity rewrite. 
-
-translateTransparently
-	:: (Monoid dec, Monad m) 
-	=> (dec -> exp1 -> RewriteM m dec exp2) 
-	-> Translate m dec exp1 exp2
-translateTransparently = translateWith id
 
 -- | 'runTranslate' executes the translation, returning either a failure message,
 -- or a success and the new parts of the environment.
@@ -79,7 +59,28 @@ runTranslate :: (Monoid dec,Monad m)
 runTranslate rr decs exp = do
   res <- runRewriteM (apply rr decs exp)
   case res of
-     RewriteSuccessM exp' ds -> return (Right (exp',ds))
+     RewriteWithDecM exp' ds -> return (Right (exp',ds))
      RewriteReturnM exp'     -> return (Right (exp',mempty))
+     RewriteIdM     exp'     -> return (Right (exp',mempty))
      RewriteFailureM msg     -> return (Left msg)
+
+{-
+instance (Monad m, Monoid dec) => Category (Translate m dec) where
+  id = translate $ \ _ e -> return e
+  (.) rr2 rr1 = 
+	translate $ \ dec e ->
+	apply rr1 dec e `chainM` \ _i dec' e' -> apply rr2 (dec `mappend` dec') e'
+
+instance (Monad m, Monoid dec) => Arrow (Translate m dec) where
+  arr f = translate $ \ env a -> return (f a)	-- non-id operation
+  first tr = translate $ \ env (b,d) -> do c <- apply tr env b
+ 					   return (c,d)
+instance (Monad m, Monoid dec) => ArrowZero (Translate m dec) where
+  arrowZero f = translate $ \ env a -> return (f a)	-- non-id operation
+  first tr = translate $ \ env (b,d) -> do c <- apply tr env b
+ 					   return (c,d)
+
+-}
+
+
 

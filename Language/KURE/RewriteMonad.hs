@@ -12,12 +12,13 @@
 module Language.KURE.RewriteMonad 
   	( RewriteM	-- abstract
 	, RewriteStatusM(..)
-	, updateStatus
 	, runRewriteM
 	, failM
 	, catchM
 	, chainM
 	, liftQ
+	, focusM
+	, idM
 	) where
 
 
@@ -33,11 +34,16 @@ data RewriteM m dec exp =
 	      runRewriteM :: m (RewriteStatusM dec exp) 
 	     }
 
+-- 'RewriteT' is a function from some value to a monadic return value.	
+type RewriteF m dec e1 e2 = e1 -> RewriteM m dec e2
+
 data RewriteStatusM dec exp
-     = RewriteSuccessM exp dec		-- ^ success implies that something changed in our rewrite world.
+     = RewriteWithDecM exp dec		-- ^ success implies that something changed in our rewrite world.
                                         -- 'dec' here are always new decs.
      | RewriteReturnM exp		-- ^ a regular success
      | RewriteFailureM String		-- ^ a real failure
+     | RewriteIdM exp			-- ^ identity marker on a value
+
 
 -- TWO possible ways of thinking about rewriting:
 
@@ -49,25 +55,25 @@ instance (Monoid dec,Monad m) => Monad (RewriteM m dec) where
    (RewriteM m) >>= k = RewriteM $ do
    	     	      		 r <- m
 				 case r of
-				   RewriteSuccessM r ds -> do
-				     r' <- runRewriteM (k r)
-				     return $ 
-				      case r' of
-				       RewriteSuccessM e' ds'
-				       		         -> RewriteSuccessM e' 
-							    		   (ds' `mappend` ds) -- TODO: choose!
-				       RewriteReturnM e' -> RewriteSuccessM e' ds
-				       RewriteFailureM msg -> RewriteFailureM msg
-				   RewriteReturnM r -> do
-				     r' <- runRewriteM (k r)
-				     return $
-				      case r' of
-				       RewriteSuccessM e' ds'
-				       		         -> RewriteSuccessM e' 
-									   ds'
-				       RewriteReturnM e' -> RewriteReturnM e'
-				       RewriteFailureM msg -> RewriteFailureM msg
+				   RewriteWithDecM r ds -> continue r
+					(\ e' ds' -> RewriteWithDecM e' (ds' `mappend` ds))
+					(\ e'     -> RewriteWithDecM e' ds)
+				   RewriteReturnM r -> continue r
+					(\ e' ds' -> RewriteWithDecM e' ds')
+					(\ e'     -> RewriteReturnM e')
 				   RewriteFailureM msg -> return $ RewriteFailureM msg
+				   RewriteIdM r -> continue r
+					(\ e' ds' -> RewriteWithDecM e' ds')
+					(\ e'     -> RewriteReturnM e')
+     where
+	continue r mkDec mkRet = do
+		r' <- runRewriteM (k r)
+		return $ case r' of
+			   RewriteWithDecM e' ds' -> mkDec e' ds'
+			   RewriteReturnM e'      -> mkRet e'
+			   RewriteFailureM msg    -> RewriteFailureM msg
+			   RewriteIdM e'	  -> mkRet e' 
+				
    fail msg = RewriteM $ return $ RewriteFailureM msg
 
 instance (Monoid dec,Monad m) => Functor (RewriteM m dec) where
@@ -87,29 +93,46 @@ catchM :: (Monad m) => RewriteM m dec a -> (String -> RewriteM m dec a) -> Rewri
 catchM (RewriteM m1) m2 = RewriteM $ do
 	r <- m1 
 	case r of
-	  RewriteSuccessM _ _  -> return r
+	  RewriteWithDecM _ _  -> return r
 	  RewriteReturnM _     -> return r 
+	  RewriteIdM _         -> return r 
 	  RewriteFailureM msg  -> runRewriteM (m2 msg)
 	
 -- | 'chainM' executes the first argument then the second, much like '>>=',
 -- except that the second computation can see if the first computation was an identity or not.
--- Used to spot when a rewrite succeeded, but was uneffective.
+-- Used to spot when a rewrite succeeded, but was the identity.
 
-chainM :: (Monoid dec,Monad m) => RewriteM m dec a -> (Bool -> dec -> a -> RewriteM m dec b) -> RewriteM m dec b
-chainM (RewriteM m1) k = RewriteM $ do
-	r <- m1 
+chainM :: (Monoid dec,Monad m) => (a -> RewriteM m dec b) -> (Bool -> dec -> b -> RewriteM m dec c) -> a -> RewriteM m dec c
+chainM  f1 k a = RewriteM $ do
+	r <- runRewriteM (f1 a)
 	case r of
-	  RewriteSuccessM a dec1 -> runRewriteM (k False dec1 a)
-	  RewriteReturnM a       -> runRewriteM (k True mempty a)
+	  RewriteWithDecM a dec1 -> runRewriteM (k False dec1 a)
+	  RewriteReturnM a       -> runRewriteM (k False mempty a)
+	  RewriteIdM a           -> runRewriteM (k True mempty a)
 	  RewriteFailureM msg    -> return $ RewriteFailureM msg -- and still fail 
- 
--- | 'updateStatus' updates the result status of the argument's computation.
-updateStatus 
-	:: (Monad m, Monoid dec)
-	=> (RewriteStatusM dec e -> RewriteStatusM dec' e) 
-	-> RewriteM m dec e
-	-> RewriteM m dec' e
-updateStatus f m = RewriteM $ do
-	r <- runRewriteM m 
-	return (f r)
+	
 
+-- no way for either to fail
+
+focusM :: (Monad m, Monoid dec) => (prod -> a) -> (prod -> a -> prod) -> (a -> RewriteM m dec a) -> prod -> RewriteM m dec prod
+focusM sel bld fn e = RewriteM $ do
+	let a = sel e
+	r <- runRewriteM (fn a)
+	case r of
+	  RewriteWithDecM a' dec1 -> return $ RewriteWithDecM (bld e a') dec1
+	  RewriteReturnM a'       -> return $ RewriteReturnM (bld e a')
+	  RewriteFailureM msg     -> return $ RewriteFailureM msg
+	  RewriteIdM a'           -> return $ RewriteIdM e
+
+-- | The primitive id micro-rewrite.
+idM :: (Monad m) => a -> RewriteM m dec a
+idM a = RewriteM $ return (RewriteIdM a)
+
+{-
+onId :: (Monad m) => (a -> RewriteM m dec a) -> (a -> RewriteM m dec a) -> a -> RewriteM m dec a
+onId f1 f2 a = RewriteM $ do
+	r <- runRewriteM (f1 a)
+-}
+	
+
+   
