@@ -15,8 +15,10 @@
 module Language.KURE.Translate 
 	( Translate
 	, apply
+	, applyF
 	, runTranslate
 	, translate
+	, translateF
 	) where
 		
 import Control.Monad
@@ -32,20 +34,26 @@ import Language.KURE.RewriteMonad
 -- and remembers identity translations.
 
 newtype Translate m dec exp1 exp2 =
-    Translate { applyTranslate :: dec -> exp1 -> RewriteM m dec exp2}
+    Translate { applyTranslate :: dec -> RewriteF m dec exp1 exp2}
 
 -- | 'apply' directly applies a 'Translate' value to an argument.
-apply :: Translate m dec exp1 exp2 -> dec -> exp1 -> RewriteM m dec exp2
-apply = applyTranslate
+apply :: (Monoid dec, Monad m) => Translate m dec exp1 exp2 -> dec -> exp1 -> RewriteM m dec exp2
+apply (Translate t) dec exp1 = liftM fst $ runRewriteF (t dec) exp1 
+
+applyF :: Translate m dec exp1 exp2 -> dec -> RewriteF m dec exp1 exp2
+applyF = applyTranslate
 
 -- | 'translate' is the standard way of building a 'Translate', where if the translation is successful it 
 -- is automatically marked as a non-identity translation. 
 --
--- Note: @translate $ \ _ e -> return e@ /is not/ an identity rewrite, but a succesfull rewrite that
--- returns its provided argument.
+-- Note: @translate $ \ _ e -> return e@ /is not/ an identity rewrite, but a succesful rewrite that
+-- returns its provided argument. 
 
 translate :: (Monoid dec, Monad m) => (dec -> exp1 -> RewriteM m dec exp2) -> Translate m dec exp1 exp2
-translate = Translate
+translate f = Translate $ \ dec -> RewriteF $ \ e -> liftM (\ r -> (r,False)) (f dec e)
+
+translateF :: (Monoid dec, Monad m) => (dec -> RewriteF m dec exp1 exp2) -> Translate m dec exp1 exp2
+translateF = Translate
 
 
 -- | 'runTranslate' executes the translation, returning either a failure message,
@@ -61,7 +69,7 @@ runTranslate rr decs exp = do
   case res of
      RewriteWithDecM exp' ds -> return (Right (exp',ds))
      RewriteReturnM exp'     -> return (Right (exp',mempty))
-     RewriteIdM     exp'     -> return (Right (exp',mempty))
+--     RewriteIdM     exp'     -> return (Right (exp',mempty))
      RewriteFailureM msg     -> return (Left msg)
 
 {-

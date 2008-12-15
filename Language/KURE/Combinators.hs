@@ -50,9 +50,11 @@ infixl 3 <+, >->, .+, !->
 
 -- | like a @;@ If the first translate succeeds, then do to the second translate after the first translate.
 (>->) :: (Monoid dec, Monad m) => Translate m dec a b -> Translate m dec b c -> Translate m dec a c
-(>->) rr1 rr2 = translate $ \ dec ->
-	chainM (\ e -> apply rr1 dec e)
-	       ( \ _i dec' e' -> apply rr2 (dec `mappend` dec') e')
+(>->) rr1 rr2 = translateF $ \ dec ->
+	chainM (applyF rr1 dec)
+	       ( \ _i optDec -> case optDec of
+				     Nothing -> applyF rr2 dec
+				     Just dec' -> applyF rr2 (dec `mappend` dec'))
 		
 -- | failing translation.
 failT :: (Monad m, Monoid dec) => String -> Translate m dec a b
@@ -111,7 +113,7 @@ acceptR fn = translate $ \ dec expA -> if fn expA
 
 -- | identity rewrite.
 idR :: (Monad m, Monoid dec) => Rewrite m dec exp
-idR = rewrite $ \ dec -> idM
+idR = rewriteF $ \ dec -> idM
 
 -- | failing rewrite.
 failR :: (Monad m, Monoid dec) => String -> Rewrite m dec a
@@ -120,7 +122,9 @@ failR = failT
 --------------------------------------------------------------------------------
 -- internal to this module.
 wasId :: (Monoid dec, Monad m) => Rewrite m dec a -> (Bool -> Rewrite m dec a) -> Rewrite m dec a
-wasId rr fn = translate $ \ dec -> 
-	chainM (\ e -> apply rr dec e)
-	       (\ i dec' e' -> apply (fn i) (dec `mappend` dec') e')
+wasId rr fn = translateF $ \ dec -> 
+	chainM (applyF rr dec)
+	       (\ i optDec -> case optDec of
+				   Nothing -> applyF (fn i) dec 
+				   Just dec' -> applyF (fn i) (dec `mappend` dec'))
 					
