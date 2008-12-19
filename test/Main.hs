@@ -32,26 +32,28 @@ appM 	:: (Monoid dec, Monad m)
      	=> (a1 -> a2 -> res)
      	-> Translate m dec Exp a1 
 	-> Translate m dec Exp a2 
-	-> dec -> Exp -> RewriteM m dec res
-appM f rr1 rr2 dec (App e1 e2) = do e1' <- apply rr1 dec e1
-			            e2' <- apply rr2 dec e2
-			            return $ f e1' e2'
-appM f rr1 rr2 _ _ = fail "appM"
+	->  Exp -> RewriteM m dec res
+appM f rr1 rr2 (App e1 e2) = do e1' <- apply rr1 e1
+			        e2' <- apply rr2 e2
+			        return $ f e1' e2'
+appM f rr1 rr2 _ = fail "appM"
 
 lamM :: (ExpDec dec, Monoid dec, Monad m)
      	=> (Name -> a1 -> res)
      	-> Translate m dec Exp a1 
-	-> dec -> Exp -> RewriteM m dec res
-lamM f rr1 dec (Lam n e1) = do 
+	-> Exp -> RewriteM m dec res
+lamM f rr1 (Lam n e1) = do
+        dec <- getDecsM
 	case addVarBind n dec of 
 	  Nothing   -> fail "lamR: binding failure"
 	  Just env' -> do 
-		e1' <- apply rr1 env' e1
+		e1' <- mapDecsM (\ _ -> env') 
+		                (apply rr1 e1)
 		return $ f n e1'		    
 ---
 
 appR :: (Monoid dec, Monad m) => Rewrite m dec Exp -> Rewrite m dec Exp -> Rewrite m dec Exp
-appR rr1 rr2 = translate (appM App rr1 rr2)
+appR rr1 rr2 = translate (congruenceM . appM App rr1 rr2)
 
 lamR :: (Monad m,ExpDec dec) => Rewrite m dec Exp -> Rewrite m dec Exp
 lamR rr = translate (lamM Lam rr)
@@ -87,7 +89,7 @@ lamU :: (Monoid dec, Monad m, ExpDec dec) => Translate m dec Exp res -> Translat
 lamU rr = translate (lamM (\ a b -> b) rr)
 
 varU :: (Monoid dec, Monad m,Monoid ret) => Translate m dec Exp ret
-varU = varR >-> translate (\ _ _ -> return mempty)
+varU = varR >-> translate (\ _ -> congruenceM $ return mempty)
 
 ---
 
@@ -107,7 +109,8 @@ freeExp :: (Walker m dec Exp,ExpDec dec) => Translate m dec Exp [Name]
 freeExp = mapDecsT clear frees >-> pureT (Data.List.nub)
    where
 	clear _ = mempty
-	varFree = varG >-> translate (\ env (Var v) -> 
+	varFree = varG >-> translate (\ (Var v) -> do
+	                env <- getDecsM
 			case lookupVarBind v env of
 		 	  Nothing -> return [v]
 			  Just _ -> return []) 

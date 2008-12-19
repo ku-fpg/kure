@@ -14,7 +14,6 @@
 module Language.KURE.Rewrite 
 	( Rewrite
 	, rewrite
-	, rewriteF
 	, runRewrite
 	) where
 
@@ -32,11 +31,8 @@ type Rewrite m dec exp = Translate m dec exp exp
 --
 -- @rewrite $ \ _ e -> return e@ /is not/ an identity rewrite. 
 
-rewrite :: (Monoid dec, Monad m) => (dec -> exp1 -> RewriteM m dec exp1) -> Rewrite m dec exp1
+rewrite :: (Monoid dec, Monad m) => (exp1 -> RewriteM m dec exp1) -> Rewrite m dec exp1
 rewrite = translate
-
-rewriteF :: (Monoid dec, Monad m) => (dec -> RewriteF m dec exp1 exp1) -> Rewrite m dec exp1
-rewriteF = translateF
 
 -- | 'runRewrite' executes the rewrite, returning either a failure message,
 -- or a success and the new parts of the environment.

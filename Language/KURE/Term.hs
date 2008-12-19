@@ -58,17 +58,17 @@ class (Monoid dec,Monad m,Term exp) => Walker m dec exp where
 -- | 'extract' converts a 'Rewrite' over a 'Generic' into a rewrite over a specific expression type. 
 
 extract  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec (Generic exp) -> Rewrite m dec exp	-- at *this* type
-extract rr = rewrite $ \ dec e -> do
-            e' <- apply rr dec (inject e)
+extract rr = rewrite $ \ e -> congruenceM $ do
+            e' <- apply rr (inject e)
             project e'
 
 -- | 'promote' promotes a 'Rewrite' into a 'Generic' 'Rewrite'; other types inside Generic cause failure.
 -- 'try' can be used to convert a failure-by-default promotion into a 'id-by-default' promotion.
 
 promote  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec exp -> Rewrite m dec (Generic exp)
-promote rr = rewrite $ \ dec e -> do
+promote rr = rewrite $ \ e -> congruenceM $ do
                e' <- project e
-               r <- apply rr dec e'
+               r <- apply rr e'
                return (inject r)
 
 -------------------------------------------------------------------------------
