@@ -19,7 +19,7 @@ module Language.KURE.RewriteMonad
         , chainM
         , liftQ
         , markM
-        , congruenceM
+        , transparently
         , getDecsM
         , mapDecsM
 --      , focusM
@@ -135,12 +135,12 @@ markM (RewriteM m) = RewriteM $ \ dec -> do
           RewriteReturnM a ds ids     -> return $ RewriteReturnM a ds ids
           RewriteFailureM msg         -> return $ RewriteFailureM msg
           
--- | 'congruenceM' sets the congruence flag, such that if the
+-- | 'transparently' sets the congruence flag, such that if the
 -- monadic action was identity preserving, then a 'markM' does
 -- not set the non-indentity flag.
         
-congruenceM :: (Monad m) => RewriteM m dec a -> RewriteM m dec a
-congruenceM (RewriteM m) = RewriteM $ \ dec -> do
+transparently :: (Monad m) => RewriteM m dec a -> RewriteM m dec a
+transparently (RewriteM m) = RewriteM $ \ dec -> do
         r <- m dec
         case r of
           RewriteReturnM a ds EmptyId -> return $ RewriteReturnM a ds IsId

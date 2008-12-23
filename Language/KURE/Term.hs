@@ -10,8 +10,9 @@
 module Language.KURE.Term 
 	( Term(..)
 	, Walker(..)
-	, extract
-	, promote
+	, extractR
+	, promoteR
+	, extractU
 	, topdownR
 	, bottomupR 
 	, alltdR 
@@ -38,12 +39,10 @@ class Term exp where
 
   -- | 'project' projects into a 'Generic' exp, to get the exp inside, or fail.
   -- TODO: rename as select
-  project :: (Monad m) => Generic exp -> m exp
+  select :: Generic exp -> Maybe exp
 
   -- | 'inject' injects an exp into a 'Generic' exp.
   inject  :: exp -> Generic exp
-
-
 
 
 -- | 'Walker' captures how we walk over @exp@, using a specific @m@ and @dec@.
@@ -57,19 +56,30 @@ class (Monoid dec,Monad m,Term exp) => Walker m dec exp where
 
 -- | 'extract' converts a 'Rewrite' over a 'Generic' into a rewrite over a specific expression type. 
 
-extract  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec (Generic exp) -> Rewrite m dec exp	-- at *this* type
-extract rr = rewrite $ \ e -> congruenceM $ do
+extractR  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec (Generic exp) -> Rewrite m dec exp	-- at *this* type
+extractR rr = rewrite $ \ e -> transparently $ do
             e' <- apply rr (inject e)
-            project e'
-
+            case select e' of
+                Nothing -> fail "extractR"
+                Just r -> return r
+                
 -- | 'promote' promotes a 'Rewrite' into a 'Generic' 'Rewrite'; other types inside Generic cause failure.
 -- 'try' can be used to convert a failure-by-default promotion into a 'id-by-default' promotion.
 
-promote  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec exp -> Rewrite m dec (Generic exp)
-promote rr = rewrite $ \ e -> congruenceM $ do
-               e' <- project e
-               r <- apply rr e'
-               return (inject r)
+promoteR  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec exp -> Rewrite m dec (Generic exp)
+promoteR rr = rewrite $ \ e -> transparently $ do
+               case select e of
+                 Nothing -> fail "promoteR"
+                 Just e' -> do
+                    r <- apply rr e'
+                    return (inject r)
+
+-- | 'accept' 
+
+
+extractU  :: (Monad m, Term exp, Monoid dec) => Translate m dec (Generic exp) r -> Translate m dec exp r
+extractU rr = translate $ \ e -> transparently $ apply rr (inject e)
+
 
 -------------------------------------------------------------------------------
 
