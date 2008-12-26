@@ -12,7 +12,6 @@
 module Language.KURE.RewriteMonad 
         ( RewriteM      -- abstract
         , RewriteStatusM(..)
---      , RewriteF      -- special abstraction round RewriteM
         , runRewriteM
         , failM
         , catchM
@@ -22,10 +21,6 @@ module Language.KURE.RewriteMonad
         , transparently
         , getDecsM
         , mapDecsM
---      , focusM
---        , idM
---       , RewriteF(..)
---      , runRewriteF
         ) where 
 
 
@@ -95,11 +90,7 @@ catchM (RewriteM m1) m2 = RewriteM $ \ dec -> do
           RewriteReturnM {}    -> return r 
           RewriteFailureM msg  -> runRewriteM (m2 msg) dec
           
-
--- 'RewriteF' is a function from some value to a monadic return value,
--- which can return the identity marker.
-newtype RewriteF m dec e1 e2 = RewriteF { runRewriteF :: e1 -> RewriteM m dec (e2,Bool) }
-
+          
 -- | 'chainM' executes the first argument then the second, much like '>>=',
 -- except that the second computation can see if the first computation was an identity or not.
 -- Used to spot when a rewrite succeeded, but was the identity.
@@ -147,8 +138,11 @@ transparently (RewriteM m) = RewriteM $ \ dec -> do
           RewriteReturnM a ds ids     -> return $ RewriteReturnM a ds ids
           RewriteFailureM msg         -> return $ RewriteFailureM msg
 
+
+-- | 'getDecsM' reads the local environment
 getDecsM :: (Monad m, Monoid dec) => RewriteM m dec dec
 getDecsM = RewriteM $ \ dec -> return $ RewriteReturnM dec mempty mempty
 
+-- | 'mapDecs" changes the local environment, inside a local monadic invocation.
 mapDecsM :: (Monad m, Monoid dec) => (dec -> dec) -> RewriteM m dec a -> RewriteM m dec a
 mapDecsM fn (RewriteM m) = RewriteM $ \ dec -> m (fn dec)

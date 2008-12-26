@@ -10,12 +10,135 @@ import Control.Monad
 import Data.List
 
 type Name = String
-data Exp = Lam Name Exp
-         | App Exp Exp
-         | Var Name
-   deriving Show
+
+data Stmt = Seq Stmt Stmt
+          | Assign Name Expr
+
+data Expr = Var Name
+          | Lit Int
+          | Add Expr Expr
+          | ESeq Stmt Expr
+
+------------------------------------------------------------------------
+
+data OurGeneric = GStmt Stmt
+                | GExpr Expr
+
+------------------------------------------------------------------------
+instance Term OurGeneric where
+  type Generic OurGeneric = OurGeneric  -- OurGeneric is its own Generic root.
+  inject    = id
+  select e = return e
+
+instance Term Stmt where
+  type Generic Stmt = OurGeneric 
+  inject    = GStmt
+  select (GStmt stmt) = Just stmt
+  select _            = Nothing
+
+instance Term Expr where
+  type Generic Expr = OurGeneric  
+  inject    = GExpr
+  select (GExpr expr) = Just expr
+  select _            = Nothing
+  
+  
+--------------------------------------------------------------------------------
+
+seqG :: (Monad m,Monoid dec) => Rewrite m dec Stmt
+seqG = acceptR (\ e -> case e of
+                         Seq {} -> True
+                         _      -> False)
+assignG ::  (Monad m,Monoid dec) => Rewrite m dec Stmt
+assignG = acceptR (\ e -> case e of
+                          Assign {} -> True
+                          _ -> False)
+
+varG ::  (Monad m,Monoid dec) => Rewrite m dec Expr
+varG = acceptR (\ e -> case e of
+                        Var {} -> True
+                        _ -> False)
+litG ::  (Monad m,Monoid dec) => Rewrite m dec Expr
+litG = acceptR (\ e -> case e of
+                        Lit {} -> True
+                        _ -> False)
+addG ::  (Monad m,Monoid dec) => Rewrite m dec Expr
+addG = acceptR (\ e -> case e of
+                        Add {} -> True
+                        _ -> False)
+eseqG ::  (Monad m,Monoid dec) => Rewrite m dec Expr
+eseqG = acceptR (\ e -> case e of
+                        ESeq {} -> True
+                        _ -> False)
+
+--------------------------------------------------------------------------------
+
+seqP :: (Monad m,Monoid dec) => (Stmt -> Stmt -> Translate m dec Stmt r) -> Translate m dec Stmt r
+seqP f = seqG >-> readerT (\ (Seq s1 s2) -> f s1 s2)                         
+
+eseqP :: (Monad m,Monoid dec) => (Stmt -> Expr -> Translate m dec Expr r) -> Translate m dec Expr r
+eseqP f = eseqG >-> readerT (\ (ESeq s1 s2) -> f s1 s2)                         
+
+--------------------------------------------------------------------------------
+
+seqR :: (Monad m) => Rewrite m C Stmt -> Rewrite m C Stmt -> Rewrite m C Stmt 
+seqR rr1 rr2 = seqG >-> (translate $ \ (Seq s1 s2) -> transparently $ 
+                                 liftM2 Seq (applyN 0 rr1 s1) (applyN 1 rr2 s2))
+            
+assignR :: (Monad m) => Rewrite m C Expr -> Rewrite m C Stmt 
+assignR rr1  = assignG >-> (translate $ \ (Assign v1 s2) -> transparently $ 
+                                 liftM (Assign v1) (applyN 0 rr1 s2))
+                                 
+varR :: (Monad m) => Rewrite m C Expr 
+varR = varG
+
+litR :: (Monad m) => Rewrite m C Expr 
+litR = varG
+
+addR :: (Monad m) => Rewrite m C Expr -> Rewrite m C Expr -> Rewrite m C Expr 
+addR rr1 rr2 = addG >-> (translate $ \ (Add s1 s2) -> transparently $ do
+                                 liftM2 Add (applyN 0 rr1 s1) (applyN 1 rr2 s2))
+eseqR :: (Monad m) => Rewrite m C Stmt -> Rewrite m C Expr -> Rewrite m C Expr 
+eseqR rr1 rr2 = eseqG >-> (translate $ \ (ESeq s1 s2) -> transparently $ do
+                                 liftM2 ESeq (applyN 0 rr1 s1) (applyN 1 rr2 s2))
+
+------------------------------------------------------------------------
+
+seqU :: (Monad m,Monoid r) => Translate m C Stmt r -> Translate m C Stmt r -> Translate m C Stmt r
+seqU rr1 rr2 = seqG >-> (translate $ \ (Seq s1 s2) -> do
+                                liftM2 mappend (apply rr1 s1) (apply rr2 s2))
+                                                                
+eseqU :: (Monad m,Monoid r) => Translate m C Stmt r -> Translate m C Expr r -> Translate m C Expr r
+eseqU rr1 rr2 = eseqG >-> (translate $ \ (ESeq s1 s2) -> do
+                                liftM2 mappend (apply rr1 s1) (apply rr2 s2))
+
+------------------------------------------------------------------------
+{-
+class (Monoid dec) => Path dec where
+  addEdge :: Int -> dec -> dec
+  lookupPath :: dec -> [Int]
+-}
+data C = C [Int]
+
+instance Monoid C where
+  mempty = C []
+  mappend (C xs) (C ys) = C (xs ++ ys)
+  
+addEdge i (C xs) = C (i : xs)
+lookupPath (C xs) = xs
+
+applyN :: (Monad m) => Int -> Translate m C exp1 exp2 -> exp1 -> RewriteM m C exp2
+applyN n rr e = mapDecsM (addEdge n) $ apply rr e
 
 
+rewriteAtR :: (Walker m C e,Monad m, Generic e ~ e) => [Int] -> Rewrite m C (Generic e) -> Rewrite m C (Generic e)
+rewriteAtR []     rr = rr
+rewriteAtR (p:ps) rr = 
+        allR (getDecsT $ \ (C (x:xs)) ->
+                if x == p
+                then rewriteAtR ps rr
+                else idR)
+{-
 ------------------------------------------------------------------------
 instance Term Exp where
   type Generic Exp = Exp  -- Exp is its own Generic root.
@@ -53,10 +176,10 @@ lamM f rr1 (Lam n e1) = do
 ---
 
 appR :: (Monoid dec, Monad m) => Rewrite m dec Exp -> Rewrite m dec Exp -> Rewrite m dec Exp
-appR rr1 rr2 = translate (congruenceM . appM App rr1 rr2)
+appR rr1 rr2 = translate (transparently . appM App rr1 rr2)
 
 lamR :: (Monad m,ExpDec dec) => Rewrite m dec Exp -> Rewrite m dec Exp
-lamR rr = translate (lamM Lam rr)
+lamR rr = translate (transparently . lamM Lam rr)
 
 varR :: (Monoid dec, Monad m) => Rewrite m dec Exp
 varR = acceptR (\ e -> case e of
@@ -77,6 +200,12 @@ varG = varR
 
 ---
 
+appP :: (Monad m, Monoid dec) => (Exp -> Exp -> Translate m dec Exp res) -> Translate m dec Exp res
+appP f = appG >-> readerT (\ (App e1 e2) -> f e1 e2)
+
+lamP :: (Monad m, Monoid dec,ExpDec dec) => (Name -> Exp -> Translate m dec Exp res) -> Translate m dec Exp res
+lamP f = lamG >-> readerT (\ (Lam v e2) -> f v e2)
+
 varP :: (Monad m, Monoid dec) => (Name -> Translate m dec Exp res) -> Translate m dec Exp res
 varP f = varG >-> readerT (\ (Var v) -> f v)
 
@@ -89,7 +218,7 @@ lamU :: (Monoid dec, Monad m, ExpDec dec) => Translate m dec Exp res -> Translat
 lamU rr = translate (lamM (\ a b -> b) rr)
 
 varU :: (Monoid dec, Monad m,Monoid ret) => Translate m dec Exp ret
-varU = varR >-> translate (\ _ -> congruenceM $ return mempty)
+varU = varR >-> translate (\ _ -> transparently $ return mempty)
 
 ---
 
@@ -115,6 +244,10 @@ freeExp = mapDecsT clear frees >-> pureT (Data.List.nub)
 		 	  Nothing -> return [v]
 			  Just _ -> return []) 
 	frees = varFree <+ allU frees
+
+
+substExp :: Translate m dec Name Exp -> Translate m dec Exp Exp
+substExp
 
 ----
 
@@ -277,3 +410,6 @@ eval =
     T.all eval
 
 -}
+-}
+
+main = print "Hello"

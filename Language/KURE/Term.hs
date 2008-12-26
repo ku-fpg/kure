@@ -50,7 +50,7 @@ class (Monoid dec,Monad m,Term exp) => Walker m dec exp where
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
   allR :: Rewrite m dec (Generic exp) -> Rewrite m dec exp
   -- | 'allU' applied a 'Generic' Translation to a common, 'Monoid'al result, to all the interesting children of this node.
-  allU :: (Monoid result) => Translate m dec (Generic exp) result -> Translate m dec exp result
+  crushU :: (Monoid result) => Translate m dec (Generic exp) result -> Translate m dec exp result
 
 ------------------------------------------------------------------------------
 
@@ -76,10 +76,8 @@ promoteR rr = rewrite $ \ e -> transparently $ do
 
 -- | 'accept' 
 
-
 extractU  :: (Monad m, Term exp, Monoid dec) => Translate m dec (Generic exp) r -> Translate m dec exp r
 extractU rr = translate $ \ e -> transparently $ apply rr (inject e)
-
 
 -------------------------------------------------------------------------------
 
@@ -105,6 +103,6 @@ innermostR s = bottomupR (tryR (s >-> innermostR s))
 
 -- fold a tree using a single translation for each node.
 foldU :: (e ~ Generic e, Walker m dec e, Monoid r) => Translate m dec e r -> Translate m dec e r
-foldU s = concatT [ s, allU (foldU s) ]
+foldU s = concatT [ s, crushU (foldU s) ]
 
 -------------------------------------------------------------------------------
