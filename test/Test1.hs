@@ -20,7 +20,7 @@ main = do
 	sequence_ [ print e | e <- es1]
 
 	let frees :: Exp -> Id [Name]
-	    frees exp = do Right (fs,b) <- runTranslate freeExp () exp
+	    frees exp = do Right (fs,b) <- runTranslate freeExpT () exp
 			   return $ nub fs
 	let e_frees = map (runId . frees) es1
 	sequence_ [ print e | e <- e_frees]
@@ -105,12 +105,47 @@ instance Walker Id () Exp where
    allR rr = appR rr rr <+ lamR rr <+ varR
    crushU rr = appU rr rr <+ lamU rr <+ varU
 
+function f = undefined
+
 ------------------------------------------------------------------------
 
-freeExp :: T Exp [Name]
-freeExp = lambda <+ var <+ crushU freeExp
+freeExpT :: T Exp [Name]
+freeExpT = lambda <+ var <+ crushU freeExpT
   where
           var    = varG >-> translate (\ (Var v) -> return [v])
           lambda = lamG >-> translate (\ (Lam n e) -> do
-                frees <- apply freeExp e
+                frees <- apply freeExpT e
                 return (nub frees \\ [n]))
+                
+freeExp :: Exp -> [Name]
+freeExp = function freeExpT
+
+newName :: Name -> [Name] -> Name
+newName suggest frees = 
+        head [ nm | nm <- suggest : suggests
+             , nm `notElem` frees
+             ]
+   where suggests = [ suggest ++ "_" ++ show n | n <- [1..]]
+
+-- Only works for lambdas
+shallowAlpha :: R Exp
+shallowAlpha = lamG >-> rewrite (\ (Lam n e) -> do
+                frees <- apply freeExpT e
+                let n' = newName n frees
+                e' <- apply (substExp n (Var n')) e
+                return $ Lam n' e')
+
+substExp :: Name -> Exp -> R Exp
+substExp v s =  rule1 <+ rule2 <+ rule3 <+ rule4 <+ rule5
+ where
+        -- const rewrite that replaces anything with s
+        rule1 = varP $ \ n -> n == v ? constT s
+        rule2 = varP $ \ n -> n /= v ? idR
+        rule3 = lamP $ \ n e -> n == v ? idR
+        rule4 = lamP $ \ n e -> (n `notElem` freeExp s || v `notElem` freeExp e) 
+                                ? allR (substExp v s)
+        rule5 = lamP $ \ n e -> (n `elem` freeExp s && v `elem` freeExp e)
+                                ? (shallowAlpha >-> substExp v s)
+
+              
+        

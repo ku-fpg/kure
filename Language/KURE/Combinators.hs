@@ -17,10 +17,12 @@ module Language.KURE.Combinators
 	  (<+)
 	, (>->)
 	, failT
+	, (?)
 	, readerT
 	, getDecsT
 	, mapDecsT
 	, pureT
+	, constT
 	, concatT
 	, -- * 'Rewrite' combinators
 	  (.+)
@@ -37,7 +39,8 @@ import Language.KURE.Translate
 import Language.KURE.Rewrite	
 import Data.Monoid
 
--- infixl 3 <+, >->, .+, !->
+infixl 3 <+, >->, .+, !->
+infixr 3 ?
 
 -- Note: We use < for catching fail, . for catching id.
 
@@ -56,6 +59,11 @@ import Data.Monoid
 failT :: (Monad m, Monoid dec) => String -> Translate m dec a b
 failT msg = translate $ \ e -> failM msg
 
+-- | Guarded translate.
+(?) ::  (Monoid dec, Monad m) => Bool -> Translate m dec a b -> Translate m dec a b
+(?) False _rr = failT "(False ?)"
+(?) True   rr = rr
+
 -- | look at the argument for the translation before choosing which translation to perform. 
 readerT :: (Monoid dec, Monad m) => (a -> Translate m dec a b) -> Translate m dec a b
 readerT fn = translate $ \ expA -> transparently $ apply (fn expA) expA
@@ -70,9 +78,13 @@ getDecsT f = translate $ \ e -> transparently $
 mapDecsT :: (Monoid dec,Monad m) => (dec -> dec) -> Translate m dec a r -> Translate m dec a r
 mapDecsT f_env rr = translate $ \ e -> mapDecsM f_env (apply rr e)
 
--- | 'pureT' promotes a function into a unfailable, non-identity 'Translate'.
+-- | 'pureT' promotes a function into an unfailable, non-identity 'Translate'.
 pureT :: (Monad m,Monoid dec) => (a -> b) -> Translate m dec a b
 pureT f = translate $ \ a -> return (f a)
+
+-- | 'constT' always translates into an unfailable 'Translate' that returns the first argument.
+constT :: (Monad m,Monoid dec) => b -> Translate m dec a b
+constT = pureT . const
 
 -- | 'concatT' composes a list of 'Translate' into a single 'Translate' which 'mconcat's its result.
 concatT :: (Monad m,Monoid dec,Monoid r) => [Translate m dec a r] -> Translate m dec a r
