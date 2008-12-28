@@ -29,6 +29,7 @@ module Language.KURE.Combinators
 	, (!->)
 	, tryR
 	, changedR
+	, repeatR
 	, acceptR
 	, idR
 	, failR

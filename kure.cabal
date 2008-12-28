@@ -7,7 +7,7 @@ Description:	     KURE is a DSL for building rewriting DSLs.
                      KURE contains two primary innovations.
 					 Firstly, the use of type families to provide a lightweight generic traversal mechanism,
 					 allowing the rewriting of mutually recursive data-structures inside a unified framework.
-					 Secondly, the use of overloading to provide context sensitive rewrites, allowing for things like
+					 Secondly, the use of parameterization to provide context sensitive rewrites, allowing for things like
 					 scoping to be abstracted into the basic syntax walking functions.
 Category:            Language
 License:             BSD3
