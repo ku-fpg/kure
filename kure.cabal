@@ -35,15 +35,5 @@ Executable test1
   Hs-Source-Dirs: ., test
   buildable: True
 
-Executable test2
-  Main-Is:        Test2.hs
-  Hs-Source-Dirs: ., test
-  buildable: True
-
-Executable test3
-  Main-Is:        Test3.hs
-  Hs-Source-Dirs: ., test
-  buildable: True
-
 
 
