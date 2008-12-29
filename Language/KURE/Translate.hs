@@ -20,11 +20,7 @@ module Language.KURE.Translate
 	) where
 		
 import Control.Monad
-import Control.Category
-import Control.Arrow
 import Data.Monoid
-import Control.Applicative hiding (many)
-import Data.Tree
 
 import Language.KURE.RewriteMonad
 
@@ -32,7 +28,7 @@ import Language.KURE.RewriteMonad
 -- and remembers identity translations.
 
 newtype Translate m dec exp1 exp2 =
-    Translate { applyTranslate :: exp1 -> RewriteM m dec exp2}
+    Translate ( exp1 -> RewriteM m dec exp2 )
 
 -- | 'apply' directly applies a 'Translate' value to an argument.
 apply :: (Monoid dec, Monad m) => Translate m dec exp1 exp2 -> exp1 -> RewriteM m dec exp2
@@ -57,30 +53,11 @@ runTranslate :: (Monoid dec,Monad m)
 	   -> dec 
 	   -> exp 
 	   -> m (Either String (res,dec))
-runTranslate rr dec exp = do
-  res <- runRewriteM (apply rr exp) dec
+runTranslate rr dec e = do
+  res <- runRewriteM (apply rr e) dec
   case res of
      RewriteReturnM exp' Nothing _   -> return (Right (exp',mempty))
      RewriteReturnM exp' (Just ds) _ -> return (Right (exp',ds))
      RewriteFailureM msg     -> return (Left msg)
-
-{-
-instance (Monad m, Monoid dec) => Category (Translate m dec) where
-  id = translate $ \ _ e -> return e
-  (.) rr2 rr1 = 
-	translate $ \ dec e ->
-	apply rr1 dec e `chainM` \ _i dec' e' -> apply rr2 (dec `mappend` dec') e'
-
-instance (Monad m, Monoid dec) => Arrow (Translate m dec) where
-  arr f = translate $ \ env a -> return (f a)	-- non-id operation
-  first tr = translate $ \ env (b,d) -> do c <- apply tr env b
- 					   return (c,d)
-instance (Monad m, Monoid dec) => ArrowZero (Translate m dec) where
-  arrowZero f = translate $ \ env a -> return (f a)	-- non-id operation
-  first tr = translate $ \ env (b,d) -> do c <- apply tr env b
- 					   return (c,d)
-
--}
-
 
 

@@ -58,7 +58,7 @@ infixr 3 ?
 
 -- | failing translation.
 failT :: (Monad m, Monoid dec) => String -> Translate m dec a b
-failT msg = translate $ \ e -> failM msg
+failT msg = translate $ \ _ -> failM msg
 
 -- | Guarded translate.
 (?) ::  (Monoid dec, Monad m) => Bool -> Translate m dec a b -> Translate m dec a b

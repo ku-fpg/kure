@@ -26,8 +26,6 @@ module Language.KURE.RewriteMonad
 
 import Control.Monad
 import Data.Monoid
-import Control.Applicative hiding (many)
-import Data.Tree
 
 ------------------------------------------------------------------------------
 
@@ -58,17 +56,18 @@ data RewriteStatusM dec exp
 -- C1 (e1) => C1 (C2 (e2)) => C1 (C2 (C3 (e3))) -- will require mergeing??
 
 instance (Monoid dec,Monad m) => Monad (RewriteM m dec) where
-   return exp = RewriteM $ \ _ -> return $ RewriteReturnM exp Nothing EmptyId
+   return e = RewriteM $ \ _ -> return $ RewriteReturnM e Nothing EmptyId
    (RewriteM m) >>= k = RewriteM $ \ dec -> do
            r <- m dec
            case r of
-             RewriteReturnM r ds ids -> do
-             r' <- runRewriteM (k r) dec
-             return $ case r' of
-               RewriteReturnM e' ds' ids' -> RewriteReturnM e' (ds' `mappend` ds) (ids' `mappend` ids)
-               RewriteFailureM msg        -> RewriteFailureM msg
-                                
-   fail msg = RewriteM $ \ a -> return $ RewriteFailureM msg
+             RewriteReturnM r1 ds ids -> do
+                r2 <- runRewriteM (k r1) dec
+                return $ case r2 of
+                 RewriteReturnM e' ds' ids' -> RewriteReturnM e' (ds' `mappend` ds) (ids' `mappend` ids)
+                 RewriteFailureM msg        -> RewriteFailureM msg
+             RewriteFailureM msg        -> return $ RewriteFailureM msg
+
+   fail msg = RewriteM $ \ _ -> return $ RewriteFailureM msg
 
 instance (Monoid dec,Monad m) => Functor (RewriteM m dec) where
   fmap f m = liftM f m
@@ -103,12 +102,12 @@ chainM m k = RewriteM $ \ dec -> do
         r <- runRewriteM m dec
         case r of
           RewriteReturnM a ds ids -> 
-                do r <- runRewriteM (k (isId ids) a) (case ds of
-                                                        Nothing -> dec
-                                                        Just ds2 -> ds2 `mappend` dec)
-                   case r of
-                     RewriteReturnM a ds' ids' ->
-                         return $ RewriteReturnM a (ds' `mappend` ds) (ids' `mappend` ids)
+                do r2 <- runRewriteM (k (isId ids) a) (case ds of
+                                                         Nothing -> dec
+                                                         Just ds2 -> ds2 `mappend` dec)
+                   case r2 of
+                     RewriteReturnM a' ds' ids' ->
+                         return $ RewriteReturnM a' (ds' `mappend` ds) (ids' `mappend` ids)
                      RewriteFailureM msg -> return $ RewriteFailureM msg
           RewriteFailureM msg        -> return $ RewriteFailureM msg -- and still fail 
   where
