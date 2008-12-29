@@ -6,7 +6,7 @@ Description:	     KURE is a DSL for building rewriting DSLs.
 
                      KURE contains two primary innovations.
 					 Firstly, the use of type families to provide a lightweight generic traversal mechanism,
-					 allowing the rewriting of mutually recursive data-structures inside a unified framework.
+					 allowing the rewriting of mutually recursive data-structures inside a simple framework.
 					 Secondly, the use of parameterization to provide context sensitive rewrites, allowing for things like
 					 scoping to be abstracted into the basic syntax walking functions.
 Category:            Language
@@ -17,7 +17,7 @@ Maintainer:          Andy Gill <andygill@ku.edu>
 Build-Depends:       base
 Stability:	     alpha
 build-type: 	     Simple
-Cabal-Version:       >= 1.2
+Cabal-Version:       >= 1.6
 
 Library
   Build-Depends:        base, containers 
@@ -33,7 +33,7 @@ Executable test1
   Ghc-Options:     -fhpc
   Main-Is:        Test.hs
   Hs-Source-Dirs: ., test
-  buildable: True
+  buildable: False
 
 
 
