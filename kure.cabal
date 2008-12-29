@@ -1,5 +1,5 @@
 Name:                kure
-Version:             0.2
+Version:             0.2.1
 Synopsis:            Combinators for Strategic Programming
 Description:	     KURE is a DSL for building rewriting DSLs.
 	 	     KURE shares combinator names and concepts with Stratego, but unlike Stratego, KURE is strongly typed.
@@ -19,7 +19,8 @@ Stability:	     alpha
 
 build-type: 	     Simple
 Cabal-Version:       >= 1.6
-
+Extra-Source-Files:
+    test/Test.hs
 
 Library
   Build-Depends:        base, containers 
@@ -39,6 +40,5 @@ Library
 --  Main-Is:        Test.hs
 --  Hs-Source-Dirs: ., test
 --  buildable: True
-
 
 
