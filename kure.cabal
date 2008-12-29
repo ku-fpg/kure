@@ -14,16 +14,16 @@ Author:              Andy Gill
 Maintainer:          Andy Gill <andygill@ku.edu>
 Copyright:           (c) 2006-2008 Andy Gill
 Homepage:            http://ittc.ku.edu/~andygill/kure.php
-Build-Depends:       base
 Stability:	     alpha
-
 build-type: 	     Simple
 Cabal-Version:       >= 1.6
 Extra-Source-Files:
     test/Test.hs
+    test/Exp.hs
+    test/Id.hs
 
 Library
-  Build-Depends:        base, containers 
+  Build-Depends:        base
   Exposed-modules:
        Language.KURE,
        Language.KURE.RewriteMonad, 
