@@ -19,6 +19,7 @@ Stability:	     alpha
 build-type: 	     Simple
 Cabal-Version:       >= 1.6
 
+
 Library
   Build-Depends:        base, containers 
   Exposed-modules:
@@ -28,6 +29,9 @@ Library
        Language.KURE.Rewrite,
        Language.KURE.Combinators,
        Language.KURE.Term
+
+  Ghc-Options:  -Wall
+
 
 Executable test1
   Ghc-Options:     -fhpc
