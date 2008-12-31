@@ -13,18 +13,17 @@
 -- and the 'Translate' functions operate with 'Rewrite'. 
 
 module Language.KURE.Combinators 
-	(  -- * 'Translate' combinators
+	(  -- * The 'Translate' combinators
 	  (<+)
 	, (>->)
 	, failT
-	, (?)
 	, readerT
 	, getDecsT
 	, mapDecsT
 	, pureT
 	, constT
 	, concatT
-	, -- * 'Rewrite' combinators
+	, -- * The 'Rewrite' combinators
 	  (.+)
 	, (!->)
 	, tryR
@@ -33,6 +32,9 @@ module Language.KURE.Combinators
 	, acceptR
 	, idR
 	, failR
+	, -- * Generic failure, over both 'Monad's and 'Translate's.
+	  (?)
+	, Failable(..)
 	) where 
 	
 import Language.KURE.RewriteMonad	
@@ -60,10 +62,6 @@ infixr 3 ?
 failT :: (Monad m, Monoid dec) => String -> Translate m dec a b
 failT msg = translate $ \ _ -> failM msg
 
--- | Guarded translate.
-(?) ::  (Monoid dec, Monad m) => Bool -> Translate m dec a b -> Translate m dec a b
-(?) False _rr = failT "(False ?)"
-(?) True   rr = rr
 
 -- | look at the argument for the translation before choosing which translation to perform. 
 readerT :: (Monoid dec, Monad m) => (a -> Translate m dec a b) -> Translate m dec a b
@@ -130,6 +128,22 @@ idR = rewrite $ \ e -> transparently $ return e
 -- | failing rewrite.
 failR :: (Monad m, Monoid dec) => String -> Rewrite m dec a
 failR = failT
+
+--------------------------------------------------------------------------------
+-- | Failable structure.
+class Failable f where
+  failure :: String -> f a
+
+instance (Monad m, Monoid dec) => Failable (Translate m dec a) where 
+  failure msg = failT msg
+
+instance (Monad m, Monoid dec) => Failable (RewriteM m dec) where 
+  failure msg = fail msg
+ 
+-- | Guarded translate or monadic action.
+(?) ::  (Failable f) => Bool -> f a -> f a
+(?) False _rr = failure "(False ?)"
+(?) True   rr = rr
 
 
 --------------------------------------------------------------------------------

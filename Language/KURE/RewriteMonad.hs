@@ -142,6 +142,6 @@ transparently (RewriteM m) = RewriteM $ \ dec -> do
 getDecsM :: (Monad m, Monoid dec) => RewriteM m dec dec
 getDecsM = RewriteM $ \ dec -> return $ RewriteReturnM dec mempty mempty
 
--- | 'mapDecs" changes the local environment, inside a local monadic invocation.
+-- | 'mapDecs' changes the local environment, inside a local monadic invocation.
 mapDecsM :: (Monad m, Monoid dec) => (dec -> dec) -> RewriteM m dec a -> RewriteM m dec a
 mapDecsM fn (RewriteM m) = RewriteM $ \ dec -> m (fn dec)
