@@ -13,6 +13,7 @@ module Language.KURE.Term
 	, extractR
 	, promoteR
 	, extractU
+        , promoteU
 	, topdownR
 	, bottomupR 
 	, alltdR 
@@ -54,7 +55,7 @@ class (Monoid dec,Monad m,Term exp) => Walker m dec exp where
 
 ------------------------------------------------------------------------------
 
--- | 'extract' converts a 'Rewrite' over a 'Generic' into a rewrite over a specific expression type. 
+-- | 'extractR' converts a 'Rewrite' over a 'Generic' into a rewrite over a specific expression type. 
 
 extractR  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec (Generic exp) -> Rewrite m dec exp	-- at *this* type
 extractR rr = rewrite $ \ e -> transparently $ do
@@ -63,7 +64,12 @@ extractR rr = rewrite $ \ e -> transparently $ do
                 Nothing -> fail "extractR"
                 Just r -> return r
                 
--- | 'promote' promotes a 'Rewrite' into a 'Generic' 'Rewrite'; other types inside Generic cause failure.
+-- | 'extractU' converts a 'Translate' taking a 'Generic' into a translate over a specific expression type. 
+
+extractU  :: (Monad m, Term exp, Monoid dec) => Translate m dec (Generic exp) r -> Translate m dec exp r
+extractU rr = translate $ \ e -> transparently $ apply rr (inject e)
+
+-- | 'promoteR' promotes a 'Rewrite' into a 'Generic' 'Rewrite'; other types inside Generic cause failure.
 -- 'try' can be used to convert a failure-by-default promotion into a 'id-by-default' promotion.
 
 promoteR  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec exp -> Rewrite m dec (Generic exp)
@@ -74,10 +80,13 @@ promoteR rr = rewrite $ \ e -> transparently $ do
                     r <- apply rr e'
                     return (inject r)
 
--- | 'accept' 
+-- | 'promoteU' promotes a 'Translate' into a 'Generic' 'Translate'; other types inside Generic cause failure.
 
-extractU  :: (Monad m, Term exp, Monoid dec) => Translate m dec (Generic exp) r -> Translate m dec exp r
-extractU rr = translate $ \ e -> transparently $ apply rr (inject e)
+promoteU  :: (Monad m, Term exp, Monoid dec) => Translate m dec exp r -> Translate m dec (Generic exp) r
+promoteU rr = translate $ \ e -> transparently $ do
+               case select e of
+                 Nothing -> fail "promoteI"
+                 Just e' -> apply rr e'
 
 -------------------------------------------------------------------------------
 
