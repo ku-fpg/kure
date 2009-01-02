@@ -35,8 +35,9 @@ Library
   Ghc-Options:  -Wall
 
 
+
 --Executable test1
---  Ghc-Options:     -fhpc
+--  Ghc-Options:     
 --  Main-Is:        Test.hs
 --  Hs-Source-Dirs: ., test
 --  buildable: True

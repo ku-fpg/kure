@@ -22,10 +22,10 @@ module Language.KURE.Term
 	, foldU 
 	) where
 	
-import Language.KURE.RewriteMonad as M	
+import Language.KURE.RewriteMonad
 import Language.KURE.Translate	
 import Language.KURE.Rewrite
-import Language.KURE.Combinators -- perhaps
+import Language.KURE.Combinators
 
 import Control.Monad
 import Data.Monoid
@@ -38,11 +38,10 @@ class Term exp where
   -- will have a new datatype for the 'Generic', which will also be an instance of class 'Term'.
   type Generic exp
 
-  -- | 'project' projects into a 'Generic' exp, to get the exp inside, or fail.
-  -- TODO: rename as select
+  -- | 'project' projects into a 'Generic', to get the exp inside, or fails.
   select :: Generic exp -> Maybe exp
 
-  -- | 'inject' injects an exp into a 'Generic' exp.
+  -- | 'inject' injects an exp into a 'Generic'.
   inject  :: exp -> Generic exp
 
 
@@ -91,27 +90,27 @@ promoteU rr = translate $ \ e -> transparently $ do
 -------------------------------------------------------------------------------
 
 -- apply a rewrite in a top down manner.
-topdownR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec e -> Rewrite m dec e
+topdownR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec (Generic e) -> Rewrite m dec (Generic e)
 topdownR  s = s >-> allR (topdownR s)
 
 -- apply a rewrite in a bottom up manner.
-bottomupR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec e -> Rewrite m dec e
+bottomupR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec (Generic e) -> Rewrite m dec (Generic e)
 bottomupR s = allR (bottomupR s) >-> s
 
 -- apply a rewrite in a top down manner, prunning at successful rewrites.
-alltdR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec e -> Rewrite m dec e
+alltdR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec (Generic e) -> Rewrite m dec (Generic e)
 alltdR    s = s <+ allR (alltdR s)
 
 -- apply a rewrite twice, in a topdown and bottom up way, using one single tree traversal.
-downupR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec e -> Rewrite m dec e
+downupR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec (Generic e) -> Rewrite m dec (Generic e)
 downupR   s = s >-> allR (downupR s) >-> s
 
 -- a fixed point traveral, starting with the innermost term.
-innermostR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec e -> Rewrite m dec e
+innermostR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec (Generic e) -> Rewrite m dec (Generic e)
 innermostR s = bottomupR (tryR (s >-> innermostR s))  
 
 -- fold a tree using a single translation for each node.
-foldU :: (e ~ Generic e, Walker m dec e, Monoid r) => Translate m dec e r -> Translate m dec e r
+foldU :: (e ~ Generic e, Walker m dec e, Monoid r) => Translate m dec (Generic e) r -> Translate m dec (Generic e) r
 foldU s = concatT [ s, crushU (foldU s) ]
 
 -------------------------------------------------------------------------------
