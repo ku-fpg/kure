@@ -32,6 +32,13 @@ module Language.KURE.Combinators
 	, acceptR
 	, idR
 	, failR
+	, -- * The Prelude combinators
+	  tuple2R
+	, listR
+	, maybeR
+	, tuple2U
+	, listU
+	, maybeU
 	, -- * Generic failure, over both 'Monad's and 'Translate's.
 	  (?)
 	, Failable(..)
@@ -41,6 +48,7 @@ import Language.KURE.RewriteMonad
 import Language.KURE.Translate	
 import Language.KURE.Rewrite	
 import Data.Monoid
+import Control.Monad
 
 infixl 3 <+, >->, .+, !->
 infixr 3 ?
@@ -130,6 +138,30 @@ failR :: (Monad m, Monoid dec) => String -> Rewrite m dec a
 failR = failT
 
 --------------------------------------------------------------------------------
+-- Prelude structures
+
+tuple2R :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec b -> Rewrite m dec (a,b)
+tuple2R rra rrb = rewrite $ \ (a,b) -> transparently $ liftM2 (,) (apply rra a) (apply rrb b)
+
+listR :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec [a]
+listR rr = rewrite $ transparently . mapM (apply rr)
+
+maybeR :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec (Maybe a)
+maybeR rr = rewrite $ \ e -> transparently $ case e of
+						Just e'  -> liftM Just (apply rr e')
+						Nothing  -> return $ Nothing
+
+tuple2U :: (Monoid dec, Monad m, Monoid r) => Translate m dec a r -> Translate m dec b r -> Translate m dec (a,b) r
+tuple2U rra rrb = translate $ \ (a,b) -> liftM2 mappend (apply rra a) (apply rrb b)
+
+listU :: (Monoid dec, Monad m, Monoid r) => Translate m dec a r -> Translate m dec [a] r
+listU rr = translate $ liftM mconcat . mapM (apply rr)
+
+maybeU :: (Monoid dec, Monad m, Monoid r) => Translate m dec a r -> Translate m dec (Maybe a) r
+maybeU rr = translate $ \ e -> case e of
+				Just e'  -> apply rr e'
+				Nothing  -> return $ mempty
+
 -- | Failable structure.
 class Failable f where
   failure :: String -> f a
