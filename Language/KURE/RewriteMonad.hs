@@ -12,15 +12,18 @@
 module Language.KURE.RewriteMonad 
         ( RewriteM      -- abstract
         , RewriteStatusM(..)
+	, Count(..)
+	, theCount
         , runRewriteM
         , failM
         , catchM
         , chainM
         , liftQ
         , markM
-        , transparently
-        , getDecsM
-        , mapDecsM
+        , transparentlyM
+        , readEnvM
+        , mapEnvM
+        , writeEnvM
         ) where 
 
 
@@ -34,18 +37,28 @@ data RewriteM m dec exp =
               runRewriteM :: dec -> m (RewriteStatusM dec exp) 
              }
 
-data IdStatus = EmptyId | IsId | NotId
 
-instance Monoid IdStatus where
-        mempty = EmptyId
-        
-        mappend EmptyId y = y
-        mappend x EmptyId = x
-        mappend IsId IsId = IsId
-        mappend _  _      = NotId
+data Count = LoneTransform
+	   | Count !Int
+
+-- | How many transformations have been performed?
+
+theCount :: Count -> Int	
+theCount (LoneTransform) = 1
+theCount (Count n)       = n
+
+instance Monoid Count where
+        mempty = Count 0
+
+        mappend (Count 0)        other          = other
+        mappend other           (Count 0)      = other
+ 	mappend (Count i1)      (Count i2)      = Count (i1 + i2)
+	mappend (LoneTransform) (Count i2)      = Count $ succ i2
+	mappend (Count i1)      (LoneTransform) = Count $ succ i1
+	mappend (LoneTransform) (LoneTransform) = Count $ 2
 
 data RewriteStatusM dec exp
-     = RewriteReturnM exp !(Maybe dec) !IdStatus      -- ^ a regular success
+     = RewriteReturnM exp !(Maybe dec) !Count -- ^ a regular success
      | RewriteFailureM String           -- ^ a real failure
 --     | RewriteIdM exp                 -- ^ identity marker on a value
 
@@ -56,7 +69,7 @@ data RewriteStatusM dec exp
 -- C1 (e1) => C1 (C2 (e2)) => C1 (C2 (C3 (e3))) -- will require mergeing??
 
 instance (Monoid dec,Monad m) => Monad (RewriteM m dec) where
-   return e = RewriteM $ \ _ -> return $ RewriteReturnM e Nothing EmptyId
+   return e = RewriteM $ \ _ -> return $ RewriteReturnM e Nothing mempty
    (RewriteM m) >>= k = RewriteM $ \ dec -> do
            r <- m dec
            case r of
@@ -96,13 +109,14 @@ catchM (RewriteM m1) m2 = RewriteM $ \ dec -> do
 
 chainM :: (Monoid dec,Monad m) 
        => (RewriteM m dec b) 
-       -> (Bool -> b -> RewriteM m dec c)
+       -> (Int -> b -> RewriteM m dec c)
        -> RewriteM m dec c
 chainM m k = RewriteM $ \ dec -> do
         r <- runRewriteM m dec
         case r of
           RewriteReturnM a ds ids -> 
-                do r2 <- runRewriteM (k (isId ids) a) (case ds of
+                do r2 <- runRewriteM (k (theCount ids) a) 
+						      (case ds of
                                                          Nothing -> dec
                                                          Just ds2 -> ds2 `mappend` dec)
                    case r2 of
@@ -110,9 +124,8 @@ chainM m k = RewriteM $ \ dec -> do
                          return $ RewriteReturnM a' (ds' `mappend` ds) (ids' `mappend` ids)
                      RewriteFailureM msg -> return $ RewriteFailureM msg
           RewriteFailureM msg        -> return $ RewriteFailureM msg -- and still fail 
-  where
-          isId NotId = False
-          isId _     = True
+
+
           
 -- | 'markM' is used to mark a monadic rewrite as a non-identity,
 -- unless the congruence flag is set.
@@ -120,28 +133,33 @@ markM :: (Monad m) => RewriteM m dec a -> RewriteM m dec a
 markM (RewriteM m) = RewriteM $ \ dec -> do
         r <- m dec
         case r of
-          RewriteReturnM a ds EmptyId -> return $ RewriteReturnM a ds NotId
-          RewriteReturnM a ds IsId    -> return $ RewriteReturnM a ds EmptyId
-          RewriteReturnM a ds ids     -> return $ RewriteReturnM a ds ids
-          RewriteFailureM msg         -> return $ RewriteFailureM msg
+          RewriteReturnM a ds (Count 0)       -> return $ RewriteReturnM a ds LoneTransform
+          RewriteReturnM a ds (Count n)       -> return $ RewriteReturnM a ds (Count $ succ n)
+          RewriteReturnM a ds (LoneTransform) -> return $ RewriteReturnM a ds (Count 2)
+          RewriteFailureM msg                 -> return $ RewriteFailureM msg
           
 -- | 'transparently' sets the congruence flag, such that if the
 -- monadic action was identity preserving, then a 'markM' does
 -- not set the non-indentity flag.
         
-transparently :: (Monad m) => RewriteM m dec a -> RewriteM m dec a
-transparently (RewriteM m) = RewriteM $ \ dec -> do
+transparentlyM :: (Monad m) => RewriteM m dec a -> RewriteM m dec a
+transparentlyM (RewriteM m) = RewriteM $ \ dec -> do
         r <- m dec
         case r of
-          RewriteReturnM a ds EmptyId -> return $ RewriteReturnM a ds IsId
-          RewriteReturnM a ds ids     -> return $ RewriteReturnM a ds ids
-          RewriteFailureM msg         -> return $ RewriteFailureM msg
-
+          RewriteReturnM a ds LoneTransform -> return $ RewriteReturnM a ds (Count 0)
+          RewriteReturnM a ds other         -> return $ RewriteReturnM a ds other
+          RewriteFailureM msg               -> return $ RewriteFailureM msg
 
 -- | 'getDecsM' reads the local environment
-getDecsM :: (Monad m, Monoid dec) => RewriteM m dec dec
-getDecsM = RewriteM $ \ dec -> return $ RewriteReturnM dec mempty mempty
+readEnvM :: (Monad m, Monoid dec) => RewriteM m dec dec
+readEnvM = RewriteM $ \ dec -> return $ RewriteReturnM dec mempty mempty
 
 -- | 'mapDecs' changes the local environment, inside a local monadic invocation.
-mapDecsM :: (Monad m, Monoid dec) => (dec -> dec) -> RewriteM m dec a -> RewriteM m dec a
-mapDecsM fn (RewriteM m) = RewriteM $ \ dec -> m (fn dec)
+mapEnvM :: (Monad m, Monoid dec) => (dec -> dec) -> RewriteM m dec a -> RewriteM m dec a
+mapEnvM fn (RewriteM m) = RewriteM $ \ dec -> m (fn dec)
+
+
+-- | 'writeDecM' writes a value to the writer monad inside the 'RewriteM'.
+writeEnvM :: (Monad m,Monoid dec) => dec -> RewriteM m dec ()
+writeEnvM dec = RewriteM $ \ _dec -> return $ RewriteReturnM () (Just dec) (Count 0)
+

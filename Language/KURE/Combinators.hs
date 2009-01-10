@@ -18,8 +18,9 @@ module Language.KURE.Combinators
 	, (>->)
 	, failT
 	, readerT
-	, getDecsT
-	, mapDecsT
+	, readEnvT
+	, mapEnvT
+	, writeEnvT
 	, pureT
 	, constT
 	, concatT
@@ -60,11 +61,11 @@ infixr 3 ?
 
 -- | like a catch, '<+' does the first translate , and if it fails, then does the second translate.	
 (<+) :: (Monoid dec, Monad m) => Translate m dec a b -> Translate m dec a b -> Translate m dec a b
-(<+) rr1 rr2 = translate $ \ e -> transparently $ apply rr1 e `catchM` (\ _ -> apply rr2 e)
+(<+) rr1 rr2 = transparently $ translate $ \ e -> apply rr1 e `catchM` (\ _ -> apply rr2 e)
 
 -- | like a @;@ If the first translate succeeds, then do to the second translate after the first translate.
 (>->) :: (Monoid dec, Monad m) => Translate m dec a b -> Translate m dec b c -> Translate m dec a c
-(>->) rr1 rr2 = translate $ \ e -> transparently $ chainM (apply rr1 e) ( \ _i e2 -> apply rr2 e2)
+(>->) rr1 rr2 = transparently $ translate $ \ e -> chainM (apply rr1 e) ( \ _i e2 -> apply rr2 e2)
 
 -- | failing translation.
 failT :: (Monad m, Monoid dec) => String -> Translate m dec a b
@@ -73,17 +74,21 @@ failT msg = translate $ \ _ -> failM msg
 
 -- | look at the argument for the translation before choosing which translation to perform. 
 readerT :: (Monoid dec, Monad m) => (a -> Translate m dec a b) -> Translate m dec a b
-readerT fn = translate $ \ expA -> transparently $ apply (fn expA) expA
+readerT fn = transparently $ translate $ \ expA -> apply (fn expA) expA
 
 -- | look at the @dec@ before choosing which translation to do.
-getDecsT :: (Monad m, Monoid dec) => (dec -> Translate m dec a b) -> Translate m dec a b
-getDecsT f = translate $ \ e -> transparently $
-                                do dec <- getDecsM 
+readEnvT :: (Monad m, Monoid dec) => (dec -> Translate m dec a b) -> Translate m dec a b
+readEnvT f = transparently $ translate $ \ e -> 
+                                do dec <- readEnvM 
                                    apply (f dec) e
 
+-- | add to the context 'dec', which is propogated using a writer monad.
+writeEnvT :: (Monad m, Monoid dec) => dec -> Rewrite m dec a
+writeEnvT dec = translate $ \ e -> do writeEnvM dec ; return e
+
 -- | change the @dec@'s for a scoped translation.
-mapDecsT :: (Monoid dec,Monad m) => (dec -> dec) -> Translate m dec a r -> Translate m dec a r
-mapDecsT f_env rr = translate $ \ e -> mapDecsM f_env (apply rr e)
+mapEnvT :: (Monoid dec,Monad m) => (dec -> dec) -> Translate m dec a r -> Translate m dec a r
+mapEnvT f_env rr = transparently $ translate $ \ e -> mapEnvM f_env (apply rr e)
 
 -- | 'pureT' promotes a function into an unfailable, non-identity 'Translate'.
 pureT :: (Monad m,Monoid dec) => (a -> b) -> Translate m dec a b
@@ -103,11 +108,11 @@ concatT ts = translate $ \ e -> do
 
 -- | if the first rewrite is an identity, then do the second rewrite.
 (.+) :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec a -> Rewrite m dec a
-(.+) a b = a `wasId` (\ i -> if i then b else idR)
+(.+) a b = a `countTrans` (\ i -> if i == 0 then b else idR)
 
 -- | if the first rewrite was /not/ an identity, then also do the second rewrite.
 (!->) :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec a -> Rewrite m dec a 
-(!->) a b = a `wasId` (\ i -> if i then idR else b)
+(!->) a b = a `countTrans` (\ i -> if i == 0 then idR else b)
 
 -- | catch a failing 'Rewrite', making it into an identity.
 tryR :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec a
@@ -123,7 +128,7 @@ repeatR s = tryR (s >-> repeatR s)
 
 -- | look at the argument to a rewrite, and choose to be either a failure of trivial success.
 acceptR :: (Monoid dec, Monad m) => (a -> Bool) -> Rewrite m dec a
-acceptR fn = translate $ \  expA -> transparently $
+acceptR fn = transparently $ translate $ \  expA ->
                                     if fn expA 
 				    then return expA
 				    else fail "accept failed"
@@ -131,7 +136,7 @@ acceptR fn = translate $ \  expA -> transparently $
 
 -- | identity rewrite.
 idR :: (Monad m, Monoid dec) => Rewrite m dec exp
-idR = rewrite $ \ e -> transparently $ return e
+idR = transparently $ rewrite $ \ e -> return e
 
 -- | failing rewrite.
 failR :: (Monad m, Monoid dec) => String -> Rewrite m dec a
@@ -141,13 +146,13 @@ failR = failT
 -- Prelude structures
 
 tuple2R :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec b -> Rewrite m dec (a,b)
-tuple2R rra rrb = rewrite $ \ (a,b) -> transparently $ liftM2 (,) (apply rra a) (apply rrb b)
+tuple2R rra rrb = transparently $ rewrite $ \ (a,b) -> liftM2 (,) (apply rra a) (apply rrb b)
 
 listR :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec [a]
-listR rr = rewrite $ transparently . mapM (apply rr)
+listR rr = transparently $ rewrite $ mapM (apply rr)
 
 maybeR :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec (Maybe a)
-maybeR rr = rewrite $ \ e -> transparently $ case e of
+maybeR rr = transparently $ rewrite $ \ e -> case e of
 						Just e'  -> liftM Just (apply rr e')
 						Nothing  -> return $ Nothing
 
@@ -162,6 +167,7 @@ maybeU rr = translate $ \ e -> case e of
 				Just e'  -> apply rr e'
 				Nothing  -> return $ mempty
 
+--------------------------------------------------------------------------------
 -- | Failable structure.
 class Failable f where
   failure :: String -> f a
@@ -180,8 +186,8 @@ instance (Monad m, Monoid dec) => Failable (RewriteM m dec) where
 
 --------------------------------------------------------------------------------
 -- internal to this module.
-wasId :: (Monoid dec, Monad m) => Rewrite m dec a -> (Bool -> Rewrite m dec a) -> Rewrite m dec a
-wasId rr fn = translate $ \ e -> transparently $
+countTrans :: (Monoid dec, Monad m) => Rewrite m dec a -> (Int -> Rewrite m dec a) -> Rewrite m dec a
+countTrans rr fn = transparently $ translate $ \ e ->
 	chainM (apply rr e)
 	       (\ i e' -> apply (fn i) e')
 

@@ -22,7 +22,6 @@ module Language.KURE.Term
 	, foldU 
 	) where
 	
-import Language.KURE.RewriteMonad
 import Language.KURE.Translate	
 import Language.KURE.Rewrite
 import Language.KURE.Combinators
@@ -57,7 +56,7 @@ class (Monoid dec,Monad m,Term exp) => Walker m dec exp where
 -- | 'extractR' converts a 'Rewrite' over a 'Generic' into a rewrite over a specific expression type. 
 
 extractR  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec (Generic exp) -> Rewrite m dec exp	-- at *this* type
-extractR rr = rewrite $ \ e -> transparently $ do
+extractR rr = transparently $ rewrite $ \ e -> do
             e' <- apply rr (inject e)
             case select e' of
                 Nothing -> fail "extractR"
@@ -66,13 +65,13 @@ extractR rr = rewrite $ \ e -> transparently $ do
 -- | 'extractU' converts a 'Translate' taking a 'Generic' into a translate over a specific expression type. 
 
 extractU  :: (Monad m, Term exp, Monoid dec) => Translate m dec (Generic exp) r -> Translate m dec exp r
-extractU rr = translate $ \ e -> transparently $ apply rr (inject e)
+extractU rr = transparently $ translate $ \ e -> apply rr (inject e)
 
 -- | 'promoteR' promotes a 'Rewrite' into a 'Generic' 'Rewrite'; other types inside Generic cause failure.
 -- 'try' can be used to convert a failure-by-default promotion into a 'id-by-default' promotion.
 
 promoteR  :: (Monad m, Term exp, Monoid dec) => Rewrite m dec exp -> Rewrite m dec (Generic exp)
-promoteR rr = rewrite $ \ e -> transparently $ do
+promoteR rr = transparently $ rewrite $ \ e -> do
                case select e of
                  Nothing -> fail "promoteR"
                  Just e' -> do
@@ -82,30 +81,30 @@ promoteR rr = rewrite $ \ e -> transparently $ do
 -- | 'promoteU' promotes a 'Translate' into a 'Generic' 'Translate'; other types inside Generic cause failure.
 
 promoteU  :: (Monad m, Term exp, Monoid dec) => Translate m dec exp r -> Translate m dec (Generic exp) r
-promoteU rr = translate $ \ e -> transparently $ do
+promoteU rr = transparently $ translate $ \ e -> do
                case select e of
                  Nothing -> fail "promoteI"
                  Just e' -> apply rr e'
 
 -------------------------------------------------------------------------------
 
--- apply a rewrite in a top down manner.
+-- | apply a rewrite in a top down manner.
 topdownR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec (Generic e) -> Rewrite m dec (Generic e)
 topdownR  s = s >-> allR (topdownR s)
 
--- apply a rewrite in a bottom up manner.
+-- | apply a rewrite in a bottom up manner.
 bottomupR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec (Generic e) -> Rewrite m dec (Generic e)
 bottomupR s = allR (bottomupR s) >-> s
 
--- apply a rewrite in a top down manner, prunning at successful rewrites.
+-- | apply a rewrite in a top down manner, prunning at successful rewrites.
 alltdR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec (Generic e) -> Rewrite m dec (Generic e)
 alltdR    s = s <+ allR (alltdR s)
 
--- apply a rewrite twice, in a topdown and bottom up way, using one single tree traversal.
+-- | apply a rewrite twice, in a topdown and bottom up way, using one single tree traversal.
 downupR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec (Generic e) -> Rewrite m dec (Generic e)
 downupR   s = s >-> allR (downupR s) >-> s
 
--- a fixed point traveral, starting with the innermost term.
+-- | a fixed point traveral, starting with the innermost term.
 innermostR :: (e ~ Generic e, Walker m dec e) => Rewrite m dec (Generic e) -> Rewrite m dec (Generic e)
 innermostR s = bottomupR (tryR (s >-> innermostR s))  
 

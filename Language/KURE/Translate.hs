@@ -16,6 +16,7 @@ module Language.KURE.Translate
 	( Translate
 	, apply
 	, runTranslate
+	, transparently
 	, translate
 	) where
 		
@@ -34,16 +35,23 @@ newtype Translate m dec exp1 exp2 =
 apply :: (Monoid dec, Monad m) => Translate m dec exp1 exp2 -> exp1 -> RewriteM m dec exp2
 apply (Translate t) exp1 = t exp1 
 
-
 -- | 'translate' is the standard way of building a 'Translate', where if the translation is successful it 
 -- is automatically marked as a non-identity translation. 
 --
--- Note: @translate $ \ _ e -> return e@ /is not/ an identity rewrite, but a succesful rewrite that
+-- Note: @translate $ \\ e -> return e@ /is not/ an identity rewrite, but a succesful rewrite that
 -- returns its provided argument. 
 
 translate :: (Monoid dec, Monad m) => (exp1 -> RewriteM m dec exp2) -> Translate m dec exp1 exp2
 translate f = Translate $ \ e -> markM $ f e
 
+
+-- | 'transparently' marks a 'translate' (or 'rewrite') as transparent, that is the identity status
+-- of any internal applications of 'apply' is preserved across the translate.
+--
+-- Note: @transparently $ translate $ \\ e -> return e@ /is/ an identity rewrite.
+
+transparently :: (Monoid dec, Monad m) => Translate m dec exp1 exp2 -> Translate m dec exp1 exp2
+transparently (Translate m) = Translate $ \ e -> transparentlyM (m e)
 
 -- | 'runTranslate' executes the translation, returning either a failure message,
 -- or a success and the new parts of the environment.
@@ -52,12 +60,11 @@ runTranslate :: (Monoid dec,Monad m)
 	   => Translate m dec exp res
 	   -> dec 
 	   -> exp 
-	   -> m (Either String (res,dec))
+	   -> m (Either String (res,dec,Int))
 runTranslate rr dec e = do
   res <- runRewriteM (apply rr e) dec
   case res of
-     RewriteReturnM exp' Nothing _   -> return (Right (exp',mempty))
-     RewriteReturnM exp' (Just ds) _ -> return (Right (exp',ds))
+     RewriteReturnM exp' Nothing c -> return (Right (exp',mempty,theCount c))
+     RewriteReturnM exp' (Just ds) c -> return (Right (exp',ds,theCount c))
      RewriteFailureM msg     -> return (Left msg)
-
 

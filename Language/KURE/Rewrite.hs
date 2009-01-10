@@ -42,5 +42,5 @@ runRewrite :: (Monoid dec,Monad m)
 	   => Rewrite m dec exp
 	   -> dec 
 	   -> exp 
-	   -> m (Either String (exp,dec))
+	   -> m (Either String (exp,dec,Int))
 runRewrite = runTranslate
