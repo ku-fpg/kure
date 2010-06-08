@@ -23,7 +23,7 @@ Extra-Source-Files:
     test/Id.hs
 
 Library
-  Build-Depends:        base
+  Build-Depends: base >= 4.2
   Ghc-Options:     -O2
   Exposed-modules:
        Language.KURE,
@@ -35,12 +35,19 @@ Library
 
   Ghc-Options:  -Wall
 
+Flag all
+  Description: Enable full development tree
+  Default:     False
 
-
---Executable test1
---  Ghc-Options:     
---  Main-Is:        Test.hs
---  Hs-Source-Dirs: ., test
---  buildable: True
+Executable test1
+  if flag(all)
+    buildable: True
+  else 
+    buildable: False
+  endif
+  Ghc-Options:     
+  Main-Is:        Test.hs
+  Hs-Source-Dirs: ., test
+  buildable: True
 
 
