@@ -22,7 +22,7 @@ main = do
 	sequence_ [ print e | e <- es1]
 
 	let frees :: Exp -> Id [Name]
-	    frees exp = do Right (fs,b) <- runTranslate freeExpT () exp
+	    frees exp = do Right (fs,_,b) <- runTranslate freeExpT () exp
 			   return $ nub fs
 	let e_frees = map (runId . frees) es1
 	sequence_ [ print e | e <- e_frees]
@@ -58,14 +58,14 @@ appR :: R Exp
                               -> R Exp
                               -> R Exp
 appR rr1 rr2 = appG >-> rewrite (\ (App e1 e2) -> 
-                                transparently $ 
+                                transparentlyM $ 
                                 liftM2 App (apply rr1 e1) 
                                            (apply rr2 e2)) 
 
 lamR :: R Exp 
                               -> R Exp
 lamR rr = lamG >-> rewrite (\ (Lam n e) -> 
-                                transparently $ do
+                                transparentlyM $ do
                                 e' <- apply rr e
                                 return $ Lam n e')
                                            
@@ -115,7 +115,7 @@ instance Walker Id () Exp where
 
 function :: Translate Id () a b -> a -> b
 function f a = runId $ do 
-        Right (b,_) <- runTranslate f () a
+        Right (b,_,_) <- runTranslate f () a
 	return $ b
 
 ------------------------------------------------------------------------
@@ -170,5 +170,5 @@ betaRedR = rewrite $ \ e ->
      _ -> fail "betaRed"
 
 debugR :: (Show e) => String -> R e      
-debugR msg = translate $ \ e -> transparently $ trace (msg ++ " : " ++ show e) (return e)
+debugR msg = translate $ \ e -> transparentlyM $ trace (msg ++ " : " ++ show e) (return e)
 
