@@ -1,6 +1,6 @@
 -- |
 -- Module: Language.KURE
--- Copyright: (c) 2006-2008 Andy Gill
+-- Copyright: (c) 2010 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Andy Gill <andygill@ku.edu>
@@ -12,15 +12,9 @@
 --
 
 module Language.KURE 
-	( module Language.KURE.RewriteMonad
-	, module Language.KURE.Translate
-	, module Language.KURE.Rewrite
+	( module Language.KURE.Types
 	, module Language.KURE.Combinators
-	, module Language.KURE.Term
 	) where
 
-import Language.KURE.RewriteMonad
-import Language.KURE.Translate
-import Language.KURE.Rewrite
+import Language.KURE.Types
 import Language.KURE.Combinators
-import Language.KURE.Term

@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances, UndecidableInstances, TypeFamilies #-}
 -- |
 -- Module: Language.KURE.Combinators 
--- Copyright: (c) 2006-2008 Andy Gill
+-- Copyright: (c) 2010 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Andy Gill <andygill@ku.edu>
@@ -59,14 +59,17 @@ module Language.KURE.Combinators
 	, foldU 
 -}	where 
 	
-import Language.KURE.RewriteMonad	
-import Language.KURE.Translate	
-import Language.KURE.Term
-import Language.KURE.Rewrite	
+--import Language.KURE.RewriteMonad	
+--import Language.KURE.Translate	
+--import Language.KURE.Term
+--import Language.KURE.Rewrite	
+import Language.KURE.Types
+
 import Data.Monoid
 import Control.Monad
 import qualified Control.Category as Cat
 import Control.Arrow
+
 
 --infixl 3 <+, >->, .+, !->
 infixr 3 ?
@@ -90,7 +93,6 @@ failT msg = translate $ \ _ -> fail msg
 -- | look at the argument for the translation before choosing which translation to perform. 
 readerT :: (a -> Translate  a b) -> Translate  a b
 readerT fn = translate $ \ expA -> apply (fn expA) expA
-
 
 pureT :: (a -> b) -> Translate a b
 pureT = arr
