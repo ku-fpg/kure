@@ -34,8 +34,7 @@ class Term exp where
 
   -- | 'equals' creates an predicate 'Translate' specialized to the first argument.
   equals :: exp -> Translate exp Bool
-  equals e = constT False
-
+  equals _ = translate $ \ _ -> return False
 
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
   allR :: Rewrite (Generic exp) -> Rewrite exp
