@@ -156,29 +156,27 @@ failR = failT
 --------------------------------------------------------------------------------
 -- Prelude structures
 
-{-
-tuple2R :: ( Monad m) => Rewrite a -> Rewrite b -> Rewrite (a,b)
-tuple2R rra rrb = transparently $ rewrite $ \ (a,b) -> liftM2 (,) (apply rra a) (apply rrb b)
+tuple2R :: Rewrite a -> Rewrite b -> Rewrite (a,b)
+tuple2R rra rrb = rewrite $ \ (a,b) -> liftM2 (,) (apply rra a) (apply rrb b)
 
-listR :: ( Monad m) => Rewrite a -> Rewrite [a]
-listR rr = transparently $ rewrite $ mapM (apply rr)
+listR :: Rewrite a -> Rewrite [a]
+listR rr = rewrite $ mapM (apply rr)
 
-maybeR :: ( Monad m) => Rewrite a -> Rewrite (Maybe a)
-maybeR rr = transparently $ rewrite $ \ e -> case e of
+maybeR :: Rewrite a -> Rewrite (Maybe a)
+maybeR rr = rewrite $ \ e -> case e of
 						Just e'  -> liftM Just (apply rr e')
 						Nothing  -> return $ Nothing
 
-tuple2U :: ( Monad m, Monoid r) => Translate a r -> Translate b r -> Translate (a,b) r
+tuple2U :: ( Monoid r) => Translate a r -> Translate b r -> Translate (a,b) r
 tuple2U rra rrb = translate $ \ (a,b) -> liftM2 mappend (apply rra a) (apply rrb b)
 
-listU :: ( Monad m, Monoid r) => Translate a r -> Translate [a] r
+listU :: ( Monoid r) => Translate a r -> Translate [a] r
 listU rr = translate $ liftM mconcat . mapM (apply rr)
 
-maybeU :: ( Monad m, Monoid r) => Translate a r -> Translate (Maybe a) r
+maybeU :: ( Monoid r) => Translate a r -> Translate (Maybe a) r
 maybeU rr = translate $ \ e -> case e of
 				Just e'  -> apply rr e'
 				Nothing  -> return $ mempty
--}
 
 --------------------------------------------------------------------------------
 -- | Guarded translate or monadic action.
