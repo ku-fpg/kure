@@ -28,6 +28,8 @@ module Language.KURE.RewriteMonad
 -}
         ) where 
 
+import System.IO.Error
+
 
 ------------------------------------------------------------------------------
 
@@ -35,6 +37,20 @@ class Monad m => TranslateMonad m where
 	catchTM :: m a -> (String -> m a) -> m a 
 	equalsTM :: a -> a -> m Bool
 	equalsTM _ _ = return False
+
+
+instance TranslateMonad IO where
+	catchTM m1 m2 = m1 `Prelude.catch` (\ e ->
+		if isUserError e 
+		then m2 $! (ioeGetErrorString e)
+		else ioError e)
+
+instance TranslateMonad Maybe where
+	catchTM m1 m2 = case m1 of
+			  Nothing -> m2 "fail inside Maybe monad"
+			  Just v -> Just v
+
+
 
 {-	
 data RewriteM m exp = 
