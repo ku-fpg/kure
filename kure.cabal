@@ -1,5 +1,5 @@
 Name:                kure
-Version:             0.3.1
+Version:             1.0.1
 Synopsis:            Combinators for Strategic Programming
 Description:	     KURE is a DSL for building rewriting DSLs.
 	 	     KURE shares combinator names and concepts with Stratego, but unlike Stratego, KURE is strongly typed.
@@ -12,8 +12,8 @@ License:             BSD3
 License-file:        LICENSE
 Author:              Andy Gill
 Maintainer:          Andy Gill <andygill@ku.edu>
-Copyright:           (c) 2006-2008 Andy Gill
-Homepage:            http://ittc.ku.edu/~andygill/kure.php
+Copyright:           (c) 2010 The University of Kansas
+Homepage:            http://www.ittc.ku.edu/csdl/fpg/Tools/KURE
 Stability:	     alpha
 build-type: 	     Simple
 Cabal-Version:       >= 1.6

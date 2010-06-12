@@ -9,3 +9,4 @@ instance Monad Id where
 
 runId :: Id a -> a
 runId (Id a) = a
+

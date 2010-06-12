@@ -10,7 +10,8 @@
 -- This is the definition of the monad inside KURE.
 
 module Language.KURE.RewriteMonad 
-        ( RewriteM      -- abstract
+        ( TranslateMonad(..)      -- abstract
+{-
         , RewriteStatusM(..)
 	, Count(..)
 	, theCount
@@ -24,19 +25,22 @@ module Language.KURE.RewriteMonad
         , readEnvM
         , mapEnvM
         , writeEnvM
+-}
         ) where 
 
 
-import Control.Monad
-import Data.Monoid
-
 ------------------------------------------------------------------------------
 
-data RewriteM m dec exp = 
+class Monad m => TranslateMonad m where
+	catchTM :: m a -> (String -> m a) -> m a 
+	equalsTM :: a -> a -> m Bool
+	equalsTM _ _ = return False
+
+{-	
+data RewriteM m exp = 
    RewriteM { -- | 'runRewriteM' runs the 'RewriteM' monad, returning a status.
               runRewriteM :: dec -> m (RewriteStatusM dec exp) 
              }
-
 
 data Count = LoneTransform
 	   | Count !Int
@@ -163,3 +167,4 @@ mapEnvM fn (RewriteM m) = RewriteM $ \ dec -> m (fn dec)
 writeEnvM :: (Monad m,Monoid dec) => dec -> RewriteM m dec ()
 writeEnvM dec = RewriteM $ \ _dec -> return $ RewriteReturnM () (Just dec) (Count 0)
 
+-}

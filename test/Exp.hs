@@ -8,12 +8,8 @@ type Name = String
 data Exp = Lam Name Exp
          | App Exp Exp
          | Var Name
-   deriving Show
+   deriving (Show,Eq)
 
-instance Term Exp where
-  type Generic Exp = Exp  -- Exp is its own Generic root.
-  inject    = id
-  select e  = return e
 
 -- examples
 e1 = Var "x"

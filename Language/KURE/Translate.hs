@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, ExistentialQuantification, Rank2Types #-}
+
 -- |
 -- Module: Language.KURE.Translate 
 -- Copyright: (c) 2006-2008 Andy Gill
@@ -15,50 +17,42 @@
 module Language.KURE.Translate 
 	( Translate
 	, apply
-	, runTranslate
-	, transparently
 	, translate
 	) where
-		
-import Control.Monad
-import Data.Monoid
 
+import Control.Category 
+import Control.Arrow
 import Language.KURE.RewriteMonad
 
 -- | 'Translate' is a translation or strategy that translates between @exp1@ and @exp2@, with the posiblity of failure,
 -- and remembers identity translations.
 
-newtype Translate m dec exp1 exp2 =
-    Translate ( exp1 -> RewriteM m dec exp2 )
+data Translate exp1 exp2 = Translate (forall m . (TranslateMonad m) => exp1 -> m exp2 )
 
 -- | 'apply' directly applies a 'Translate' value to an argument.
-apply :: (Monoid dec, Monad m) => Translate m dec exp1 exp2 -> exp1 -> RewriteM m dec exp2
+apply :: (TranslateMonad m) => Translate exp1 exp2 -> exp1 -> m exp2
 apply (Translate t) exp1 = t exp1 
 
 -- | 'translate' is the standard way of building a 'Translate', where if the translation is successful it 
 -- is automatically marked as a non-identity translation. 
---
--- Note: @translate $ \\ e -> return e@ /is not/ an identity rewrite, but a succesful rewrite that
--- returns its provided argument. 
 
-translate :: (Monoid dec, Monad m) => (exp1 -> RewriteM m dec exp2) -> Translate m dec exp1 exp2
-translate f = Translate $ \ e -> markM $ f e
+translate :: (forall m . (TranslateMonad m) => exp1 -> m exp2) -> Translate exp1 exp2
+translate f = Translate $ \ e -> f e
 
+instance Category (Translate) where
+   id = translate $ return 
+   (.) rr1 rr2 = translate $ \ e -> apply rr2 e >>= apply rr1
 
--- | 'transparently' marks a 'translate' (or 'rewrite') as transparent, that is the identity status
--- of any internal applications of 'apply' is preserved across the translate.
---
--- Note: @transparently $ translate $ \\ e -> return e@ /is/ an identity rewrite.
+instance Arrow (Translate) where
+   arr f = translate (return Prelude.. f)
+   first rr = translate $ \ (b,d) -> do c <- apply rr b ; return (c,d)
 
-transparently :: (Monoid dec, Monad m) => Translate m dec exp1 exp2 -> Translate m dec exp1 exp2
-transparently (Translate m) = Translate $ \ e -> transparentlyM (m e)
-
+{-
 -- | 'runTranslate' executes the translation, returning either a failure message,
 -- or a success and the new parts of the environment.
 
 runTranslate :: (Monoid dec,Monad m) 
 	   => Translate m dec exp res
-	   -> dec 
 	   -> exp 
 	   -> m (Either String (res,dec,Int))
 runTranslate rr dec e = do
@@ -67,4 +61,4 @@ runTranslate rr dec e = do
      RewriteReturnM exp' Nothing c -> return (Right (exp',mempty,theCount c))
      RewriteReturnM exp' (Just ds) c -> return (Right (exp',ds,theCount c))
      RewriteFailureM msg     -> return (Left msg)
-
+-}

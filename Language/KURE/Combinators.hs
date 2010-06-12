@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances, UndecidableInstances, TypeFamilies #-}
 -- |
 -- Module: Language.KURE.Combinators 
 -- Copyright: (c) 2006-2008 Andy Gill
@@ -13,7 +14,7 @@
 -- and the 'Translate' functions operate with 'Rewrite'. 
 
 module Language.KURE.Combinators 
-	(  -- * The 'Translate' combinators
+{-	(  -- * The 'Translate' combinators
 	  (<+)
 	, (>->)
 	, failT
@@ -43,15 +44,31 @@ module Language.KURE.Combinators
 	, -- * Generic failure, over both 'Monad's and 'Translate's.
 	  (?)
 	, Failable(..)
-	) where 
+	) 
+	-}
+{-
+	, extractR
+	, promoteR
+	, extractU
+        , promoteU
+	, topdownR
+	, bottomupR 
+	, alltdR 
+	, downupR 
+	, innermostR 
+	, foldU 
+-}	where 
 	
 import Language.KURE.RewriteMonad	
 import Language.KURE.Translate	
+import Language.KURE.Term
 import Language.KURE.Rewrite	
 import Data.Monoid
 import Control.Monad
+import qualified Control.Category as Cat
+import Control.Arrow
 
-infixl 3 <+, >->, .+, !->
+--infixl 3 <+, >->, .+, !->
 infixr 3 ?
 
 -- Note: We use < for catching fail, . for catching id.
@@ -60,134 +77,183 @@ infixr 3 ?
 -- The Translate combinators.
 
 -- | like a catch, '<+' does the first translate , and if it fails, then does the second translate.	
-(<+) :: (Monoid dec, Monad m) => Translate m dec a b -> Translate m dec a b -> Translate m dec a b
-(<+) rr1 rr2 = transparently $ translate $ \ e -> apply rr1 e `catchM` (\ _ -> apply rr2 e)
+(<+) :: Translate a b -> Translate a b -> Translate a b
+(<+) rr1 rr2 = translate $ \ e -> apply rr1 e `catchTM` (\ _ -> apply rr2 e)
 
--- | like a @;@ If the first translate succeeds, then do to the second translate after the first translate.
-(>->) :: (Monoid dec, Monad m) => Translate m dec a b -> Translate m dec b c -> Translate m dec a c
-(>->) rr1 rr2 = transparently $ translate $ \ e -> chainM (apply rr1 e) ( \ _i e2 -> apply rr2 e2)
+(>->) :: Translate a b -> Translate b c -> Translate a c
+(>->) rr1 rr2 = rr1 >>> rr2
 
 -- | failing translation.
-failT :: (Monad m, Monoid dec) => String -> Translate m dec a b
-failT msg = translate $ \ _ -> failM msg
-
+failT :: String -> Translate a b
+failT msg = translate $ \ _ -> fail msg
 
 -- | look at the argument for the translation before choosing which translation to perform. 
-readerT :: (Monoid dec, Monad m) => (a -> Translate m dec a b) -> Translate m dec a b
-readerT fn = transparently $ translate $ \ expA -> apply (fn expA) expA
+readerT :: (a -> Translate  a b) -> Translate  a b
+readerT fn = translate $ \ expA -> apply (fn expA) expA
 
--- | look at the @dec@ before choosing which translation to do.
-readEnvT :: (Monad m, Monoid dec) => (dec -> Translate m dec a b) -> Translate m dec a b
-readEnvT f = transparently $ translate $ \ e -> 
-                                do dec <- readEnvM 
-                                   apply (f dec) e
 
--- | add to the context 'dec', which is propogated using a writer monad.
-writeEnvT :: (Monad m, Monoid dec) => dec -> Rewrite m dec a
-writeEnvT dec = translate $ \ e -> do writeEnvM dec ; return e
-
--- | change the @dec@'s for a scoped translation.
-mapEnvT :: (Monoid dec,Monad m) => (dec -> dec) -> Translate m dec a r -> Translate m dec a r
-mapEnvT f_env rr = transparently $ translate $ \ e -> mapEnvM f_env (apply rr e)
-
--- | 'pureT' promotes a function into an unfailable, non-identity 'Translate'.
-pureT :: (Monad m,Monoid dec) => (a -> b) -> Translate m dec a b
-pureT f = translate $ \ a -> return (f a)
+pureT :: (a -> b) -> Translate a b
+pureT = arr
 
 -- | 'constT' always translates into an unfailable 'Translate' that returns the first argument.
-constT :: (Monad m,Monoid dec) => b -> Translate m dec a b
+constT :: b -> Translate a b
 constT = pureT . const
 
--- | 'concatT' composes a list of 'Translate' into a single 'Translate' which 'mconcat's its result.
-concatT :: (Monad m,Monoid dec,Monoid r) => [Translate m dec a r] -> Translate m dec a r
+concatT :: (Monoid r) => [Translate a r] -> Translate a r
 concatT ts = translate $ \ e -> do
 	rs <- sequence [ apply t e | t <- ts ]
 	return (mconcat rs)
+	
+
 --------------------------------------------------------------------------------
 -- The 'Rewrite' combinators.
-
 -- | if the first rewrite is an identity, then do the second rewrite.
-(.+) :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec a -> Rewrite m dec a
-(.+) a b = a `countTrans` (\ i -> if i == 0 then b else idR)
+(.+) :: (Term a) => Rewrite a -> Rewrite a -> Rewrite a
+(.+) a b = rewrite $ \ e0 -> do
+		e1 <- apply a e0		
+		isId <- apply (equals e0) e1
+		if isId then apply b e1
+			else return e1
 
 -- | if the first rewrite was /not/ an identity, then also do the second rewrite.
-(!->) :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec a -> Rewrite m dec a 
-(!->) a b = a `countTrans` (\ i -> if i == 0 then idR else b)
+(!->) :: (Term a) => Rewrite  a -> Rewrite  a -> Rewrite  a
+(!->) a b = rewrite $ \ e0 -> do
+		e1 <- apply a e0		
+		isId <- apply (equals e0) e1
+		if isId then return e1
+			else apply b e1
 
 -- | catch a failing 'Rewrite', making it into an identity.
-tryR :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec a
+tryR :: Rewrite a -> Rewrite a
 tryR s = s <+ idR
 
 -- | if this is an identity rewrite, make it fail. To succeed, something must have changed.
-changedR :: (Monoid dec,Monad m) => Rewrite m dec a -> Rewrite m dec a
+changedR :: (Term a) => Rewrite a -> Rewrite a
 changedR rr = rr .+ failR "unchanged"
 
 -- | repeat a rewrite until it fails, then return the result before the failure.
-repeatR :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec a
+repeatR :: Rewrite a -> Rewrite a
 repeatR s = tryR (s >-> repeatR s) 
 
 -- | look at the argument to a rewrite, and choose to be either a failure of trivial success.
-acceptR :: (Monoid dec, Monad m) => (a -> Bool) -> Rewrite m dec a
-acceptR fn = transparently $ translate $ \  expA ->
+acceptR :: (a -> Bool) -> Rewrite a
+acceptR fn = translate $ \  expA ->
                                     if fn expA 
 				    then return expA
 				    else fail "accept failed"
 
+-- equalR :: (a -> m Bool) -> Rewrite a
+
 
 -- | identity rewrite.
-idR :: (Monad m, Monoid dec) => Rewrite m dec exp
-idR = transparently $ rewrite $ \ e -> return e
+idR :: Rewrite  exp
+idR = rewrite $ \ e -> return e
 
 -- | failing rewrite.
-failR :: (Monad m, Monoid dec) => String -> Rewrite m dec a
+failR :: String -> Rewrite  a
 failR = failT
 
 --------------------------------------------------------------------------------
 -- Prelude structures
 
-tuple2R :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec b -> Rewrite m dec (a,b)
+{-
+tuple2R :: ( Monad m) => Rewrite a -> Rewrite b -> Rewrite (a,b)
 tuple2R rra rrb = transparently $ rewrite $ \ (a,b) -> liftM2 (,) (apply rra a) (apply rrb b)
 
-listR :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec [a]
+listR :: ( Monad m) => Rewrite a -> Rewrite [a]
 listR rr = transparently $ rewrite $ mapM (apply rr)
 
-maybeR :: (Monoid dec, Monad m) => Rewrite m dec a -> Rewrite m dec (Maybe a)
+maybeR :: ( Monad m) => Rewrite a -> Rewrite (Maybe a)
 maybeR rr = transparently $ rewrite $ \ e -> case e of
 						Just e'  -> liftM Just (apply rr e')
 						Nothing  -> return $ Nothing
 
-tuple2U :: (Monoid dec, Monad m, Monoid r) => Translate m dec a r -> Translate m dec b r -> Translate m dec (a,b) r
+tuple2U :: ( Monad m, Monoid r) => Translate a r -> Translate b r -> Translate (a,b) r
 tuple2U rra rrb = translate $ \ (a,b) -> liftM2 mappend (apply rra a) (apply rrb b)
 
-listU :: (Monoid dec, Monad m, Monoid r) => Translate m dec a r -> Translate m dec [a] r
+listU :: ( Monad m, Monoid r) => Translate a r -> Translate [a] r
 listU rr = translate $ liftM mconcat . mapM (apply rr)
 
-maybeU :: (Monoid dec, Monad m, Monoid r) => Translate m dec a r -> Translate m dec (Maybe a) r
+maybeU :: ( Monad m, Monoid r) => Translate a r -> Translate (Maybe a) r
 maybeU rr = translate $ \ e -> case e of
 				Just e'  -> apply rr e'
 				Nothing  -> return $ mempty
+-}
 
 --------------------------------------------------------------------------------
--- | Failable structure.
-class Failable f where
-  failure :: String -> f a
-
-instance (Monad m, Monoid dec) => Failable (Translate m dec a) where 
-  failure msg = failT msg
-
-instance (Monad m, Monoid dec) => Failable (RewriteM m dec) where 
-  failure msg = fail msg
- 
 -- | Guarded translate or monadic action.
-(?) ::  (Failable f) => Bool -> f a -> f a
-(?) False _rr = failure "(False ?)"
+(?) ::  Bool -> Translate a b -> Translate a b
+(?) False _rr = failT "(False ?)"
 (?) True   rr = rr
 
 
+{-
 --------------------------------------------------------------------------------
 -- internal to this module.
-countTrans :: (Monoid dec, Monad m) => Rewrite m dec a -> (Int -> Rewrite m dec a) -> Rewrite m dec a
+countTrans :: ( Monad m) => Rewrite a -> (Int -> Rewrite a) -> Rewrite a
 countTrans rr fn = transparently $ translate $ \ e ->
 	chainM (apply rr e)
 	       (\ i e' -> apply (fn i) e')
+
+-}
+
+-- | 'extractR' converts a 'Rewrite' over a 'Generic' into a rewrite over a specific expression type. 
+
+extractR  :: (Term exp) => Rewrite  (Generic exp) -> Rewrite  exp	-- at *this* type
+extractR rr = rewrite $ \ e -> do
+            e' <- apply rr (inject e)
+            case select e' of
+                Nothing -> fail "extractR"
+                Just r -> return r
+                
+-- | 'extractU' converts a 'Translate' taking a 'Generic' into a translate over a specific expression type. 
+
+extractU  :: (Term exp) => Translate  (Generic exp) r -> Translate  exp r
+extractU rr = translate $ \ e -> apply rr (inject e)
+
+-- | 'promoteR' promotes a 'Rewrite' into a 'Generic' 'Rewrite'; other types inside Generic cause failure.
+-- 'try' can be used to convert a failure-by-default promotion into a 'id-by-default' promotion.
+
+promoteR  :: (Term exp) => Rewrite  exp -> Rewrite  (Generic exp)
+promoteR rr = rewrite $ \ e -> do
+               case select e of
+                 Nothing -> fail "promoteR"
+                 Just e' -> do
+                    r <- apply rr e'
+                    return (inject r)
+
+-- | 'promoteU' promotes a 'Translate' into a 'Generic' 'Translate'; other types inside Generic cause failure.
+
+promoteU  :: (Term exp) => Translate  exp r -> Translate  (Generic exp) r
+promoteU rr = translate $ \ e -> do
+               case select e of
+                 Nothing -> fail "promoteI"
+                 Just e' -> apply rr e'
+
+-------------------------------------------------------------------------------
+
+-- | apply a rewrite in a top down manner.
+topdownR :: ( e ~ Generic e, Term e) => Rewrite (Generic e) -> Rewrite (Generic e)
+topdownR  s = s >-> allR (topdownR s)
+
+-- | apply a rewrite in a bottom up manner.
+bottomupR :: ( e ~ Generic e, Term e) => Rewrite (Generic e) -> Rewrite (Generic e)
+bottomupR s = allR (bottomupR s) >-> s
+
+-- | apply a rewrite in a top down manner, prunning at successful rewrites.
+alltdR :: ( e ~ Generic e, Term e) => Rewrite (Generic e) -> Rewrite (Generic e)
+alltdR    s = s <+ allR (alltdR s)
+
+-- | apply a rewrite twice, in a topdown and bottom up way, using one single tree traversal.
+downupR :: ( e ~ Generic e, Term e) => Rewrite (Generic e) -> Rewrite (Generic e)
+downupR   s = s >-> allR (downupR s) >-> s
+
+-- | a fixed point traveral, starting with the innermost term.
+innermostR :: ( e ~ Generic e, Term e) => Rewrite (Generic e) -> Rewrite (Generic e)
+innermostR s = bottomupR (tryR (s >-> innermostR s))  
+
+-- fold a tree using a single translation for each node.
+foldU :: ( e ~ Generic e, Term e, Monoid r) => Translate (Generic e) r -> Translate (Generic e) r
+foldU s = concatT [ s, crushU (foldU s) ]
+
 
