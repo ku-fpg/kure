@@ -26,12 +26,9 @@ Library
   Build-Depends: base >= 4.2
   Ghc-Options:     -O2
   Exposed-modules:
-       Language.KURE,
-       Language.KURE.RewriteMonad, 
-       Language.KURE.Translate,
-       Language.KURE.Rewrite,
-       Language.KURE.Combinators,
-       Language.KURE.Term
+       Language.KURE
+       Language.KURE.Types
+       Language.KURE.Combinators
 
   Ghc-Options:  -Wall
 
