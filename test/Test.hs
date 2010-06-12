@@ -3,7 +3,6 @@
 module Main where
 
 import Language.KURE
-import Language.KURE.Term as T
 
 import Data.Monoid
 import Control.Monad
@@ -38,12 +37,6 @@ splitR :: (Term exp) => exp -> [Translate (Generic exp) t -> Translate exp t]
 splitR rr = translate $ \ e ->
 	 	case e ->
 -}
-
-instance TranslateMonad IO where
-	catchTM m1 m2 = m1 `Prelude.catch` (\ e ->
-		if isUserError e 
-		then m2 $! (ioeGetErrorString e)
-		else ioError e)
 
 type R e = T e e
 type T e1 e2 = Translate e1 e2
