@@ -14,7 +14,9 @@
 module Language.KURE 
 	( module Language.KURE.Types
 	, module Language.KURE.Combinators
+	, module Language.KURE.Boilerplate
 	) where
 
 import Language.KURE.Types
 import Language.KURE.Combinators
+import Language.KURE.Boilerplate
