@@ -20,7 +20,6 @@ Cabal-Version:       >= 1.6
 Extra-Source-Files:
     test/Test.hs
     test/Exp.hs
-    test/Id.hs
 
 Library
   Build-Depends: base >= 4.2
