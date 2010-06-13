@@ -39,7 +39,7 @@ Flag all
   Description: Enable full development tree
   Default:     False
 
-Executable test-core
+Executable test-exp
   if flag(all)
     buildable: True
   else 
@@ -47,6 +47,17 @@ Executable test-core
   endif
   Ghc-Options:     
   Main-Is: Test.hs
-  Hs-Source-Dirs: ., tests/common, tests/core
+  Hs-Source-Dirs: ., tests/common, tests/exp
+
+Executable test-exp-syb
+  if flag(all)
+    buildable: True
+  else 
+    buildable: False
+  endif
+  Ghc-Options:     
+  Main-Is: Test.hs
+  Hs-Source-Dirs: ., tests/common, tests/exp-kyb
+
 
 

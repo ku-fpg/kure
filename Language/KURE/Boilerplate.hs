@@ -190,7 +190,7 @@ liftM unzip3 $ sequence [ kureType debug (map pprint api_resolved_tys)
                               (foldl AppT (ConT ''Term) [ConT gname]) 
                               [ TySynInstD ''Generic [ConT gname] (ConT gname)
 			      , FunD (mkName "allR") [ Clause [VarP rr] (NormalB $ foldl1 choice altsR) allR']
-                              , FunD (mkName "crushU") [ Clause [VarP rr] (NormalB $ foldl1 choice altsU) allU']
+                             , FunD (mkName "crushU") [ Clause [VarP rr] (NormalB $ foldl1 choice altsU) allU']
                               ]
                     ]
              
