@@ -18,10 +18,6 @@ instance Term Exp where
    type Generic Exp = Exp  -- Exp is its own Generic root.
    inject    = id
    select e  = return e
-   equals e  = translate $ \ e' -> do
-		b <- e `equalsTM` e'
-		if b then return True
-		     else return $ e == e'
 
    allR rr   = appR rr rr <+ lamR rr <+ varR
    crushU rr = appU rr rr <+ lamU rr <+ varU
