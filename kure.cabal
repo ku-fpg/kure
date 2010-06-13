@@ -39,15 +39,14 @@ Flag all
   Description: Enable full development tree
   Default:     False
 
-Executable test1
+Executable test-core
   if flag(all)
     buildable: True
   else 
     buildable: False
   endif
   Ghc-Options:     
-  Main-Is:        Test.hs
-  Hs-Source-Dirs: ., test
-  buildable: True
+  Main-Is: Test.hs
+  Hs-Source-Dirs: ., tests/common, tests/core
 
 
