@@ -106,6 +106,8 @@ concatT ts = translate $ \ e -> do
 	rs <- sequence [ apply t e | t <- ts ]
 	return (mconcat rs)
 	
+emptyT :: (Monoid r) => Translate a r
+emptyT = constT mempty
 
 --------------------------------------------------------------------------------
 -- The 'Rewrite' combinators.
