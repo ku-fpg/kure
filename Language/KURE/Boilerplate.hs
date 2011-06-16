@@ -47,7 +47,7 @@ module Language.KURE.Boilerplate
 
  where
 
-import Debug.Trace
+-- import Debug.Trace
 
 import Language.KURE.Types
 import Language.KURE.Combinators
@@ -252,15 +252,26 @@ kureCons _debug tyNames (NormalC consName args)  = do
             isInteresting ty [] | pprint ty `elem` tyNames
                                           = True
             isInteresting    (ConT _ ) [] = False       -- the above case caught this
+
             isInteresting    (ConT nm) [inner_ty]
-                | nm == ''[] = isInteresting inner_ty []
                 | nm == ''Maybe = isInteresting inner_ty []
+            -- the following two cases only happen in GHC 6.12 and below
+                | nm == ''[] = isInteresting inner_ty []
             isInteresting (ConT nm) tys
                 | length tys >= 2 && nm == tupleTypeName (length tys) = or [ isInteresting ty [] | ty <- tys ]
+
+            -- Beginning with GHC 7, TH returns 'ListT' for the list type constructor
+            -- instead of 'ConT GHC.Types.[]', likewise for TupleT (instead of 'ConT GHC.Prim.(,)')
+            isInteresting ListT [inner_ty] = isInteresting inner_ty []
+            isInteresting (TupleT i) inner_tys -- unlike the 6.12 case above, this works for any size tuple
+                | length inner_tys < i = error $ "TupleT doesn't have enough types! Expected " ++ show i ++ " got: " ++ show inner_tys
+                | otherwise            = or $ [ isInteresting t r | t <- take i inner_tys ] where r = drop i inner_tys
+
             isInteresting (AppT e1 e2) es = isInteresting e1 (e2:es)
-            isInteresting ty         _ = error $ "unsupported type " ++ pprint ty ++ " as argument to " ++ show consName
+            isInteresting ty            _ = error $ "unsupported type " ++ pprint ty ++ " as argument to " ++ show consName
 
         resolvedArgsTypes <- mapM resolveSynonym argsTypes
+
         -- This denotes if the 'R' combinator and 'U' combinator will have an explicitly called out argument.
         let interestingConsArgs = [ isInteresting ty [] | ty <- resolvedArgsTypes ]
 
@@ -340,7 +351,7 @@ kureCons _debug tyNames (NormalC consName args)  = do
 kureCons _ _tyNames other  = error $ "Unsupported constructor : " ++ show other
 
 mkExtract :: [String] -> ResultStyle -> Name -> Type -> Exp
-mkExtract t e r ty | trace ("mkExtract: " ++ show (t,e,r,ty)) False = undefined
+-- mkExtract t e r ty | trace ("mkExtract: " ++ show (t,e,r,ty)) False = undefined
 mkExtract tyNames extract rr ty | pprint ty `elem` tyNames
                                               = AppE (VarE $ theExtract extract) (VarE rr)
 mkExtract tyNames extract rr (AppT e1 e2)     = mkExtract' tyNames extract rr e1 [e2]
@@ -348,17 +359,28 @@ mkExtract _       extract _  _                = VarE $ theEmpty extract
 
 mkExtract' :: [String] -> ResultStyle -> Name -> Type -> [Type] -> Exp
 mkExtract' tyNames extract rr (AppT e1 e2) es   = mkExtract' tyNames extract rr e1 (e2:es)
+
+-- these two cases (tuple and list) only happen in GHC 6.12 and below
 mkExtract' tyNames extract rr (ConT con) [t1,t2]
-        | con == tupleTypeName 2                =  AppE (AppE (VarE $ theTuple2 extract)
+        | con == tupleTypeName 2                =  AppE (AppE (VarE $ theTuple 2 extract)
                                                               (mkExtract tyNames extract rr t1)
                                                         )     (mkExtract tyNames extract rr t2)
 
 mkExtract' tyNames extract rr (ConT con) [t1]
         | con == ''[]                           =  AppE (VarE $ theList extract)
                                                         (mkExtract tyNames extract rr t1)
-mkExtract' tyNames extract rr (ConT con) [t1]
         | con == ''Maybe                        =  AppE (VarE $ theMaybe extract)
                                                         (mkExtract tyNames extract rr t1)
+
+-- these cases only happen in GHC 7 and above (see note above about ListT and TupleT)
+mkExtract' tyNames extract rr ListT [t] = AppE (VarE $ theList extract)
+                                               (mkExtract tyNames extract rr t)
+mkExtract' tyNames extract rr (TupleT i) ts
+        | i /= length ts = error "mkExtract': tuple size doesn't not match type argument size!"
+        | otherwise = foldr (flip AppE)
+                            (VarE $ theTuple i extract)
+                            [mkExtract tyNames extract rr t | t <- reverse ts]
+
 mkExtract' _       _       _  ty         _      = error $ "mkExtract' failed for " ++ pprint ty
 
 
@@ -371,9 +393,10 @@ theExtract :: ResultStyle -> Name
 theExtract R = 'extractR
 theExtract U = 'extractU
 
-theTuple2 :: ResultStyle -> Name
-theTuple2 R = 'tuple2R
-theTuple2 U = 'tuple2U
+theTuple :: Int -> ResultStyle -> Name
+theTuple 2 R = 'tuple2R
+theTuple 2 U = 'tuple2U
+theTuple _ _ = error "unsupported tuple size!"
 
 theList :: ResultStyle -> Name
 theList R = 'listR
@@ -408,7 +431,9 @@ resolveSynonym (AppT e1 e2) = do
         e2' <- resolveSynonym e2
         return $ AppT e1' e2'
 
-resolveSynonym other = fail $ "resolveSynonym problem : " ++ show other
+resolveSynonym ListT      = return ListT
+resolveSynonym (TupleT i) = return $ TupleT i
+resolveSynonym other      = fail $ "resolveSynonym problem : " ++ show other
 
 pprintTermInstances :: Name -> (Name,Type) -> Q ()
 pprintTermInstances gnm (nm,ty) =
