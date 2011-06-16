@@ -101,17 +101,7 @@ kureYourBoilerplate gname = do
   runIO $ print ("tyNames",tyInfo)
   runIO $ putStrLn "---------------------------------"
 
-
-
-{-
-TySynInstD ''Generic [ty] (ConT gname)
-                              , FunD (mkName "select")
-                                    [ Clause [ConP VarP rr] (NormalB $ foldl1 choice altsR) allR'
-                                    , WildP
--}
-
   t <- newName "t"
-
 
   (decs,allR',allU') <-
         case tyInfo of
@@ -140,43 +130,10 @@ TySynInstD ''Generic [ty] (ConT gname)
                                         | (con,ty) <- zip cons api_resolved_tys
                                         ]
 
-{-
-liftM unzip3 $ sequence [ kureType debug (map pprint api_resolved_tys)
-                                                        (generateTypeFunStuff rty) rty ty
-                                                | (rty,ty) <- zip api_resolved_tys api_tys
-                                                ]
-
-
-
-  let generateTypeFunStuff ty =
-        case info of
-           TyConI (TySynD _ [] singleTy) ->
-                [ TySynInstD ''Generic [ty] (ConT gname)
-                , FunD (mkName "select")
-                   [ Clause [VarP t] (NormalB (AppE (ConE 'Just) (VarE t))) []
-                   ]
-                , FunD (mkName "inject")
-                   [ Clause [VarP t] (NormalB (VarE t)  ) []
-                   ]
-                ]
-{-
-           TyConI (DataD _ _ _ cons _) -> do
-                -- we look at *types* so that we can support more in the future.
-                let gconss = unzip [ (con,argTy) | (NormalC con [(_,argTy)]) <- cons,
--}
-{-
-           _ -> -- its a complex generic structure, so reflect this
-                [ TySynInstD ''Generic [ty] (ConT gname)
-                , FunD (mkName "select")
-                   [ Clause [VarP t] (NormalB (AppE (ConE 'Just) (VarE t))) []
-                   ]
--}
--}
-
   rr <- newName "rr"
 
   -- Here, we find a way to promote from the generic type to specific type(s).
-  let mkPromote prom nm ty = AppE (VarE prom) (AppE (VarE nm) (VarE rr))
+  let mkPromote prom nm _ = AppE (VarE prom) (AppE (VarE nm) (VarE rr))
 
   theOptGenericInstance <-
          case tyInfo of
@@ -218,8 +175,8 @@ kureType debug tyNames tfs ty@(ConT nm)  = do
           where
              choice e1 e2 = InfixE (Just e1) (VarE '(<+)) (Just e2)
              alts = [ foldl AppE (VarE (mkName $ consName ++ suffix))
-                                 [ mkExtract tyNames extract rr ty
-                                 | ty <- argTypes
+                                 [ mkExtract tyNames extract rr ty'
+                                 | ty' <- argTypes
                                  ]
                     | (consName,argTypes) <- zip consNames argTypess
                     ]
@@ -238,14 +195,14 @@ kureType debug tyNames tfs ty@(ConT nm)  = do
          )
 
 -- A bit of a hack for now
-kureType debug tyNames tfs ty = do
+kureType _debug tyNames tfs ty = do
   runIO $ print ("kureType",tyNames,tfs,ty)
 
   -- For other types, we do not generate the G,U, etc, functions, but do define
   -- the *all* instance, which works directly over the type.
   rr <- newName "rr"
   tup <- newName "x"
-  let buildFn name suffix extract = FunD name
+  let buildFn name _ extract = FunD name
             [ Clause [VarP rr] (NormalB
                                         $ AppE (VarE 'translate)
                                         $ LamE [VarP tup]
@@ -267,8 +224,6 @@ kureType debug tyNames tfs ty = do
          , buildFn allR_nm "R" 'extractR
          , buildFn allU_nm "U" 'extractU
          )
-
--- kureType _debug _ _tyNames ty ty2 = fail $ "kureType: unsupported type :: " ++ pprint ty ++ " ( " ++ pprint ty2 ++ " )"
 
 kureCons :: Bool -> [String] -> Con -> Q ([Dec],String,[Type])
 kureCons _debug tyNames (NormalC consName args)  = do
@@ -296,8 +251,8 @@ kureCons _debug tyNames (NormalC consName args)  = do
         let isInteresting ty@(VarT {}) _ = error $ "found " ++ pprint ty ++ " as argument to " ++ show consName
             isInteresting ty [] | pprint ty `elem` tyNames
                                           = True
-            isInteresting ty@(ConT nm) [] = False       -- the above case caught this
-            isInteresting ty@(ConT nm) [inner_ty]
+            isInteresting    (ConT _ ) [] = False       -- the above case caught this
+            isInteresting    (ConT nm) [inner_ty]
                 | nm == ''[] = isInteresting inner_ty []
                 | nm == ''Maybe = isInteresting inner_ty []
             isInteresting (ConT nm) tys
@@ -356,8 +311,6 @@ kureCons _debug tyNames (NormalC consName args)  = do
                                                $ AppE (VarE 'mconcat) (ListE (map VarE [ e' | Just e' <- es']))
                                           ]))))
 
---        let nameRDef = ValD (VarP nameR) (NormalB nameRExpr) []
-
         let nameUDef = FunD nameU [ Clause (map VarP rrs) (NormalB nameUExpr) []]
 
         let nameP = mkName (combName consName ++ "P")
@@ -391,7 +344,7 @@ mkExtract t e r ty | trace ("mkExtract: " ++ show (t,e,r,ty)) False = undefined
 mkExtract tyNames extract rr ty | pprint ty `elem` tyNames
                                               = AppE (VarE $ theExtract extract) (VarE rr)
 mkExtract tyNames extract rr (AppT e1 e2)     = mkExtract' tyNames extract rr e1 [e2]
-mkExtract tyNames extract rr ty               = VarE $ theEmpty extract -- error $ "failed to make extract blah for " ++ pprint ty
+mkExtract _       extract _  _                = VarE $ theEmpty extract
 
 mkExtract' :: [String] -> ResultStyle -> Name -> Type -> [Type] -> Exp
 mkExtract' tyNames extract rr (AppT e1 e2) es   = mkExtract' tyNames extract rr e1 (e2:es)
@@ -406,7 +359,7 @@ mkExtract' tyNames extract rr (ConT con) [t1]
 mkExtract' tyNames extract rr (ConT con) [t1]
         | con == ''Maybe                        =  AppE (VarE $ theMaybe extract)
                                                         (mkExtract tyNames extract rr t1)
-mkExtract' tyNames extract rr ty _              = error $ "failed to make extract foo for " ++ pprint ty
+mkExtract' _       _       _  ty         _      = error $ "mkExtract' failed for " ++ pprint ty
 
 
 data ResultStyle = R | U
@@ -450,31 +403,12 @@ resolveSynonym ty@(ConT con) = do
     TyConI (TySynD _ [] ty2)      -> resolveSynonym ty2
     _ -> fail $ "unable to resolve synonym - unknown info inside " ++ show con ++ " ( " ++ show info ++ ")"
 
-resolveSynonym ty@(AppT e1 e2) = do
+resolveSynonym (AppT e1 e2) = do
         e1' <- resolveSynonym e1
         e2' <- resolveSynonym e2
         return $ AppT e1' e2'
 
 resolveSynonym other = fail $ "resolveSynonym problem : " ++ show other
-
-
-typeToSuffix :: Type -> String
-typeToSuffix (ConT con) = nameBase con
-typeToSuffix (AppT e1 e2) = typesToSuffix e1 [e2]
-typeToSuffix ty = error $ "typeToSuffix failure with " ++ show ty
-
-
-typesToSuffix (ConT con) es
-  | length es /= 1 && con == tupleTypeName (length es) = typesToSuffix (TupleT $ length es) es
-  | length es == 1 && con == ''[] = typesToSuffix ListT es
-typesToSuffix (ListT) [e1]     = "ListOf_" ++ typeToSuffix e1
-typesToSuffix (TupleT i) []    = "'Unit'"
-typesToSuffix (TupleT i) es    = show i ++ "TupleOf_" ++
-                                 foldr1 (\ a b -> a ++ "_And_" ++ b)
-                                        (map typeToSuffix es)
-typesToSuffix (AppT e1 e2) es = typesToSuffix e1 (e2:es)
-typesToSuffix ty _ = error $ "typesToSuffix failure with " ++ show ty
-
 
 pprintTermInstances :: Name -> (Name,Type) -> Q ()
 pprintTermInstances gnm (nm,ty) =
@@ -488,4 +422,3 @@ pprintTermInstances gnm (nm,ty) =
         putStrLn $ "  inject          = " ++ nameBase nm
         putStrLn $ "--------------------------------------------------"
         putStrLn $ ""
-

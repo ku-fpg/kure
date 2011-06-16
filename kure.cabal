@@ -7,7 +7,7 @@ Description:	     KURE is a DSL for building rewriting DSLs.
 		     rather than SYB.
 
 		     We include KURE-your-boilerplate (KYB), a Template Haskell powered library for generating shallow
-		     tree walking combinators, 
+		     tree walking combinators,
                      for use with the KURE DSL.
 
 Category:            Language
@@ -33,7 +33,7 @@ Library
        Language.KURE.Combinators
        Language.KURE.Boilerplate
 
-  Ghc-Options:  -Wall
+  Ghc-Options:  -Wall -Werror
 
 Flag all
   Description: Enable full development tree
@@ -42,20 +42,20 @@ Flag all
 Executable test-exp
   if flag(all)
     buildable: True
-  else 
+  else
     buildable: False
   endif
-  Ghc-Options:     
+  Ghc-Options:
   Main-Is: Test.hs
   Hs-Source-Dirs: ., tests/common, tests/exp
 
 Executable test-exp-syb
   if flag(all)
     buildable: True
-  else 
+  else
     buildable: False
   endif
-  Ghc-Options:     
+  Ghc-Options:
   Main-Is: Test.hs
   Hs-Source-Dirs: ., tests/common, tests/exp-kyb
 

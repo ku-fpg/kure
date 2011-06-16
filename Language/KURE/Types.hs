@@ -10,7 +10,7 @@
 --
 -- This is the definition of the types inside KURE.
 
-module Language.KURE.Types where 
+module Language.KURE.Types where
 
 import System.IO.Error
 import Data.Monoid
@@ -24,45 +24,43 @@ data Translate exp1 exp2 = Translate (forall m . (TranslateMonad m) => exp1 -> m
 
 -- | 'apply' directly applies a 'Translate' value to an argument.
 apply :: (TranslateMonad m) => Translate exp1 exp2 -> exp1 -> m exp2
-apply (Translate t) exp1 = t exp1 
+apply (Translate t) exp1 = t exp1
 
--- | 'translate' is the standard way of building a 'Translate', where if the translation is successful it 
--- is automatically marked as a non-identity translation. 
-
+-- | 'translate' is the standard way of building a 'Translate'.
 translate :: (forall m . (TranslateMonad m) => exp1 -> m exp2) -> Translate exp1 exp2
-translate f = Translate $ \ e -> f e
+translate = Translate
 
 instance Cat.Category Translate where
-   id = translate $ return 
+   id = translate return
    (.) rr1 rr2 = translate $ \ e -> apply rr2 e >>= apply rr1
 
 instance Arrow Translate where
    arr f = translate (return Prelude.. f)
    first rr = translate $ \ (b,d) -> do c <- apply rr b ; return (c,d)
 
--- | A 'Rewrite' is a 'Translate' that shares the same source and target type. Literally, 
+-- | A 'Rewrite' is a 'Translate' that shares the same source and target type. Literally,
 -- a 'Rewrite' provides the details about how to /re-write/ a specific type.
-
 type Rewrite exp = Translate exp exp
 
 -- | 'rewrite' is our primitive way of building a Rewrite,
 --
--- @rewrite $ \\ _ e -> return e@ /is/ (now) an identity rewrite. 
-
+-- @rewrite $ \\ _ e -> return e@ /is/ (now) an identity rewrite.
 rewrite :: (forall m . (TranslateMonad m) => exp1 -> m exp1) -> Rewrite exp1
 rewrite = translate
 
--- | 'TranslateMonad' is the monad inside translate. You can define your own, or use 
+-- | 'TranslateMonad' is the monad inside translate. You can define your own, or use
 -- 'IO' or 'Maybe'.
-
 class Monad m => TranslateMonad m where
-	catchTM :: m a -> (String -> m a) -> m a 
+	catchTM :: m a -> (String -> m a) -> m a
+
+    -- | While 'Term's can be compared for equality, the 'TranslateMonad' may
+    -- optionally define the notion of "pointer equality", offering a speedup
 	ptrEqualsTM :: a -> a -> m Bool
-	ptrEqualsTM x y = return $ False
+	ptrEqualsTM _ _ = return $ False
 
 instance TranslateMonad IO where
 	catchTM m1 m2 = m1 `Prelude.catch` (\ e ->
-		if isUserError e 
+		if isUserError e
 		then m2 $! (ioeGetErrorString e)
 		else ioError e)
 
@@ -73,19 +71,20 @@ instance TranslateMonad Maybe where
 
 -- | 'Term's are things that syntax are built from.
 class Eq exp => Term exp where
-  -- | 'Generic' is a sum of all the interesting sub-types, transitively, of @exp@. 
+  -- | 'Generic' is a sum of all the interesting sub-types, transitively, of @exp@.
   -- We use @Generic e ~ e@ to signify that something is its own Generic.
   -- Simple expression types might be their own sole 'Generic', more complex examples
   -- will have a new datatype for the 'Generic', which will also be an instance of class 'Term'.
   type Generic exp
 
-  -- | 'project' projects into a 'Generic', to get the exp inside, or fails.
+  -- | 'select' looks in a 'Generic', to get the exp inside, or fails.
   select :: Generic exp -> Maybe exp
 
   -- | 'inject' injects an exp into a 'Generic'.
-  inject  :: exp -> Generic exp
+  inject :: exp -> Generic exp
 
   -- | 'equals' creates an predicate 'Translate' specialized to the first argument.
+  -- Attempts to use 'ptrEqualsTM' to check "pointer equality", resorts to Eq otherwise
   equals :: exp -> Translate exp Bool
   equals e0 = Translate $ \ e1 -> do
 		b <- ptrEqualsTM e0 e1
@@ -93,15 +92,6 @@ class Eq exp => Term exp where
 
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
   allR :: Rewrite (Generic exp) -> Rewrite exp
-  -- | 'allU' applied a 'Generic' Translation to a common, 'Monoid'al result, to all the interesting children of this node.
+
+  -- | 'crushU' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
   crushU :: (Monoid result) => Translate (Generic exp) result -> Translate exp result
-
-{-
-  type Tag exp
-  tag :: exp -> Tag exp
--}
-
---type RewritePath exp = Rewrite (Generic exp) -> Rewrite exp
---RewritePath exp
-
-
