@@ -33,7 +33,7 @@ Library
        Language.KURE.Combinators
        Language.KURE.Boilerplate
 
-  Ghc-Options:  -Wall -Werror
+  Ghc-Options:  -Wall
 
 Flag all
   Description: Enable full development tree
@@ -49,7 +49,7 @@ Executable test-exp
   Main-Is: Test.hs
   Hs-Source-Dirs: ., tests/common, tests/exp
 
-Executable test-exp-syb
+Executable test-exp-kyb
   if flag(all)
     buildable: True
   else
