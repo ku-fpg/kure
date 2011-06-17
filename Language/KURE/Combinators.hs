@@ -109,19 +109,23 @@ emptyT = constT mempty
 -- The 'Rewrite' combinators.
 -- | if the first rewrite is an identity, then do the second rewrite.
 (.+) :: (Term a) => Rewrite a -> Rewrite a -> Rewrite a
-(.+) a b = rewrite $ \ e0 -> do
-		e1 <- apply a e0
-		isId <- apply (equals e0) e1
-		if isId then apply b e1
-			else return e1
+(.+) r0 r1 = rewrite $ \ e0 -> do
+		e1 <- apply r0 e0
+		isId <- e0 .==. e1
+		if isId then apply r1 e1
+			    else return e1
 
 -- | if the first rewrite was /not/ an identity, then also do the second rewrite.
-(!->) :: (Term a) => Rewrite  a -> Rewrite  a -> Rewrite  a
-(!->) a b = rewrite $ \ e0 -> do
-		e1 <- apply a e0
-		isId <- apply (equals e0) e1
+(!->) :: (Term a) => Rewrite a -> Rewrite a -> Rewrite a
+(!->) r0 r1 = rewrite $ \ e0 -> do
+		e1 <- apply r0 e0
+		isId <- e0 .==. e1
 		if isId then return e1
-			else apply b e1
+			    else apply r1 e1
+
+-- | Term equality
+(.==.) :: (TranslateMonad m, Term e) => e -> e -> m Bool
+(.==.) = apply . equals
 
 -- | catch a failing 'Rewrite', making it into an identity.
 tryR :: Rewrite a -> Rewrite a
