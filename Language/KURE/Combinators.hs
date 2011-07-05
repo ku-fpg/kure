@@ -235,6 +235,10 @@ downupR   s = s >-> allR (downupR s) >-> s
 innermostR :: ( e ~ Generic e, Term e) => Rewrite (Generic e) -> Rewrite (Generic e)
 innermostR s = bottomupR (tryR (s >-> innermostR s))
 
+-- | repeated apply 'downupR s' until no further changes can be made
+repeatedR :: ( e ~ Generic e, Term e) => Rewrite (Generic e) -> Rewrite (Generic e)
+repeatedR s = downupR s !-> repeatedR s
+
 -- fold a tree using a single translation for each node.
 foldU :: ( e ~ Generic e, Term e, Monoid r) => Translate (Generic e) r -> Translate (Generic e) r
 foldU s = concatT [ s, crushU (foldU s) ]
