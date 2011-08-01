@@ -235,7 +235,7 @@ downupR   s = s >-> allR (downupR s) >-> s
 innermostR :: ( e ~ Generic e, Term e) => Rewrite (Generic e) -> Rewrite (Generic e)
 innermostR s = bottomupR (tryR (s >-> innermostR s))
 
--- | repeated apply 'downupR s' until no further changes can be made
+-- | repeatedly apply 'downupR s' until no further changes can be made
 repeatedR :: ( e ~ Generic e, Term e) => Rewrite (Generic e) -> Rewrite (Generic e)
 repeatedR s = downupR s !-> repeatedR s
 
