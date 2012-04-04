@@ -1,76 +1,124 @@
-{-# LANGUAGE TypeFamilies, ExistentialQuantification, Rank2Types #-}
+{-# LANGUAGE TypeFamilies, FlexibleInstances #-}
 -- |
 -- Module: Language.KURE.Types
--- Copyright: (c) 2010 The University of Kansas
+-- Copyright: (c) 2012 The University of Kansas
 -- License: BSD3
 --
--- Maintainer: Andy Gill <andygill@ku.edu>
+-- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
 -- Stability: unstable
 -- Portability: ghc
 --
 -- This is the definition of the types inside KURE.
 
-module Language.KURE.Types where
+-- module Language.KURE.Types where
+module Types where
 
-import System.IO.Error
+import Prelude hiding (catch)
+import System.IO.Error hiding (catch)
+import Control.Exception (catch)
+
+import Control.Applicative
+import Control.Monad
 import Data.Monoid
-import qualified Control.Category as Cat
-import Control.Arrow
 
--- | 'Translate' is a translation or strategy that translates between @exp1@ and @exp2@, with the posiblity of failure,
--- and remembers identity translations.
+------------------------------------------------------------------------------------------
 
-data Translate exp1 exp2 = Translate (forall m . (TranslateMonad m) => exp1 -> m exp2)
-
--- | 'apply' directly applies a 'Translate' value to an argument.
-apply :: (TranslateMonad m) => Translate exp1 exp2 -> exp1 -> m exp2
-apply (Translate t) exp1 = t exp1
+-- | 'Translate' is a translation or strategy that translates from a value in a context to a monadic value.
+data Translate c m a b = Translate {apply :: c a -> m b}
 
 -- | 'translate' is the standard way of building a 'Translate'.
-translate :: (forall m . (TranslateMonad m) => exp1 -> m exp2) -> Translate exp1 exp2
+translate :: (c a -> m b) -> Translate c m a b
 translate = Translate
 
-instance Cat.Category Translate where
-   id = translate return
-   (.) rr1 rr2 = translate $ \ e -> apply rr2 e >>= apply rr1
+instance Functor m => Functor (Translate c m a) where
+  
+-- fmap :: (b -> d) -> Translate c m a b -> Translate c m a d  
+   fmap f t = translate (fmap f . apply t)
 
-instance Arrow Translate where
-   arr f = translate (return Prelude.. f)
-   first rr = translate $ \ (b,d) -> do c <- apply rr b ; return (c,d)
+instance Applicative m => Applicative (Translate c m a) where
+  
+-- pure :: b -> Translate c m a b  
+   pure b = translate (\ _ -> pure b)
+   
+-- (<*>) :: Translate c m a (b -> d) -> Translate c m a b -> Translate c m a d   
+   tf <*> tb = translate (\ ca -> apply tf ca <*> apply tb ca) 
 
--- | A 'Rewrite' is a 'Translate' that shares the same source and target type. Literally,
--- a 'Rewrite' provides the details about how to /re-write/ a specific type.
-type Rewrite exp = Translate exp exp
+instance Monad m => Monad (Translate c m a) where 
+  
+-- return :: b -> Translate c m a b
+   return b = translate (\ _ -> return b)
+-- (>>=) :: Translate c m a b -> (b -> Translate c m a d) -> Translate c m a d  
+   
+   tb >>= f = translate $ \ ca -> do b <- apply tb ca 
+                                     apply (f b) ca
+                                     
+-- fail :: String -> Translate c m a b
+   fail msg = translate (\ _ -> fail msg)
 
--- | 'rewrite' is our primitive way of building a Rewrite,
---
--- @rewrite $ \\ _ e -> return e@ /is/ (now) an identity rewrite.
-rewrite :: (forall m . (TranslateMonad m) => exp1 -> m exp1) -> Rewrite exp1
+instance MonadPlus m => MonadPlus (Translate c m a) where
+-- mzero :: Translate c m a b  
+   mzero = translate (\ _ -> mzero)
+
+-- mplus :: Translate c m a b -> Translate c m a b -> Translate c m a b
+   mplus t1 t2 = translate (\ ca -> apply t1 ca `mplus` apply t2 ca)
+   
+-- | 'Applicative' should be a superclass of 'Monad'.
+--   It isn't, but we partially compensate for it by making it a superclass of 'MonadCatch'.
+class (Applicative m, Monad m) => MonadCatch m where
+  
+-- | Left Biased mplus  
+   catchM :: m a -> (String -> m a) -> m a
+
+instance MonadCatch m => MonadCatch (Translate c m a) where
+-- catchM :: Translate c m a b -> (String -> Translate c m a) -> Translate c m a
+   catchM t f = translate (\ ca -> apply t ca `catchM` (\ msg -> apply (f msg) ca))
+  
+instance MonadCatch Maybe where
+-- catchM :: Maybe a -> (String -> Maybe a) -> Maybe a
+   catchM (Just a)  f = Just a  
+   catchM (Nothing) f = f "Failure inside Maybe Monad"
+
+instance MonadCatch (Either String) where
+-- catchM :: Either String a -> (String -> Either String a) -> Either String a
+   catchM (Right a)  f = Right a  
+   catchM (Left msg) f = f msg
+
+instance MonadCatch IO where
+-- catchM :: IO a -> (String -> IO a) -> IO a  
+   catchM ma f = ma `catch` (\ e -> if isUserError e
+	 	                     then f $! (ioeGetErrorString e)
+		                     else ioError e)
+                 
+-- | Contextual is similar to comonad, but more restricted.
+--   It's precise definition is still under development. 
+--   It's very close to a co-endomonad, but that's not quite good enough due to the required interaction with monads. 
+class Contextual c where
+  extractC :: c a -> a
+  replaceC :: c a -> a -> c a  
+
+lowerC :: Contextual c => (a -> b) -> c a -> b
+lowerC f = f . extractC
+
+lowerC2 :: Contextual c => (a -> b -> d) -> c a -> c b -> d
+lowerC2 f ca cb = f (extractC ca) (extractC cb)
+
+liftC :: Contextual c => (a -> a) -> c a -> c a
+liftC f ca = replaceC ca (lowerC f ca)
+
+------------------------------------------------------------------------------------------
+
+-- | A 'Rewrite' is a 'Translate' that shares the same source and target type.
+type Rewrite c m a = Translate c m a a
+
+-- | 'rewrite' is our primitive way of building a Rewrite
+rewrite :: (c a -> m a) -> Rewrite c m a
 rewrite = translate
 
--- | 'TranslateMonad' is the monad inside translate. You can define your own, or use
--- 'IO' or 'Maybe'.
-class Monad m => TranslateMonad m where
-	catchTM :: m a -> (String -> m a) -> m a
-
-    -- | While 'Term's can be compared for equality, the 'TranslateMonad' may
-    -- optionally define the notion of "pointer equality", offering a speedup
-	ptrEqualsTM :: a -> a -> m Bool
-	ptrEqualsTM _ _ = return $ False
-
-instance TranslateMonad IO where
-	catchTM m1 m2 = m1 `Prelude.catch` (\ e ->
-		if isUserError e
-		then m2 $! (ioeGetErrorString e)
-		else ioError e)
-
-instance TranslateMonad Maybe where
-	catchTM m1 m2 = case m1 of
-		Nothing -> m2 "fail inside Maybe monad"
-		Just v -> Just v
+------------------------------------------------------------------------------------------
 
 -- | 'Term's are things that syntax are built from.
 class Eq exp => Term exp where
+  
   -- | 'Generic' is a sum of all the interesting sub-types, transitively, of @exp@.
   -- We use @Generic e ~ e@ to signify that something is its own Generic.
   -- Simple expression types might be their own sole 'Generic', more complex examples
@@ -83,15 +131,9 @@ class Eq exp => Term exp where
   -- | 'inject' injects an exp into a 'Generic'.
   inject :: exp -> Generic exp
 
-  -- | 'equals' creates an predicate 'Translate' specialized to the first argument.
-  -- Attempts to use 'ptrEqualsTM' to check "pointer equality", resorts to Eq otherwise
-  equals :: exp -> Translate exp Bool
-  equals e0 = Translate $ \ e1 -> do
-		b <- ptrEqualsTM e0 e1
-		return $ b || e0 == e1
-
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
-  allR :: Rewrite (Generic exp) -> Rewrite exp
+  allR :: Rewrite c m (Generic exp) -> Rewrite c m exp
 
   -- | 'crushU' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
-  crushU :: (Monoid result) => Translate (Generic exp) result -> Translate exp result
+  crushU :: (Monoid b) => Translate c m (Generic exp) b -> Translate c m exp b
+  

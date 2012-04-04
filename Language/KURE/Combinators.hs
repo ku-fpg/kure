@@ -1,16 +1,16 @@
 {-# LANGUAGE FlexibleInstances, UndecidableInstances, TypeFamilies #-}
 -- |
 -- Module: Language.KURE.Combinators
--- Copyright: (c) 2010 The University of Kansas
+-- Copyright: (c) 2012 The University of Kansas
 -- License: BSD3
 --
--- Maintainer: Andy Gill <andygill@ku.edu>
+-- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
 -- Stability: unstable
 -- Portability: ghc
 --
 -- This module contains various combinators that use 'Translate' and 'Rewrite'. The convension is that
 -- 'Translate' based combinators end with @T@, and 'Rewrite' based combinators end with @R@. Of course,
--- because 'Rewrite' is a type synomim of 'Translate', the 'Rewrite' functions also operate with on 'Translate',
+-- because 'Rewrite' is a type synonymm of 'Translate', the 'Rewrite' functions also operate with on 'Translate',
 -- and the 'Translate' functions operate with 'Rewrite'.
 
 module Language.KURE.Combinators
@@ -55,104 +55,71 @@ module Language.KURE.Combinators
 	, foldU
     ) -} where
 
-import Language.KURE.Types
+-- import Language.KURE.Types
+import Types
 
 import Data.Monoid
-import Control.Arrow
-import qualified Control.Category as Cat
+import Control.Applicative
 import Control.Monad
 
---infixl 3 <+, >->, .+, !->
-infixr 3 ?
-
--- Note: We use < for catching fail, . for catching id.
+infixl 3 <+, >->
+-- infixr 3 ?
 
 --------------------------------------------------------------------------------
 -- The Translate combinators.
 
--- | like a catch, '<+' does the first translate, and if it fails, then does the second translate.
-(<+) :: Translate a b -> Translate a b -> Translate a b
-(<+) rr1 rr2 = translate $ \ e -> apply rr1 e `catchTM` (\ _ -> apply rr2 e)
+-- | like a catch, '<+' does the first 'Translate', and if it fails, then does the second 'Translate'.
+(<+) :: MonadCatch m => Translate c m a b -> Translate c m a b -> Translate c m a b
+t1 <+ t2 = translate $ \ ca -> apply t1 ca `catchM` (\ _ -> apply t2 ca)
 
-(>->) :: Translate a b -> Translate b c -> Translate a c
-(>->) rr1 rr2 = rr1 >>> rr2
+-- | sequencing translates, the first must be a rewrite for the context to remain valid.
+(>->) :: (Contextual c, Monad m) => Rewrite c m a -> Translate c m a b -> Translate c m a b
+t1 >-> t2 = translate $ \ ca -> apply t1 ca >>= apply t2 . replaceC ca
 
 -- | failing translation.
-failT :: String -> Translate a b
-failT msg = translate $ \ _ -> fail msg
+failT :: Monad m => String -> Translate c m a b
+failT = fail
 
--- | look at the argument for the translation before choosing which translation to perform.
-readerT :: (a -> Translate a b) -> Translate a b
-readerT fn = translate $ \ expA -> apply (fn expA) expA
+-- | look at the argument for the translation before choosing which 'Translate' to perform.
+readerT :: (c a -> Translate c m a b) -> Translate c m a b
+readerT f = translate $ \ ca -> apply (f ca) ca
 
--- | lift a function into a Translate
-pureT :: (a -> b) -> Translate a b
-pureT = arr
+-- | lift a function into a 'Translate'
+liftT :: (Contextual c, Applicative m) => (a -> b) -> Translate c m a b
+liftT f = translate (pure . f . extractC)
 
--- | 'constT' always translates into an unfailable 'Translate' that returns the first argument.
-constT :: b -> Translate a b
-constT = pureT . const
+-- | 'constT' produces an unfailable 'Translate' that returns the first argument.
+constT :: (Applicative m) => b -> Translate c m a b
+constT b = translate (pure . const b)
 
 -- | 'concatT' turns a list of 'Translate's that return a common 'Monoid'al result
 -- into a single 'Translate' that performs them all in sequence and combines their
 -- results with 'mconcat'
-concatT :: (Monoid r) => [Translate a r] -> Translate a r
-concatT ts = translate $ \ e -> do
-	rs <- sequence [ apply t e | t <- ts ]
-	return (mconcat rs)
-
+concatT :: (Monad m , Monoid b) => [Translate c m a b] -> Translate c m a b
+concatT ts = translate (liftM mconcat . forM ts . flip apply)
+ 
 -- | 'emptyT' is an unfailing 'Translate' that always returns 'mempty'
-emptyT :: (Monoid r) => Translate a r
+emptyT :: (Applicative m, Monoid b) => Translate c m a b
 emptyT = constT mempty
 
 --------------------------------------------------------------------------------
--- The 'Rewrite' combinators.
--- | if the first rewrite is an identity, then do the second rewrite.
-(.+) :: (Term a) => Rewrite a -> Rewrite a -> Rewrite a
-(.+) r0 r1 = rewrite $ \ e0 -> do
-		e1 <- apply r0 e0
-		isId <- e0 .==. e1
-		if isId then apply r1 e1
-			    else return e1
-
--- | if the first rewrite was /not/ an identity, then also do the second rewrite.
-(!->) :: (Term a) => Rewrite a -> Rewrite a -> Rewrite a
-(!->) r0 r1 = rewrite $ \ e0 -> do
-		e1 <- apply r0 e0
-		isId <- e0 .==. e1
-		if isId then return e1
-			    else apply r1 e1
-
--- | Term equality
-(.==.) :: (TranslateMonad m, Term e) => e -> e -> m Bool
-(.==.) = apply . equals
-
--- | catch a failing 'Rewrite', making it into an identity.
-tryR :: Rewrite a -> Rewrite a
-tryR s = s <+ idR
-
--- | if this is an identity rewrite, make it fail. To succeed, something must have changed.
-changedR :: (Term a) => Rewrite a -> Rewrite a
-changedR rr = rr .+ failR "unchanged"
-
--- | repeat a rewrite until it fails, then return the result before the failure.
-repeatR :: Rewrite a -> Rewrite a
-repeatR s = tryR (s >-> repeatR s)
-
--- | look at the argument to a rewrite, and choose to be either a failure of trivial success.
-acceptR :: (a -> Bool) -> Rewrite a
-acceptR fn = translate $ \  expA -> if fn expA
-                				    then return expA
-			                	    else fail "accept failed"
 
 -- | identity rewrite.
-idR :: Rewrite exp
-idR = Cat.id
+idR :: (Contextual c, Applicative m) => Rewrite c m a
+idR = rewrite (pure . extractC)
 
--- | failing rewrite.
-failR :: String -> Rewrite a
-failR = failT
+-- | catch a failing 'Rewrite', making it into an identity.
+tryR :: (Contextual c, MonadCatch m) => Rewrite c m a -> Rewrite c m a
+tryR s = s <+ idR
 
+-- | repeat a rewrite until it fails, then return the result before the failure.
+repeatR :: (Contextual c, MonadCatch m) => Rewrite c m a -> Rewrite c m a
+repeatR s = tryR (s >-> repeatR s)
+
+-- | look at the argument to a 'Rewrite', and choose to be either a failure or trivial success.
+acceptR :: (Contextual c, Monad m) => (a -> Bool) -> Rewrite c m a
+acceptR p = rewrite $ lowerC (\ a -> if p a then return a else fail "accept failed")
+{-
 --------------------------------------------------------------------------------
 -- Prelude structures
 
@@ -244,3 +211,4 @@ foldU :: ( e ~ Generic e, Term e, Monoid r) => Translate (Generic e) r -> Transl
 foldU s = concatT [ s, crushU (foldU s) ]
 
 
+-}
