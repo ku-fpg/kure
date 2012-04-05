@@ -9,7 +9,7 @@
 -- Portability: ghc
 --
 -- This module contains a Template Haskell based generator for the many data-type specific
--- functions that KURE want users to write. KURE Your Boilerplate (KYB) attempts to make
+-- functions that KURE wants users to write. KURE Your Boilerplate (KYB) attempts to make
 -- writing these function easy. Eventually, there will be a small DSL for effects inside the
 -- generated functions.
 --
@@ -65,7 +65,7 @@ import System.Environment
 --
 -- The first argument is the name of the Generic data-structure, which you need to write by hand.
 -- If you provide the name of a type synonym as the first argument, then KYB assumes that you are acting
--- over a single data-type, i.e. you generic is your AST type.
+-- over a single data-type, i.e. your generic is your AST type.
 -- If you provide the name of a data-type  (the typical use-case), then this function generates
 -- code for every conceptual sub-type of the provided data-type.
 --

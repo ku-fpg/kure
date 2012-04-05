@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies, FlexibleInstances, MultiParamTypeClasses #-}
 -- |
 -- Module: Language.KURE.Types
 -- Copyright: (c) 2012 The University of Kansas
@@ -19,6 +19,8 @@ import Control.Exception (catch)
 
 import Control.Applicative
 import Control.Monad
+import Data.Pointed
+import Data.Copointed
 import Data.Monoid
 
 ------------------------------------------------------------------------------------------
@@ -34,6 +36,10 @@ instance Functor m => Functor (Translate c m a) where
   
 -- fmap :: (b -> d) -> Translate c m a b -> Translate c m a d  
    fmap f t = translate (fmap f . apply t)
+
+instance Pointed m => Pointed (Translate c m a) where
+-- point :: b -> Translate c m a b
+   point b = translate (\ _ -> point b)
 
 instance Applicative m => Applicative (Translate c m a) where
   
@@ -61,12 +67,12 @@ instance MonadPlus m => MonadPlus (Translate c m a) where
 
 -- mplus :: Translate c m a b -> Translate c m a b -> Translate c m a b
    mplus t1 t2 = translate (\ ca -> apply t1 ca `mplus` apply t2 ca)
-   
--- | 'Applicative' should be a superclass of 'Monad'.
---   It isn't, but we partially compensate for it by making it a superclass of 'MonadCatch'.
-class (Applicative m, Monad m) => MonadCatch m where
-  
--- | Left Biased mplus  
+
+-- | 'Pointed' should be a superclass of 'Applicative', 
+--   and 'Applpicative' should be a superclass of 'Monad'.
+--   They aren't, but we can make them superclasses of 'MonadCatch'.
+class (Pointed m, Applicative m, Monad m) => MonadCatch m where
+-- | Catch monadic 'fail's  
    catchM :: m a -> (String -> m a) -> m a
 
 instance MonadCatch m => MonadCatch (Translate c m a) where
@@ -89,21 +95,26 @@ instance MonadCatch IO where
 	 	                     then f $! (ioeGetErrorString e)
 		                     else ioError e)
                  
--- | Contextual is similar to comonad, but more restricted.
---   It's precise definition is still under development. 
---   It's very close to a co-endomonad, but that's not quite good enough due to the required interaction with monads. 
-class Contextual c where
-  extractC :: c a -> a
-  replaceC :: c a -> a -> c a  
+-- | 'EndoFunctor' is a Functor that only allows the mapping of endofunctions
+--   This is different from the categorical notion of an endofunctor, 
+--   which is a functor from a category to itself (and which all 'Functor's in Haskell are anyway).   
+class EndoFunctor c where   
+  liftC :: (a -> a) -> c a -> c a
 
-lowerC :: Contextual c => (a -> b) -> c a -> b
-lowerC f = f . extractC
+class (Copointed c, EndoFunctor c) => EndoCopointed c where
 
-lowerC2 :: Contextual c => (a -> b -> d) -> c a -> c b -> d
-lowerC2 f ca cb = f (extractC ca) (extractC cb)
+constC :: EndoFunctor c => a -> c a -> c a
+constC a = liftC (const a) 
 
-liftC :: Contextual c => (a -> a) -> c a -> c a
-liftC f ca = replaceC ca (lowerC f ca)
+-- | Replace the value in the context while leaving the context unchanged
+replaceC :: EndoFunctor c => c a -> a -> c a
+replaceC = flip constC
+
+lowerC :: Copointed c => (a -> b) -> c a -> b
+lowerC f = f . copoint
+
+lowerC2 :: Copointed c => (a -> b -> d) -> c a -> c b -> d
+lowerC2 f ca cb = f (copoint ca) (copoint cb)
 
 ------------------------------------------------------------------------------------------
 
@@ -113,27 +124,42 @@ type Rewrite c m a = Translate c m a a
 -- | 'rewrite' is our primitive way of building a Rewrite
 rewrite :: (c a -> m a) -> Rewrite c m a
 rewrite = translate
-
+  
 ------------------------------------------------------------------------------------------
 
 -- | 'Term's are things that syntax are built from.
-class Eq exp => Term exp where
+class (Generic a ~ Generic (Generic a)) => Term a where
   
-  -- | 'Generic' is a sum of all the interesting sub-types, transitively, of @exp@.
-  -- We use @Generic e ~ e@ to signify that something is its own Generic.
+  -- | 'Generic' is a sum of all the interesting sub-types, transitively, of @a@.
+  -- We use @Generic a ~ a@ to signify that something is its own Generic.
   -- Simple expression types might be their own sole 'Generic', more complex examples
   -- will have a new datatype for the 'Generic', which will also be an instance of class 'Term'.
-  type Generic exp
+  type Generic a
 
-  -- | 'select' looks in a 'Generic', to get the exp inside, or fails.
-  select :: Generic exp -> Maybe exp
+  -- | 'inject' injects an expression into a 'Generic'.
+  inject :: a -> Generic a
 
-  -- | 'inject' injects an exp into a 'Generic'.
-  inject :: exp -> Generic exp
+  -- | 'select' attempts to extract an expression of the correct type from a 'Generic'.
+  select :: Generic a -> Maybe a
+
+
+-- | 'TermC's are 'Term's in a context
+class (EndoFunctor c, Term a) => TermC c a where
+  
+-- | 'injectC' allows an expression to be injected into a 'Generic' inside a context.
+  injectC :: c a -> c (Generic a)
+  
+  -- | 'selectC' attempts to extract an expression of the correct type from a 'Generic', inside a context.
+  selectC :: c (Generic a) -> Maybe (c a)
+  
+
+-- | 'Walker' captures how we walk over an expression in a context, using a monad m. 
+class (TermC c a, Monad m) => Walker c m a where
 
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
-  allR :: Rewrite c m (Generic exp) -> Rewrite c m exp
+  allR :: Rewrite c m (Generic a) -> Rewrite c m a
 
-  -- | 'crushU' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
-  crushU :: (Monoid b) => Translate c m (Generic exp) b -> Translate c m exp b
+  -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
+  crushT :: (Monoid b) => Translate c m (Generic a) b -> Translate c m a b
   
+------------------------------------------------------------------------------------------
