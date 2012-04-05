@@ -1,21 +1,21 @@
 Name:                kure
-Version:             1.0.2
+Version:             1.1.0
 Synopsis:            Combinators for Strategic Programming
 Description:	     KURE is a DSL for building rewriting DSLs.
 	 	     KURE shares combinator names and concepts with Stratego, but unlike Stratego, KURE is strongly typed.
 		     KURE is similar to Strafunski, but has a lightweight generic traversal mechanism using type families
 		     rather than SYB.
 
-		     We include KURE-your-boilerplate (KYB), a Template Haskell powered library for generating shallow
-		     tree walking combinators,
-                     for use with the KURE DSL.
+		     -- We include KURE-your-boilerplate (KYB), a Template Haskell powered library for generating shallow
+		     -- tree walking combinators,
+                     -- for use with the KURE DSL.
 
 Category:            Language
 License:             BSD3
 License-file:        LICENSE
 Author:              Andy Gill
-Maintainer:          Andy Gill <andygill@ku.edu>
-Copyright:           (c) 2010 The University of Kansas
+Maintainer:          Neil Sculthorpe <neil@ittc.ku.edu>
+Copyright:           (c) 2012 The University of Kansas
 Homepage:            http://www.ittc.ku.edu/csdl/fpg/Tools/KURE
 Stability:	     alpha
 build-type: 	     Simple
@@ -25,13 +25,13 @@ Extra-Source-Files:
     test/Exp.hs
 
 Library
-  Build-Depends: base >= 4.2, template-haskell
+  Build-Depends: base >= 4.2, pointed
   Ghc-Options:     -O2
   Exposed-modules:
        Language.KURE
        Language.KURE.Types
        Language.KURE.Combinators
-       Language.KURE.Boilerplate
+       -- Language.KURE.Boilerplate
 
   Ghc-Options:  -Wall
 

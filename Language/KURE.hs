@@ -1,9 +1,9 @@
 -- |
 -- Module: Language.KURE
--- Copyright: (c) 2010 The University of Kansas
+-- Copyright: (c) 2012 The University of Kansas
 -- License: BSD3
 --
--- Maintainer: Andy Gill <andygill@ku.edu>
+-- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
 -- Stability: unstable
 -- Portability: ghc
 --
@@ -14,9 +14,9 @@
 module Language.KURE 
 	( module Language.KURE.Types
 	, module Language.KURE.Combinators
-	, module Language.KURE.Boilerplate
+--	, module Language.KURE.Boilerplate
 	) where
 
 import Language.KURE.Types
 import Language.KURE.Combinators
-import Language.KURE.Boilerplate
+-- import Language.KURE.Boilerplate

@@ -10,8 +10,7 @@
 --
 -- This is the definition of the types inside KURE.
 
--- module Language.KURE.Types where
-module Types where
+module Language.KURE.Types where
 
 import Prelude hiding (catch)
 import System.IO.Error hiding (catch)
@@ -81,12 +80,12 @@ instance MonadCatch m => MonadCatch (Translate c m a) where
   
 instance MonadCatch Maybe where
 -- catchM :: Maybe a -> (String -> Maybe a) -> Maybe a
-   catchM (Just a)  f = Just a  
+   catchM (Just a)  _ = Just a  
    catchM (Nothing) f = f "Failure inside Maybe Monad"
 
 instance MonadCatch (Either String) where
 -- catchM :: Either String a -> (String -> Either String a) -> Either String a
-   catchM (Right a)  f = Right a  
+   catchM (Right a)  _ = Right a  
    catchM (Left msg) f = f msg
 
 instance MonadCatch IO where

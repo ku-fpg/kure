@@ -42,10 +42,8 @@ module Language.KURE.Combinators
 	, foldT
     )  where
 
--- import Language.KURE.Types
-import Types
+import Language.KURE.Types
 
-import Control.Applicative
 import Control.Monad
 import Data.Pointed
 import Data.Copointed
