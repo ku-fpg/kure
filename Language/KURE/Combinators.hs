@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, ConstraintKinds #-}
 -- |
 -- Module: Language.KURE.Combinators
 -- Copyright: (c) 2012 The University of Kansas
@@ -43,7 +43,8 @@ module Language.KURE.Combinators
         , foldT
 ) where
 
-import Language.KURE.Types
+-- import Language.KURE.Types
+import Types
 
 import Control.Monad
 import Data.Pointed
@@ -139,27 +140,27 @@ promoteR = liftM inject . promoteT
 -------------------------------------------------------------------------------
 
 -- | apply a 'Rewrite' in a top down manner.
-topdownR :: Walker c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+topdownR :: GenericWalker c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 topdownR r = r >-> allR (topdownR r)
 
 -- | apply a 'Rewrite' in a bottom up manner.
-bottomupR :: Walker c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+bottomupR :: GenericWalker c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 bottomupR r = allR (bottomupR r) >-> r
 
 -- | apply a 'Rewrite' in a top down manner, prunning at successful rewrites.
-alltdR :: Walker c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+alltdR :: GenericWalker c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 alltdR r = r <+ allR (alltdR r)
 
 -- | apply a 'Rewrite' twice, in a topdown and bottom up way, using one single tree traversal.
-downupR :: Walker c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+downupR :: GenericWalker c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 downupR r = r >-> allR (downupR r) >-> r
 
 -- | a fixed point traveral, starting with the innermost term.
-innermostR :: Walker c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+innermostR :: GenericWalker c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 innermostR r = bottomupR (tryR (r >-> innermostR r))
 
 -- | fold a tree using a single 'Translate' for each node.
-foldT :: (Walker c m a, Monoid b) => Translate c m (Generic a) b -> Translate c m (Generic a) b
+foldT :: (GenericWalker c m a, Monoid b) => Translate c m (Generic a) b -> Translate c m (Generic a) b
 foldT t = concatT [ t, crushT (foldT t) ]
 
 -------------------------------------------------------------------------------

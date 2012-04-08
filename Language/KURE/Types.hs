@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts, ConstraintKinds #-}
 -- |
 -- Module: Language.KURE.Types
 -- Copyright: (c) 2012 The University of Kansas
@@ -10,7 +10,8 @@
 --
 -- This is the definition of the types inside KURE.
 
-module Language.KURE.Types where
+-- module Language.KURE.Types where
+module Types where
 
 import Control.Applicative
 import Control.Monad
@@ -115,7 +116,7 @@ lowerC f = f . copoint
 lowerC2 :: Copointed c => (a -> b -> d) -> c a -> c b -> d
 lowerC2 f ca cb = f (copoint ca) (copoint cb)
 
-class (Copointed c, EndoFunctor c, InjectiveFunctor c) => Context c where
+type Context c = (Copointed c, EndoFunctor c, InjectiveFunctor c)
 
 ------------------------------------------------------------------------------------------
 
@@ -130,12 +131,15 @@ class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
   
 
 -- | 'Walker' captures how we walk over an expression in a context, using a monad m. 
-class (Context c, Pointed m, MonadPlus m, Term a, a ~ Generic a) => Walker c m a where
+class (Context c, Monad m, Term a) => Walker c m a where
 
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
 
   -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
-  crushT :: (Monoid b) => Translate c m (Generic a) b -> Translate c m a b
+  crushT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
   
+  
+type GenericWalker c m a = (Walker c m a, Pointed m, MonadPlus m, a ~ Generic a)
+
 ------------------------------------------------------------------------------------------
