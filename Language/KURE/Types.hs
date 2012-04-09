@@ -10,8 +10,8 @@
 --
 -- This is the definition of the types inside KURE.
 
--- module Language.KURE.Types where
-module Types where
+module Language.KURE.Types where
+-- module Types where
 
 import Control.Applicative
 import Control.Monad

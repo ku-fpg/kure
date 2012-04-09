@@ -43,8 +43,8 @@ module Language.KURE.Combinators
         , foldT
 ) where
 
--- import Language.KURE.Types
-import Types
+import Language.KURE.Types
+-- import Types
 
 import Control.Monad
 import Data.Pointed
