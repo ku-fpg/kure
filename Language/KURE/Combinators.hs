@@ -14,37 +14,38 @@
 -- and the 'Translate' functions operate with 'Rewrite'.
 
 module Language.KURE.Combinators
-        (  -- * The 'Translate' combinators
-          (<+)
-        , (>->)
-        , failT
-        , readerT
-        , liftT
-        , constT
-        , concatT
-        , emptyT
-        , contextT
-          -- * The 'Rewrite' combinators
-        , idR
-        , tryR
-        , repeatR
-        , acceptR
-        , (?)
-          -- * The 'Walker' combinators
-        , extractR
-        , promoteR
-        , extractT
-        , promoteT
-        , topdownR
-        , bottomupR
-        , alltdR
-        , downupR
-        , innermostR
-        , foldT
-) where
+--         (  -- * The 'Translate' combinators
+--           (<+)
+--         , (>->)
+--         , failT
+--         , readerT
+--         , liftT
+--         , constT
+--         , concatT
+--         , emptyT
+--         , contextT
+--           -- * The 'Rewrite' combinators
+--         , idR
+--         , tryR
+--         , repeatR
+--         , acceptR
+--         , (?)
+--           -- * The 'Walker' combinators
+--         , extractR
+--         , promoteR
+--         , extractT
+--         , promoteT
+--         , topdownR
+--         , bottomupR
+--         , alltdR
+--         , downupR
+--         , innermostR
+--         , foldT
+-- )
+ where
 
-import Language.KURE.Types
--- import Types
+-- import Language.KURE.Types
+import Types
 
 import Control.Monad
 import Data.Pointed
@@ -63,9 +64,9 @@ infixl 3 <+, >->
 t1 <+ t2 = translate $ \ ca -> apply t1 ca `mplus` apply t2 ca
 
 -- | sequencing translates, the first must be a rewrite for the context to remain valid.
-(>->) :: (EndoFunctor c, Monad m) => Rewrite c m a -> Translate c m a b -> Translate c m a b
-t1 >-> t2 = translate $ \ ca -> apply t1 ca >>= apply t2 . replaceC ca
-
+(>->) :: (Functor c, Monad m) => Rewrite c m a -> Translate c m a b -> Translate c m a b
+t1 >-> t2 = translate $ \ ca -> apply t1 ca >>= (apply t2 . freplace ca)
+{-
 -- | failing translation.
 failT :: Monad m => String -> Translate c m a b
 failT = fail
@@ -79,7 +80,7 @@ liftT :: (Copointed c, Pointed m) => (a -> b) -> Translate c m a b
 liftT f = translate (point . f . copoint)
 
 -- | 'constT' produces an unfailable 'Translate' that returns the first argument.
-constT :: (Pointed m) => b -> Translate c m a b
+constT :: Pointed m => b -> Translate c m a b
 constT b = translate (point . const b)
 
 -- | 'concatT' turns a list of 'Translate's that return a common 'Monoid'al result
@@ -164,3 +165,4 @@ foldT :: (GenericWalker c m a, Monoid b) => Translate c m (Generic a) b -> Trans
 foldT t = concatT [ t, crushT (foldT t) ]
 
 -------------------------------------------------------------------------------
+-}

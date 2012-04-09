@@ -10,8 +10,8 @@
 --
 -- This is the definition of the types inside KURE.
 
-module Language.KURE.Types where
--- module Types where
+-- module Language.KURE.Types where
+module Types where
 
 import Control.Applicative
 import Control.Monad
@@ -86,42 +86,44 @@ instance MonadPlus m => MonadPlus (Translate c m a) where
                
 ------------------------------------------------------------------------------------------
 
-class Injection a b where
-  inject  :: a -> b  
-  retract :: b -> Maybe a
+-- class Injection a b where
+--   inject  :: a -> b  
+--   retract :: b -> Maybe a
   -- Law:  retract (inject a) == Just a
   
 -- | 'EndoFunctor' here is a 'Functor' that only allows the mapping of endofunctions.
 --   This is different from the categorical notion of an endofunctor, 
 --   which is a functor from a category to itself (and which all 'Functor's in Haskell are anyway).   
-class EndoFunctor c where   
-  liftC :: (a -> a) -> c a -> c a
+-- class EndoFunctor c where   
+--   liftC :: (a -> a) -> c a -> c a
   
 -- | 'InjectiveFunctor' is a 'Functor' that only allows the mapping of injective functions.
-class InjectiveFunctor c where
-  injectC  :: Injection a b => c a -> c b
-  retractC :: Injection a b => c b -> Maybe (c a)
+-- class InjectiveFunctor c where
+--   injectC  :: Injection a b => c a -> c b
+--   retractC :: Injection a b => c b -> Maybe (c a)
 
 -- | Replace the value in the context while leaving the context unchanged
-constC :: EndoFunctor c => a -> c a -> c a
-constC a = liftC (const a) 
+-- constC :: EndoFunctor c => a -> c a -> c a
+-- constC a = liftC (const a) 
 
--- | Replace the value in the context while leaving the context unchanged
-replaceC :: EndoFunctor c => c a -> a -> c a
-replaceC = flip constC
+-- | Map a constant value onto a 'Functor'
+fconst :: Functor f => b -> f a -> f b
+fconst b = fmap (const b)
 
-lowerC :: Copointed c => (a -> b) -> c a -> b
-lowerC f = f . copoint
+-- | 'freplace' is 'fconst' with the arguments flipped
+freplace :: Functor f => f a -> b -> f b
+freplace = flip fconst
 
-lowerC2 :: Copointed c => (a -> b -> d) -> c a -> c b -> d
-lowerC2 f ca cb = f (copoint ca) (copoint cb)
+-- lowerC :: Copointed c => (a -> b) -> c a -> b
+-- lowerC f = f . copoint
 
-type Context c = (Copointed c, EndoFunctor c, InjectiveFunctor c)
+-- lowerC2 :: Copointed c => (a -> b -> d) -> c a -> c b -> d
+-- lowerC2 f ca cb = f (copoint ca) (copoint cb)
 
 ------------------------------------------------------------------------------------------
 
 -- | 'Term's are things that syntax are built from.
-class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
+class (Generic a ~ Generic (Generic a)) => Term a where
   
   -- | 'Generic' is a sum of all the interesting sub-types, transitively, of @a@.
   -- We use @Generic a ~ a@ to signify that something is its own Generic.
@@ -129,9 +131,12 @@ class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
   -- will have a new datatype for the 'Generic', which will also be an instance of class 'Term'.
   type Generic a
   
+  inject :: a -> Generic a
+  
+  retract :: Generic a -> Maybe a
 
 -- | 'Walker' captures how we walk over an expression in a context, using a monad m. 
-class (Context c, Monad m, Term a) => Walker c m a where
+class (Copointed c, Functor c, Pointed m, Monad m, Term a) => Walker c m a where
 
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
@@ -140,6 +145,6 @@ class (Context c, Monad m, Term a) => Walker c m a where
   crushT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
   
   
-type GenericWalker c m a = (Walker c m a, Pointed m, MonadPlus m, a ~ Generic a)
+-- type GenericWalker c m a = (Walker c m a, Pointed m, MonadPlus m, a ~ Generic a)
 
 ------------------------------------------------------------------------------------------
