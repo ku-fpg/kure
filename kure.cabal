@@ -1,5 +1,5 @@
 Name:                kure
-Version:             1.1.1
+Version:             1.1.2
 Synopsis:            Combinators for Strategic Programming
 Description:	     KURE is a DSL for building rewriting DSLs.
 	 	     KURE shares combinator names and concepts with Stratego, but unlike Stratego, KURE is strongly typed.
@@ -29,8 +29,8 @@ Library
   Ghc-Options:     -O2
   Exposed-modules:
        Language.KURE
-       Language.KURE.Types
-       Language.KURE.Combinators
+       Language.KURE.Translate
+       Language.KURE.Term
        -- Language.KURE.Boilerplate
 
   Ghc-Options:  -Wall

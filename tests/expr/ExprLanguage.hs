@@ -5,4 +5,5 @@ data Expr = Var Name | Lit Int | Add Expr Expr | ESeq Cmd Expr
 
 type Name = String
 
-newtype Ctxt a = Ctxt (a,[(Name,Expr)])
+type Context = [(Name,Expr)]
+

@@ -9,49 +9,36 @@ import Data.Monoid
 import Language.KURE
 import ExprLanguage
 
-instance Copointed Ctxt where
-  copoint (Ctxt (a,c)) = a 
-
-instance EndoFunctor Ctxt where
-  liftC f (Ctxt (a,c)) = Ctxt (f a, c)
-
-instance InjectiveFunctor Ctxt where
-  injectC  (Ctxt (a,c)) = Ctxt (inject a,c)
-  retractC (Ctxt (a,c)) = fmap (\ a' -> Ctxt (a',c)) (retract a)
-
 
 data GenericExpr = GExpr Expr
                  | GCmd Cmd
 
-
-instance Injection GenericExpr GenericExpr where
-  inject = id
-  retract = Just
-
 instance Term GenericExpr where
   type Generic GenericExpr = GenericExpr
-  
+  inject  = id
+  retract = Just
 
-instance Injection Expr GenericExpr where
-  inject = GExpr
-  retract (GExpr e) = Just e
-  retract _         = Nothing
 
 instance Term Expr where
+  
   type Generic Expr = GenericExpr
   
-instance Walker Ctxt Maybe Expr where
-  allR gr = rewrite $ \ (Ctxt (e,c)) -> case e of
-                                         (Lit n) -> return (Lit n)
-                                         (Var v) -> return (Var v)
-                                         (Add e1 e2) -> liftM2 Add  (apply (extractR gr) (Ctxt (e1,c))) (apply (extractR gr) (Ctxt (e2,c)))
-                                         (ESeq cm e) -> liftM2 ESeq (apply (extractR gr) (Ctxt (cm,c))) (apply (extractR gr) (Ctxt (e,c)))
+  inject = GExpr
+  
+  retract (GExpr e) = Just e
+  retract _         = Nothing
+  
+  allR gr = rewrite $ \ c e -> case e of
+                                 Lit n     -> pure (Lit n)
+                                 Var v     -> pure (Var v)
+                                 Add e1 e2 -> liftA2 Add  (apply (extractR gr) c e1) (apply (extractR gr) c e2)
+                                 ESeq cm e -> liftA2 ESeq (apply (extractR gr) c cm) (apply (extractR gr) c e)
                                          
-  crushT gt = translate $ \ (Ctxt (e,c)) -> case e of                     
-                                              (Lit n) -> return mempty
-                                              (Var v) -> return mempty
-                                              (Add e1 e2) -> liftM2 mappend (apply (extractT gt) (Ctxt (e1,c))) (apply (extractT gt) (Ctxt (e2,c)))
-                                              (ESeq cm e) -> liftM2 mappend (apply (extractT gt) (Ctxt (cm,c))) (apply (extractT gt) (Ctxt (e,c)))
+  crushT gt = translate $ \ c e -> case e of                     
+                                     Lit n     -> pure mempty
+                                     Var v     -> pure mempty
+                                     Add e1 e2 -> liftA2 mappend (apply (extractT gt) c e1) (apply (extractT gt) c e2)
+                                     ESeq cm e -> liftA2 mappend (apply (extractT gt) c cm) (apply (extractT gt) c e)
   
   
 instance Injection Cmd GenericExpr where
