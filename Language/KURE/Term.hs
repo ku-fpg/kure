@@ -11,10 +11,8 @@
 -- This module contains combinators that allow us to traverse an expression tree.
 
 module Language.KURE.Term      
-        ( inject
-        , retract  
-        , allR  
-        , crushT  
+        ( Injection, inject, retract  
+        , Term, Generic, crushT, allR  
         , extractR
         , promoteR
         , extractT
@@ -26,8 +24,7 @@ module Language.KURE.Term
         , innermostR
         , topdownfoldT
         , bottomupfoldT  
-)
- where
+) where
 
 import Language.KURE.Translate
 
