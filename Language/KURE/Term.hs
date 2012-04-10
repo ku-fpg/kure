@@ -12,18 +12,21 @@
 
 module Language.KURE.Term      
         ( Injection, inject, retract  
-        , Term, Generic, crushT, allR  
+        , Term, Generic 
         , extractR
         , promoteR
         , extractT
-        , promoteT
+        , promoteT  
+        , Walker, crushT, allR  
+        , WalkerR                  
         , topdownR
         , bottomupR
         , alltdR
         , downupR
         , innermostR
-        , topdownfoldT
-        , bottomupfoldT  
+        , WalkerT  
+        , topdownT
+        , bottomupT  
 ) where
 
 import Language.KURE.Translate
@@ -49,12 +52,6 @@ class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
   -- will have a new datatype for the 'Generic', which will also be an instance of class 'Term'.
   type Generic a :: *
   
-  -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
-  crushT :: (Applicative m, Monoid b) => Translate c m (Generic a) b -> Translate c m a b
- 
-  -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
-  allR :: (Pointed m, Alternative m, Monad m) => Rewrite c m (Generic a) -> Rewrite c m a
-  
 --------------------------------------------------------------------------------
 
 -- | 'extractT' converts a 'Translate' taking a 'Generic' into a translate over a specific expression type.
@@ -76,40 +73,50 @@ promoteR = liftA inject . promoteT
 
 -------------------------------------------------------------------------------
 
+-- | 'Walker' captures how we walk over the children of a node, using a specific context @c@ and applicative functor @m@.
+class (Pointed m, Applicative m, Term a) => Walker c m a where
+  -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
+  crushT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
+ 
+  -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
+  allR :: (Alternative m, Monad m) => Rewrite c m (Generic a) -> Rewrite c m a
+  
+-------------------------------------------------------------------------------
+
 -- | 'WalkerR' is a constraint synonym for the common constraints of the 'Rewrite' traversal combinators. 
-type WalkerR m a = (Pointed m, Alternative m, Monad m, Term a, a ~ Generic a)
+type WalkerR c m a = (Alternative m, Monad m, Walker c m a, a ~ Generic a)
 
 -- | apply a 'Rewrite' in a top-down manner.
-topdownR :: WalkerR m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+topdownR :: WalkerR c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 topdownR r = r >-> allR (topdownR r)
 
 -- | apply a 'Rewrite' in a bottom-up manner.
-bottomupR :: WalkerR m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+bottomupR :: WalkerR c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 bottomupR r = allR (bottomupR r) >-> r
 
 -- | apply a 'Rewrite' in a top-down manner, prunning at successful rewrites.
-alltdR :: WalkerR m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+alltdR :: WalkerR c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 alltdR r = r <+ allR (alltdR r)
 
 -- | apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal.
-downupR :: WalkerR m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+downupR :: WalkerR c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 downupR r = r >-> allR (downupR r) >-> r
 
 -- | a fixed-point traveral, starting with the innermost term.
-innermostR :: WalkerR m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+innermostR :: WalkerR c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 innermostR r = bottomupR (tryR (r >-> innermostR r))
 
 -------------------------------------------------------------------------------
 
 -- | 'WalkerT' is a constraint synonym for the common constraints of the 'Translate' traversal combinators. 
-type WalkerT m a b = (Applicative m, Term a, a ~ Generic a, Monoid b)
+type WalkerT c m a b = (Applicative m, Walker c m a, a ~ Generic a, Monoid b)
 
 -- | fold a tree in a top-down manner, using a single 'Translate' for each node.
-topdownfoldT :: WalkerT m a b => Translate c m (Generic a) b -> Translate c m (Generic a) b
-topdownfoldT t = concatT [ t, crushT (topdownfoldT t) ]
+topdownT :: WalkerT c m a b => Translate c m (Generic a) b -> Translate c m (Generic a) b
+topdownT t = concatT [ t, crushT (topdownT t) ]
 
 -- | fold a tree in a bottom-up manner, using a single 'Translate' for each node.
-bottomupfoldT :: WalkerT m a b => Translate c m (Generic a) b -> Translate c m (Generic a) b
-bottomupfoldT t = concatT [ crushT (bottomupfoldT t), t ]
+bottomupT :: WalkerT c m a b => Translate c m (Generic a) b -> Translate c m (Generic a) b
+bottomupT t = concatT [ crushT (bottomupT t), t ]
 
 -------------------------------------------------------------------------------

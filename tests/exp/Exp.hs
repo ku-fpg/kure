@@ -1,7 +1,5 @@
 module Exp where
 
-import Language.KURE
-
 type Name = String
 data Exp = Lam Name Exp
          | App Exp Exp
