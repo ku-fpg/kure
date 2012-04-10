@@ -14,7 +14,6 @@
 -- and the 'Translate' functions operate with 'Rewrite'.
 
 module Language.KURE.Translate
--- module Translate 
        (  -- * Primitives
           Translate
         , Rewrite
