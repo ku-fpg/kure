@@ -10,6 +10,8 @@ type Name = String
 
 type Context = [(Name,Expr)]
 
+-- for simplicity we assume the language does not allow variable shadowing
+
 updateContext :: Cmd -> Context -> Context
 updateContext (Seq c1 c2)  = updateContext c2 . updateContext c1
 updateContext (Assign v e) = ((v,e):)
