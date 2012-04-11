@@ -3,25 +3,21 @@
 module ExpInstances where
 
 import Language.KURE
-
 import Exp
 
 import Data.Monoid
-import Control.Monad
+import Control.Applicative
 
-
-type R e = T e e
-type T e1 e2 = Translate e1 e2
-
-
+-- type R e = T e e
+-- type T e1 e2 = Translate e1 e2
+  
 instance Term Exp where
    type Generic Exp = Exp  -- Exp is its own Generic root.
-   inject    = id
-   select e  = return e
-
-   allR rr   = appR rr rr <+ lamR rr <+ varR
+  
+   allR r = 
    crushU rr = appU rr rr <+ lamU rr <+ varU
-
+   
+{-
 ------------------------------------------------------------------------
 --
 -- First the guards
@@ -94,3 +90,4 @@ varP :: (Name -> T Exp r)
 varP f = varG >-> readerT (\ (Var n) -> f n)
 
 ------------------------------------------------------------------------
+-}

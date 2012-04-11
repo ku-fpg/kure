@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts, KindSignatures, ConstraintKinds #-}
+{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts, KindSignatures, ConstraintKinds, FlexibleInstances #-}
 -- |
 -- Module: Language.KURE.Translate
 -- Copyright: (c) 2012 The University of Kansas
@@ -43,9 +43,12 @@ class Injection a b where
   inject  :: a -> b
   retract :: b -> Maybe a
 
+instance Injection a a where
+  inject  = id
+  retract = Just
+
 -- | 'Term's are things that syntax are built from.
 class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
-  
   -- | 'Generic' is a sum of all the interesting sub-types, transitively, of @a@.
   -- We use @Generic a ~ a@ to signify that something is its own Generic.
   -- Simple expression types might be their own sole 'Generic', more complex examples

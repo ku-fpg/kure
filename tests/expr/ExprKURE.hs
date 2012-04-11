@@ -13,10 +13,6 @@ import ExprLanguage
 data GenericExpr = GExpr Expr
                  | GCmd Cmd
 
-instance Injection GenericExpr GenericExpr where
-  inject  = id
-  retract = Just
-
 instance Term GenericExpr where
   type Generic GenericExpr = GenericExpr
   
