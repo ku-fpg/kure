@@ -14,13 +14,10 @@
 -- and the 'Translate' functions operate with 'Rewrite'.
 
 module Language.KURE.Translate
-       (  -- * Primitives
+       (  -- * Translations
           Translate
-        , Rewrite
+        , translate 
         , apply  
-        , translate  
-        , rewrite
-          -- * The 'Translate' combinators
         , (<+)
         , (>->)
         , failT
@@ -30,13 +27,15 @@ module Language.KURE.Translate
         , readerT
         , concatT
         , emptyT
-          -- * The 'Rewrite' combinators
+          -- * Rewrites
+        , Rewrite  
+        , rewrite  
         , idR
         , tryR
         , repeatR
         , acceptR
         , (?)
-          -- * The prelude combinators          
+          -- * Prelude combinators          
         , tuple2R
         , listR
         , maybeR
@@ -44,12 +43,20 @@ module Language.KURE.Translate
         , listT
         , maybeT
         , fromJustT  
+          -- * Lenses
+        , Lens  
+        , lens
+        , idL  
+        , failL  
+        , composeL  
+        , rewriteL  
 ) where
 
 import Prelude hiding (id, (.))
 import Data.Monoid
 import Data.Traversable (sequenceA)
 import Control.Applicative
+import Control.Monad
 import Control.Category
 import Control.Arrow
 
@@ -214,5 +221,28 @@ maybeT t = translate $ \ c -> maybe (pure mempty) (apply t c)
 -- | Translate a 'Just' a into an a, or a 'Nothing' into a failure 
 fromJustT :: Alternative m => Translate c m (Maybe a) a
 fromJustT = translate $ \ _ -> maybe empty pure
+
+------------------------------------------------------------------------------------------
+
+type Lens c m a b = Translate c m a ((c,b), (b -> m a))
+
+lens :: (c -> a -> m ((c,b), (b -> m a))) -> Lens c m a b
+lens = translate
+
+idL :: Applicative m => Lens c m a a
+idL = lens $ \ c a -> pure ((c,a), pure)
+
+failL :: Alternative m => Lens c m a b
+failL = lens $ \ _ _ -> empty
+
+composeL :: Monad m => Lens c m a b -> Lens c m b d -> Lens c m a d
+composeL l1 l2 = lens $ \ ca a -> do ((cb,b),kb) <- apply l1 ca a
+                                     ((cd,d),kd) <- apply l2 cb b
+                                     return ((cd,d),kd >=> kb)
+
+-- not sure about the order of Lens vs Rewrite.
+rewriteL :: Monad m => Lens c m a b -> Rewrite c m b -> Rewrite c m a
+rewriteL l r = rewrite $ \ c a -> do ((cb,b),kb) <- apply l c a
+                                     apply r cb b >>= kb
 
 ------------------------------------------------------------------------------------------
