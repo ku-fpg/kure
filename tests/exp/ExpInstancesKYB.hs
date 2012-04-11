@@ -1,7 +1,6 @@
-{-# LANGUAGE TypeFamilies, TemplateHaskell, NoMonomorphismRestriction
-  #-}
+{-# LANGUAGE TypeFamilies, TemplateHaskell, NoMonomorphismRestriction #-}
 
-module ExpInstances where
+module ExpInstancesKYB where
 
 import Language.KURE
 
@@ -9,9 +8,6 @@ import Exp
 
 import Data.Monoid
 import Control.Monad
-
-type R e = T e e
-type T e1 e2 = Translate e1 e2
 
 type MyGeneric = Exp
 

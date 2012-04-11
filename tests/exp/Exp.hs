@@ -27,7 +27,10 @@ e11 = Lam "x" e5
 
 type Context = [Name] -- bound variable names
 
-newtype ExpM a = ExpM (Int -> (Int, Maybe a)) 
+newtype ExpM a = ExpM {expM :: Int -> (Int, Maybe a)} 
+
+runExpM :: ExpM a -> Maybe a
+runExpM m = snd (expM m 0)
 
 instance Functor ExpM where
   fmap f (ExpM m) = ExpM (second (fmap f) . m)
