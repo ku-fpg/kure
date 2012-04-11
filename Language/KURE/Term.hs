@@ -32,7 +32,6 @@ module Language.KURE.Term
 import Language.KURE.Translate
 
 import Data.Monoid
-import Data.Pointed
 import Control.Applicative
 
 ------------------------------------------------------------------------------------------
@@ -66,7 +65,7 @@ promoteT  :: (Alternative m, Term a) => Translate c m a b -> Translate c m (Gene
 promoteT t = translate $ \ c -> maybe empty (apply t c) . retract
 
 -- | 'extractR' converts a 'Rewrite' over a 'Generic' into a rewrite over a specific expression type.
-extractR :: (Pointed m, Alternative m, Monad m, Term a) => Rewrite c m (Generic a) -> Rewrite c m a
+extractR :: (Alternative m, Monad m, Term a) => Rewrite c m (Generic a) -> Rewrite c m a
 extractR r =  extractT r >-> liftT retract >-> fromJustT
 
 -- | 'promoteR' promotes a 'Rewrite' into a 'Generic' 'Rewrite'; other types inside Generic cause failure.
@@ -77,13 +76,13 @@ promoteR = liftA inject . promoteT
 -------------------------------------------------------------------------------
 
 -- | 'Walker' captures how we walk over the children of a node, using a specific context @c@ and applicative functor @m@.
-class (Pointed m, Applicative m, Term a) => Walker c m a where
+class (Applicative m, Term a) => Walker c m a where
   -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
   crushT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
- 
+
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
   allR :: (Alternative m, Monad m) => Rewrite c m (Generic a) -> Rewrite c m a
-  
+
 -------------------------------------------------------------------------------
 
 -- | 'WalkerR' is a constraint synonym for the common constraints of the 'Rewrite' traversal combinators. 

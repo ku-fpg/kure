@@ -48,8 +48,7 @@ module Language.KURE.Translate
 
 import Prelude hiding (id, (.))
 import Data.Monoid
-import Data.Pointed
-import Data.Traversable
+import Data.Traversable (sequenceA)
 import Control.Applicative
 import Control.Category
 import Control.Arrow
@@ -76,20 +75,20 @@ rewrite = translate
 ------------------------------------------------------------------------------------------
 
 -- | identity rewrite.
-idR :: Pointed m => Rewrite c m a
-idR = rewrite (\ _ -> point)
+idR :: Applicative m => Rewrite c m a
+idR = rewrite (\ _ -> pure)
       
 -- | extract the current context
-contextT :: Pointed m => Translate c m a c
-contextT = translate (\ c _ -> point c)
+contextT :: Applicative m => Translate c m a c
+contextT = translate (\ c _ -> pure c)
 
 -- | lift a function into a 'Translate'
-liftT :: Pointed m => (a -> b) -> Translate c m a b
-liftT f = translate (\ _ -> point . f)
+liftT :: Applicative m => (a -> b) -> Translate c m a b
+liftT f = translate (\ _ -> pure . f)
 
 -- | 'constT' produces an unfailable 'Translate' that returns the first argument.
-constT :: Pointed m => b -> Translate c m a b
-constT b = translate (\ _ _ -> point b)
+constT :: Applicative m => b -> Translate c m a b
+constT b = translate (\ _ _ -> pure b)
 
 -- | failing translation.
 failT :: Alternative m => Translate c m a b
@@ -103,9 +102,6 @@ t1 <+ t2 = translate $ \ c a -> apply t1 c a <|> apply t2 c a
 (>->) :: Monad m => Translate c m a b -> Translate c m b d -> Translate c m a d
 t1 >-> t2 = translate $ \ c a -> apply t1 c a >>= apply t2 c
 
-firstT :: Functor m => Translate c m a b -> Translate c m (a,z) (b,z)
-firstT t = translate $ \ c (a,z) -> fmap (\b -> (b,z)) (apply t c a)
-
 ------------------------------------------------------------------------------------------
 
 instance Functor m => Functor (Translate c m a) where
@@ -113,14 +109,10 @@ instance Functor m => Functor (Translate c m a) where
 -- fmap :: (b -> d) -> Translate c m a b -> Translate c m a d  
    fmap f t = translate (\ c -> fmap f . apply t c)
 
-instance Pointed m => Pointed (Translate c m a) where
--- point :: b -> Translate c m a b
-   point = constT
-
 instance Applicative m => Applicative (Translate c m a) where
   
 -- pure :: b -> Translate c m a b  
-   pure b = translate (\ _ _ -> pure b)
+   pure = constT
    
 -- (<*>) :: Translate c m a (b -> d) -> Translate c m a b -> Translate c m a d   
    tf <*> tb = translate (\ c a -> apply tf c a <*> apply tb c a) 
@@ -145,7 +137,7 @@ instance Monad m => Monad (Translate c m a) where
 -- fail :: String -> Translate c m a b
    fail msg = translate $ \ _ _ -> fail msg
 
-instance (Pointed m, Monad m) => Category (Translate c m) where
+instance (Applicative m, Monad m) => Category (Translate c m) where
 
 --  id :: Translate c m a a
     id = idR
@@ -153,13 +145,13 @@ instance (Pointed m, Monad m) => Category (Translate c m) where
 --  (.) :: Translate c m b d -> Translate c m a b -> Translate c m a d
     t2 . t1 = t1 >-> t2
       
-instance (Functor m, Pointed m, Monad m) => Arrow (Translate c m) where
+instance (Applicative m, Monad m) => Arrow (Translate c m) where
   
 -- arr :: (a -> b) -> Translate c m a b  
    arr = liftT
 
 -- first :: (a -> b) -> Translate c m (a,z) (b,z)
-   first = firstT
+   first t = translate $ \ c (a,z) -> liftA (\b -> (b,z)) (apply t c a)
    
 ------------------------------------------------------------------------------------------
 
@@ -170,7 +162,7 @@ concatT :: (Applicative m , Monoid b) => [Translate c m a b] -> Translate c m a 
 concatT = liftA mconcat . sequenceA
 
 -- | 'emptyT' is an unfailing 'Translate' that always returns 'mempty'
-emptyT :: (Pointed m, Monoid b) => Translate c m a b
+emptyT :: (Applicative m, Monoid b) => Translate c m a b
 emptyT = constT mempty
 
 ------------------------------------------------------------------------------------------
@@ -184,11 +176,11 @@ acceptR :: Alternative m => (a -> Bool) -> Rewrite c m a
 acceptR p = rewrite $ \ _ a -> if p a then pure a else empty
 
 -- | catch a failing 'Rewrite', making it into an identity.
-tryR :: (Pointed m, Alternative m) => Rewrite c m a -> Rewrite c m a
+tryR :: Alternative m => Rewrite c m a -> Rewrite c m a
 tryR s = s <+ idR
 
 -- | repeat a rewrite until it fails, then return the result before the failure.
-repeatR :: (Pointed m, Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a
+repeatR :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a
 repeatR s = tryR (s >-> repeatR s)
 
 -- | Guarded translate.

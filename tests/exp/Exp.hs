@@ -1,39 +1,59 @@
 module Exp where
 
+import Control.Applicative
+import Control.Monad
+import Control.Arrow
 
--- Using de Bruijn Indices
-type Index = Int
+type Name = String
 
-data Exp = Lam Exp
+data Exp = Lam Name Exp
          | App Exp Exp
-         | Var Index
-         deriving (Show,Eq)
+         | Var Name
+           deriving (Show,Eq)
 
 -- examples
-e1 = Var 0
-e2 = Var 1
-e3 = Lam e1
-e4 = Lam e2
+e1 = Var "x"
+e2 = Var "y"
+e3 = Lam "x" e1
+e4 = Lam "x" e2
 e5 = App e1 e2
 e6 = App e3 e4
 e7 = App e4 e6
-e8 = Lam (Var 3)
-e9 = Lam e3
-e10 = Lam e4
-e11 = Lam e5
+e8 = Lam "z" (Var "z")
+e9 = Lam "x" e3
+e10 = Lam "x" e4
+e11 = Lam "x" e5
 
 
-type Context = [Exp]
+type Context = [Name] -- bound variable names
 
-lookupVar :: Index -> Context -> Maybe Exp
-lookupVar _ []     = Nothing
-lookupVar 0 (e:_)  = Just e
-lookupVar n (_:es) = lookupVar n es
+newtype ExpM a = ExpM (Int -> (Int, Maybe a)) 
 
-underLam :: Context -> Context
-underLam c = map (incrVarFrom 0) c
+instance Functor ExpM where
+  fmap f (ExpM m) = ExpM (second (fmap f) . m)
 
-incrVarFrom :: Index -> Exp -> Exp
-incrVarFrom i (Lam e)     = Lam (incrVarFrom (succ i) e)
-incrVarFrom i (App e1 e2) = App (incrVarFrom i e1) (incrVarFrom i e2) 
-incrVarFrom i (Var v)     = Var (if v >= i then succ v else v)
+instance Monad ExpM where  
+  return a = ExpM (\n -> (n,Just a))
+  (ExpM f) >>= gg = ExpM $ \ n -> case f n of
+                                    (n',Nothing) -> (n', Nothing)
+                                    (n',Just a)  -> case gg a of  
+                                                      ExpM g -> g n'
+  
+instance Applicative ExpM where
+  pure  = return  
+  (<*>) = ap
+  
+instance Alternative ExpM where
+  empty = ExpM (\n -> (n,Nothing))
+  (ExpM f) <|> (ExpM g) = ExpM $ \ n -> case f n of
+                                          (n',Nothing) -> g n'
+                                          (n',Just a)  -> (n', Just a)
+    
+suggestName :: ExpM Name
+suggestName = ExpM (\n -> ((n+1), Just (show n)))
+
+newName :: Context -> ExpM Name
+newName c = do n <- suggestName
+               if n `elem` c
+                then newName c  
+                else return n

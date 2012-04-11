@@ -8,10 +8,13 @@ import Exp
 import ExpInstances
 
 import Data.Monoid
-import Control.Monad
+import Control.Applicative
 import Data.List
 import Debug.Trace
 
+type R e   = Rewrite   Context ExpM e
+type T e b = Translate Context ExpM b
+{-
 expTest = do
 	let es1 = [e1,e2,e3,e4,e5,e6,e7,e8,e9,e10,e11]
 	print "all expressions"
@@ -69,7 +72,7 @@ shallowAlpha frees' = lamG >->
                 let n' = newName n (frees ++ frees')
                 e' <- apply (substExp n (Var n')) e
                 return $ Lam n' e') 
-
+-}
 substExp :: Name -> Exp -> R Exp
 substExp v s = rule1 <+ rule2 <+ rule3 <+ rule4 <+ rule5 <+ rule6
  where
@@ -89,8 +92,8 @@ betaRedR :: R Exp
 betaRedR = rewrite $ \ e ->
    case e of
      (App (Lam v e1) e2) -> apply (substExp v e2) e1
-     _ -> fail "betaRed"
+     _                   -> empty
 
 debugR :: (Show e) => String -> R e      
-debugR msg = translate $ \ e -> trace (msg ++ " : " ++ show e) (return e)
+debugR msg = translate $ \ e -> trace (msg ++ " : " ++ show e) (pure e)
 
