@@ -63,12 +63,12 @@ instance Walker Context Maybe Expr where
                                 Lit n      ->  empty
                                 Var v      ->  empty
                                 Add e1 e2  ->  case n of
-                                                 0 -> pure ((c,GExpr e1), maybe empty (pure . flip Add e2) . retract)
-                                                 1 -> pure ((c,GExpr e2), maybe empty (pure . Add e1) . retract)
+                                                 0 -> pure ((c,GExpr e1), retractWithA (flip Add e2))
+                                                 1 -> pure ((c,GExpr e2), retractWithA (Add e1))
                                                  _ -> empty
                                 ESeq cm e  ->  case n of
-                                                   0 -> pure ((c,GCmd cm), maybe empty (pure . flip ESeq e) . retract)
-                                                   1 -> pure (((updateContext cm c), GExpr e), maybe empty (pure . ESeq cm) . retract)
+                                                   0 -> pure ((c,                    GCmd cm), retractWithA (flip ESeq e))
+                                                   1 -> pure (((updateContext cm c), GExpr e), retractWithA (ESeq cm))
                                                    _ -> empty
 
   
@@ -95,9 +95,9 @@ instance Walker Context Maybe Cmd where
 
   chooseL n = lens $ \ c cm -> case cm of
                                  Assign v e  ->  case n of
-                                                   0 -> pure ((c,GExpr e), maybe empty (pure . Assign v) . retract)
-                                                   _ -> empty  
+                                                   0 -> pure ((c,GExpr e), retractWithA (Assign v))
+                                                   _ -> empty
                                  Seq cm1 cm2 ->  case n of
-                                                   0 -> pure ((c,GCmd cm1), maybe empty (pure . flip Seq cm2) . retract)
-                                                   1 -> pure (((updateContext cm1 c), GCmd cm2), maybe empty (pure . Seq cm1) . retract)
+                                                   0 -> pure ((c,GCmd cm1), retractWithA (flip Seq cm2))
+                                                   1 -> pure (((updateContext cm1 c), GCmd cm2), retractWithA (Seq cm1))
                                                    _ -> empty

@@ -41,8 +41,7 @@ module Language.KURE.Translate
         , maybeR
         , tuple2T
         , listT
-        , maybeT
-        , fromJustT  
+        , maybeT  
           -- * Lenses
         , Lens  
         , lens
@@ -216,12 +215,6 @@ listT t = translate $ \ c -> liftA mconcat . sequenceA . map (apply t c)
 
 maybeT :: (Applicative m, Monoid r) => Translate c m a r -> Translate c m (Maybe a) r
 maybeT t = translate $ \ c -> maybe (pure mempty) (apply t c)
-
-------------------------------------------------------------------------------------------
-
--- | translate a @Just a@ into an @a@, or a @Nothing@ into a failure 
-fromJustT :: Alternative m => Translate c m (Maybe a) a
-fromJustT = translate $ \ _ -> maybe empty pure
 
 ------------------------------------------------------------------------------------------
 
