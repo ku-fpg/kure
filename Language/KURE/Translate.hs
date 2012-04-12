@@ -233,7 +233,7 @@ idL :: Applicative m => Lens c m a a
 idL = lens $ \ c a -> pure ((c,a), pure)
 
 failL :: Alternative m => Lens c m a b
-failL = lens $ \ _ _ -> empty
+failL = empty
 
 composeL :: Monad m => Lens c m a b -> Lens c m b d -> Lens c m a d
 composeL l1 l2 = lens $ \ ca a -> do ((cb,b),kb) <- apply l1 ca a
