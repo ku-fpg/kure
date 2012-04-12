@@ -27,13 +27,16 @@ module Language.KURE.Term
         , WalkerR                  
         , topdownR
         , bottomupR
-        , alltdR
+        , tdpruneR
         , downupR
         , innermostR
         , WalkerT  
         , topdownT
         , bottomupT
+        , tdpruneT  
         , pathL  
+        , exhaustPathL  
+        , repeatPathL  
 ) where
 
 import Language.KURE.Translate
@@ -113,20 +116,20 @@ promoteL = lens $ \ c a -> pure ((c, inject a), retractA)
 -------------------------------------------------------------------------------
 
 -- | 'Walker' captures how we walk over the children of a node, using a specific context @c@ and applicative functor @m@.
-class (Applicative m, Term a) => Walker c m a where
+class (Alternative m, Term a) => Walker c m a where
   -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
   crushT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
 
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
-  allR :: (Alternative m, Monad m) => Rewrite c m (Generic a) -> Rewrite c m a
+  allR :: Monad m => Rewrite c m (Generic a) -> Rewrite c m a
 
   -- | 'chooseL' constructs a 'Lens' pointing at the n-th interesting child of this node.  
-  chooseL :: Alternative m => Int -> Lens c m a (Generic a)
+  chooseL :: Int -> Lens c m a (Generic a)
 
 -------------------------------------------------------------------------------
 
 -- | 'WalkerR' is a constraint synonym for the common constraints of the 'Rewrite' traversal combinators. 
-type WalkerR c m a = (Alternative m, Monad m, Walker c m a, a ~ Generic a)
+type WalkerR c m a = (Monad m, Walker c m a, a ~ Generic a)
 
 -- | apply a 'Rewrite' in a top-down manner.
 topdownR :: WalkerR c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
@@ -136,9 +139,9 @@ topdownR r = r >-> allR (topdownR r)
 bottomupR :: WalkerR c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 bottomupR r = allR (bottomupR r) >-> r
 
--- | apply a 'Rewrite' in a top-down manner, prunning at successful rewrites.
-alltdR :: WalkerR c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-alltdR r = r <+ allR (alltdR r)
+-- | attempt to apply a 'Rewrite' in a top-down manner, prunning at successful rewrites.
+tdpruneR :: WalkerR c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+tdpruneR r = r <+ allR (tdpruneR r)
 
 -- | apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal.
 downupR :: WalkerR c m a => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
@@ -161,10 +164,29 @@ topdownT t = concatT [ t, crushT (topdownT t) ]
 bottomupT :: WalkerT c m a b => Translate c m (Generic a) b -> Translate c m (Generic a) b
 bottomupT t = concatT [ crushT (bottomupT t), t ]
 
+-- | attempt to apply a 'Translate' in a top-down manner, prunning at successes.
+tdpruneT :: WalkerT c m a b => Translate c m (Generic a) b -> Translate c m (Generic a) b
+tdpruneT t = t <+ crushT (tdpruneT t)
+
 -------------------------------------------------------------------------------
 
--- | construct a 'Lens' by following a path of 'Int's, where each 'Int' specifies which interesting child to focus on at each step.
-pathL :: (Alternative m, Monad m, Walker c m a, a ~ Generic a) => [Int] -> Lens c m (Generic a) (Generic a)
+-- | a 'Path' is a list of 'Int's, where each 'Int' specifies which interesting child to descend to at each step.
+type Path = [Int]
+
+-- | 'WalkerL' is a constraint synonym for the common constraints of the 'Lens' combinators.
+type WalkerL c m a = (Monad m, Walker c m a, a ~ Generic a)
+
+-- | construct a 'Lens' by following a 'Path'.
+pathL :: WalkerL c m a => Path -> Lens c m (Generic a) (Generic a)
 pathL = sequenceL . map chooseL
+
+-- | construct a 'Lens' that points to the last node at which the 'Path' can be followed.
+exhaustPathL :: WalkerL c m a => Path -> Lens c m (Generic a) (Generic a)
+exhaustPathL []     = idL 
+exhaustPathL (n:ns) = tryL (chooseL n `composeL` exhaustPathL ns)
+
+-- | repeat as many iterations of the 'Path' as possible.
+repeatPathL :: WalkerL c m a => Path -> Lens c m (Generic a) (Generic a)
+repeatPathL p = tryL (pathL p `composeL` repeatPathL p)
 
 -------------------------------------------------------------------------------

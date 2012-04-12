@@ -47,9 +47,11 @@ module Language.KURE.Translate
         , lens
         , idL  
         , failL  
+        , tryL  
         , composeL  
         , sequenceL
         , rewriteL  
+        , translateL
 ) where
 
 import Prelude hiding (id, (.))
@@ -233,21 +235,27 @@ idL = lens $ \ c a -> pure ((c,a), pure)
 failL :: Alternative m => Lens c m a b
 failL = empty
 
--- | composition of lenses.
+-- | catch a failing endo'Lens', making it into an identity.
+tryL :: Alternative m => Lens c m a a -> Lens c m a a
+tryL l = l <+ idL
+
+-- | composition of 'Lens's.
 composeL :: Monad m => Lens c m a b -> Lens c m b d -> Lens c m a d
 composeL l1 l2 = lens $ \ ca a -> do ((cb,b),kb) <- apply l1 ca a
                                      ((cd,d),kd) <- apply l2 cb b
                                      return ((cd,d),kd >=> kb)
 
--- | sequence a list of endolenses.
+-- | sequence a list of endo'Lens's.
 sequenceL :: (Applicative m, Monad m) => [Lens c m a a] -> Lens c m a a
 sequenceL = foldr composeL idL
-
--- not sure about the order of Lens vs Rewrite.
 
 -- | apply a 'Rewrite' at a point specified by a 'Lens'.
 rewriteL :: Monad m => Lens c m a b -> Rewrite c m b -> Rewrite c m a
 rewriteL l r = rewrite $ \ c a -> do ((cb,b),kb) <- apply l c a
                                      apply r cb b >>= kb
+
+-- | extract a 'Translate' from a 'Lens'
+translateL :: Functor m => Lens c m a b -> Translate c m a b
+translateL = fmap (snd.fst)
 
 ------------------------------------------------------------------------------------------
