@@ -17,7 +17,9 @@ module Language.KURE.Term
         , promoteR
         , extractT
         , promoteT  
-        , Walker, crushT, allR  
+        , extractL  
+        , promoteL
+        , Walker, crushT, allR, chooseL  
         , WalkerR                  
         , topdownR
         , bottomupR
@@ -26,7 +28,8 @@ module Language.KURE.Term
         , innermostR
         , WalkerT  
         , topdownT
-        , bottomupT  
+        , bottomupT
+        , pathL  
 ) where
 
 import Language.KURE.Translate
@@ -42,6 +45,7 @@ class Injection a b where
   inject  :: a -> b
   retract :: b -> Maybe a
 
+-- | There is an identity injection for all types.
 instance Injection a a where
   inject  = id
   retract = Just
@@ -75,6 +79,16 @@ promoteR = liftA inject . promoteT
 
 -------------------------------------------------------------------------------
 
+-- | a 'Lens' that lets you view a @Generic a@ node as an @a@ node. 
+extractL :: (Alternative m, Term a) => Lens c m (Generic a) a
+extractL = lens $ \ c -> maybe empty (\ a -> pure ((c,a), pure . inject)) . retract
+
+-- | a 'Lens' that lets you view an @a@ node as a @Generic a@ node. 
+promoteL  :: (Alternative m, Term a) => Lens c m a (Generic a)
+promoteL = lens $ \ c a -> pure ((c, inject a), maybe empty pure . retract)
+
+-------------------------------------------------------------------------------
+
 -- | 'Walker' captures how we walk over the children of a node, using a specific context @c@ and applicative functor @m@.
 class (Applicative m, Term a) => Walker c m a where
   -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
@@ -82,6 +96,9 @@ class (Applicative m, Term a) => Walker c m a where
 
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
   allR :: (Alternative m, Monad m) => Rewrite c m (Generic a) -> Rewrite c m a
+
+  -- | 'chooseL' constructs a 'Lens' pointing at the n-th interesting child of this node.  
+  chooseL :: Alternative m => Int -> Lens c m a (Generic a)
 
 -------------------------------------------------------------------------------
 
@@ -111,7 +128,7 @@ innermostR r = bottomupR (tryR (r >-> innermostR r))
 -------------------------------------------------------------------------------
 
 -- | 'WalkerT' is a constraint synonym for the common constraints of the 'Translate' traversal combinators. 
-type WalkerT c m a b = (Applicative m, Walker c m a, a ~ Generic a, Monoid b)
+type WalkerT c m a b = (Walker c m a, a ~ Generic a, Monoid b)
 
 -- | fold a tree in a top-down manner, using a single 'Translate' for each node.
 topdownT :: WalkerT c m a b => Translate c m (Generic a) b -> Translate c m (Generic a) b
@@ -120,5 +137,11 @@ topdownT t = concatT [ t, crushT (topdownT t) ]
 -- | fold a tree in a bottom-up manner, using a single 'Translate' for each node.
 bottomupT :: WalkerT c m a b => Translate c m (Generic a) b -> Translate c m (Generic a) b
 bottomupT t = concatT [ crushT (bottomupT t), t ]
+
+-------------------------------------------------------------------------------
+
+-- | construct a 'Lens' by following a path of 'Int's, where each 'Int' specifies which interesting child to focus on at each step.
+pathL :: (Alternative m, Monad m, Walker c m a, a ~ Generic a) => [Int] -> Lens c m (Generic a) (Generic a)
+pathL = sequenceL . map chooseL
 
 -------------------------------------------------------------------------------

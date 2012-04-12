@@ -49,6 +49,7 @@ module Language.KURE.Translate
         , idL  
         , failL  
         , composeL  
+        , sequenceL
         , rewriteL  
 ) where
 
@@ -71,11 +72,11 @@ data Translate c m a b = Translate {apply :: c -> a -> m b}
 -- | A 'Rewrite' is a 'Translate' that shares the same source and target type.
 type Rewrite c m a = Translate c m a a
 
--- | 'translate' is the standard way of building a 'Translate'.
+-- | 'translate' is the primitive  way of building a 'Translate'.
 translate :: (c -> a -> m b) -> Translate c m a b
 translate = Translate
 
--- | 'rewrite' is our primitive way of building a 'Rewrite'.
+-- | 'rewrite' is the primitive way of building a 'Rewrite'.
 rewrite :: (c -> a -> m a) -> Rewrite c m a
 rewrite = translate
 
@@ -105,7 +106,7 @@ failT = translate (\ _ _ -> empty)
 (<+) :: Alternative m => Translate c m a b -> Translate c m a b -> Translate c m a b
 t1 <+ t2 = translate $ \ c a -> apply t1 c a <|> apply t2 c a
 
--- | sequencing translates
+-- | sequencing translates.
 (>->) :: Monad m => Translate c m a b -> Translate c m b d -> Translate c m a d
 t1 >-> t2 = translate $ \ c a -> apply t1 c a >>= apply t2 c
 
@@ -218,29 +219,40 @@ maybeT t = translate $ \ c -> maybe (pure mempty) (apply t c)
 
 ------------------------------------------------------------------------------------------
 
--- | Translate a 'Just' a into an a, or a 'Nothing' into a failure 
+-- | translate a @Just a@ into an @a@, or a @Nothing@ into a failure 
 fromJustT :: Alternative m => Translate c m (Maybe a) a
 fromJustT = translate $ \ _ -> maybe empty pure
 
 ------------------------------------------------------------------------------------------
 
+-- | A Lens is a way to focus in on a particular point in a structure
 type Lens c m a b = Translate c m a ((c,b), (b -> m a))
 
+-- | 'lens' is the primitive way of building a 'Lens'.
 lens :: (c -> a -> m ((c,b), (b -> m a))) -> Lens c m a b
 lens = translate
 
+-- | identity lens.
 idL :: Applicative m => Lens c m a a
 idL = lens $ \ c a -> pure ((c,a), pure)
 
+-- | failing lens.
 failL :: Alternative m => Lens c m a b
 failL = empty
 
+-- | composition of lenses.
 composeL :: Monad m => Lens c m a b -> Lens c m b d -> Lens c m a d
 composeL l1 l2 = lens $ \ ca a -> do ((cb,b),kb) <- apply l1 ca a
                                      ((cd,d),kd) <- apply l2 cb b
                                      return ((cd,d),kd >=> kb)
 
+-- | sequence a list of endolenses.
+sequenceL :: (Applicative m, Monad m) => [Lens c m a a] -> Lens c m a a
+sequenceL = foldr composeL idL
+
 -- not sure about the order of Lens vs Rewrite.
+
+-- | apply a 'Rewrite' at a point specified by a 'Lens'.
 rewriteL :: Monad m => Lens c m a b -> Rewrite c m b -> Rewrite c m a
 rewriteL l r = rewrite $ \ c a -> do ((cb,b),kb) <- apply l c a
                                      apply r cb b >>= kb

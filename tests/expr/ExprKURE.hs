@@ -3,6 +3,7 @@
 module ExprKURE where
 
 import Control.Applicative
+import Control.Arrow
 import Data.Monoid
 import Data.Pointed
 
@@ -25,7 +26,12 @@ instance Walker Context Maybe GenericExpr where
   crushT t = translate $ \ c g -> case g of 
                                     GExpr e   -> apply (crushT t) c e
                                     GCmd  cm  -> apply (crushT t) c cm
-    
+                                    
+  chooseL n = lens $ \ c g -> case g of
+                                GExpr e  ->  liftA (second (liftA GExpr .)) (apply (chooseL n) c e)
+                                GCmd cm  ->  liftA (second (liftA GCmd .))  (apply (chooseL n) c cm)
+                              
+
 instance Injection Expr GenericExpr where  
   inject = GExpr
   
@@ -53,6 +59,18 @@ instance Walker Context Maybe Expr where
                                      ESeq cm e -> liftA2 mappend (apply (extractT t) c cm) 
                                                                  (apply (extractT t) (updateContext cm c) e)
   
+  chooseL n = lens $ \ c e -> case e of
+                                Lit n      ->  empty
+                                Var v      ->  empty
+                                Add e1 e2  ->  case n of
+                                                 0 -> pure ((c,GExpr e1), maybe empty (pure . flip Add e2) . retract)
+                                                 1 -> pure ((c,GExpr e2), maybe empty (pure . Add e1) . retract)
+                                                 _ -> empty
+                                ESeq cm e  ->  case n of
+                                                   0 -> pure ((c,GCmd cm), maybe empty (pure . flip ESeq e) . retract)
+                                                   1 -> pure (((updateContext cm c), GExpr e), maybe empty (pure . ESeq cm) . retract)
+                                                   _ -> empty
+
   
 instance Injection Cmd GenericExpr where  
   inject = GCmd
@@ -66,11 +84,20 @@ instance Term Cmd where
 instance Walker Context Maybe Cmd where
   
   allR r = rewrite $ \ c cm -> case cm of
-                                  Assign v e  -> liftA (Assign v) (apply (extractR r) c e)
-                                  Seq cm1 cm2 -> liftA2 Seq (apply (extractR r) c cm1) 
-                                                            (apply (extractR r) (updateContext cm1 c) cm2)
+                                 Assign v e  -> liftA (Assign v) (apply (extractR r) c e)
+                                 Seq cm1 cm2 -> liftA2 Seq (apply (extractR r) c cm1) 
+                                                           (apply (extractR r) (updateContext cm1 c) cm2)
                                          
   crushT t = translate $ \ c cm -> case cm of                     
                                       Assign v e  -> apply (extractT t) c e
                                       Seq cm1 cm2 -> liftA2 mappend (apply (extractT t) c cm1) 
                                                                     (apply (extractT t) (updateContext cm1 c) cm2)
+
+  chooseL n = lens $ \ c cm -> case cm of
+                                 Assign v e  ->  case n of
+                                                   0 -> pure ((c,GExpr e), maybe empty (pure . Assign v) . retract)
+                                                   _ -> empty  
+                                 Seq cm1 cm2 ->  case n of
+                                                   0 -> pure ((c,GCmd cm1), maybe empty (pure . flip Seq cm2) . retract)
+                                                   1 -> pure (((updateContext cm1 c), GCmd cm2), maybe empty (pure . Seq cm1) . retract)
+                                                   _ -> empty
