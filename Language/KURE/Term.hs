@@ -17,7 +17,7 @@ module Language.KURE.Term
         , maybeA  
         , retractA  
         , retractWithA  
-        , retractWithMA  
+        , retractWith
         , extractR
         , promoteR
         , extractT
@@ -87,8 +87,8 @@ retractWithA f = maybeA f . retract
 
 -- | attempts to extract an @a@ from a @Generic a@, and then maps a monadic function over it.
 --   can be useful when defining 'chooseL' instances.
-retractWithMA :: (Alternative m, Term a) => (a -> m b) -> Generic a -> m b
-retractWithMA f = maybe empty f . retract
+retractWith :: (Alternative m, Term a) => (a -> m b) -> Generic a -> m b
+retractWith f = maybe empty f . retract
 
 --------------------------------------------------------------------------------
 
