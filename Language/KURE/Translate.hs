@@ -22,6 +22,7 @@ module Language.KURE.Translate
         , (>->)
         , failT
         , contextT
+        , contextidT
         , liftT
         , constT
         , readerT
@@ -90,6 +91,9 @@ idR = rewrite (\ _ -> pure)
 -- | extract the current context
 contextT :: Applicative m => Translate c m a c
 contextT = translate (\ c _ -> pure c)
+
+contextidT :: Applicative m => Translate c m a (c,a)
+contextidT = translate (\ c a -> pure (c,a))
 
 -- | lift a function into a 'Translate'
 liftT :: Applicative m => (a -> b) -> Translate c m a b

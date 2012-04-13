@@ -17,6 +17,7 @@ module Language.KURE.Term
         , maybeA  
         , retractA  
         , retractWithA  
+        , retractWithMA  
         , extractR
         , promoteR
         , extractT
@@ -84,6 +85,11 @@ retractA = fromMaybeA . retract
 retractWithA :: (Alternative m, Term a) => (a -> b) -> Generic a -> m b
 retractWithA f = maybeA f . retract
 
+-- | attempts to extract an @a@ from a @Generic a@, and then maps a monadic function over it.
+--   can be useful when defining 'chooseL' instances.
+retractWithMA :: (Alternative m, Term a) => (a -> m b) -> Generic a -> m b
+retractWithMA f = maybe empty f . retract
+
 --------------------------------------------------------------------------------
 
 -- | 'extractT' converts a 'Translate' taking a 'Generic' into a translate over a specific expression type.
@@ -115,7 +121,7 @@ promoteL = lens $ \ c a -> pure ((c, inject a), retractA)
 
 -------------------------------------------------------------------------------
 
--- | 'Walker' captures how we walk over the children of a node, using a specific context @c@ and applicative functor @m@.
+-- | 'Walker' captures how we walk over the children of a node, using a specific context @c@ and an 'Alternative' @m@.
 class (Alternative m, Term a) => Walker c m a where
   -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
   crushT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
