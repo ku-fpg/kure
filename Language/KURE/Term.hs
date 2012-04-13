@@ -35,6 +35,8 @@ module Language.KURE.Term
         , topdownT
         , bottomupT
         , tdpruneT  
+        , WalkerL  
+        , Path  
         , pathL  
         , exhaustPathL  
         , repeatPathL  
