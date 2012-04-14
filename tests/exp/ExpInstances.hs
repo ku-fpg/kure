@@ -15,12 +15,12 @@ instance Walker Context ExpM Exp where
   
    allR r = rewrite $ \ c e -> case e of 
                                  Var v     -> pure (Var v)
-                                 App e1 e2 -> liftA2 App (apply r c e1) (apply r c e2)
-                                 Lam v e   -> liftA (Lam v) (apply r (v:c) e)
+                                 App e1 e2 -> App <$> apply r c e1 <*> apply r c e2
+                                 Lam v e   -> Lam v <$> apply r (v:c) e
 
    crushT t = translate $ \ c e -> case e of
-                                     Var v     -> pure   mempty
-                                     App e1 e2 -> liftA2 mappend (apply t c e1) (apply t c e2)
+                                     Var v     -> pure mempty
+                                     App e1 e2 -> mappend <$> apply t c e1 <*> apply t c e2
                                      Lam v e   -> apply t (v:c) e
 
    chooseL n = lens $ \ c e -> case e of

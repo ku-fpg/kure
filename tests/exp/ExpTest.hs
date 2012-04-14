@@ -104,18 +104,16 @@ varG = acceptR $ \ e -> case e of { Var {} -> True; _ -> False }
 --
 
 appR :: R Exp -> R Exp -> R Exp
-appR r1 r2 = appG >-> rewrite (\ c (App e1 e2) -> liftA2 App (apply r1 c e1) 
-                                                             (apply r2 c e2)) 
+appR r1 r2 = appG >-> rewrite (\ c (App e1 e2) -> App <$> apply r1 c e1 <*> apply r2 c e2) 
 
 lamR :: R Exp -> R Exp
-lamR r = lamG >-> rewrite (\ c (Lam n e) -> liftA (Lam n) (apply r c e))
+lamR r = lamG >-> rewrite (\ c (Lam n e) -> Lam n <$> apply r c e)
                                            
 varR :: R Exp
 varR = varG
 
 appT :: (Monoid r) => T Exp r -> T Exp r -> T Exp r
-appT r1 r2 = appG >-> translate (\ c (App e1 e2) -> liftA2 mappend (apply r1 c e1) 
-                                                                   (apply r2 c e2)) 
+appT r1 r2 = appG >-> translate (\ c (App e1 e2) -> mappend <$> apply r1 c e1 <*> apply r2 c e2) 
 
 lamT :: (Monoid r) => T Exp r -> T Exp r
 lamT t = lamG >-> translate (\ c (Lam n e) -> apply t c e)
