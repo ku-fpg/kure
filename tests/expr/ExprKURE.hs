@@ -20,16 +20,16 @@ instance Term GenericExpr where
 instance Walker Context Maybe GenericExpr where
   
   allR r = rewrite $ \ c g -> case g of
-                                GExpr e   -> liftA GExpr (apply (allR r) c e)
-                                GCmd  cm  -> liftA GCmd  (apply (allR r) c cm)
+                                GExpr e   -> GExpr <$> apply (allR r) c e
+                                GCmd  cm  -> GCmd  <$> apply (allR r) c cm
 
   crushT t = translate $ \ c g -> case g of 
-                                    GExpr e   -> apply (crushT t) c e
-                                    GCmd  cm  -> apply (crushT t) c cm
+                                    GExpr e  -> apply (crushT t) c e
+                                    GCmd  cm -> apply (crushT t) c cm
                                     
   chooseL n = lens $ \ c g -> case g of
-                                GExpr e  ->  liftA (second (liftA GExpr .)) (apply (chooseL n) c e)
-                                GCmd cm  ->  liftA (second (liftA GCmd .))  (apply (chooseL n) c cm)
+                                GExpr e ->  second (\ k -> liftA GExpr . k) <$> apply (chooseL n) c e
+                                GCmd cm ->  second (\ k -> liftA GCmd  . k) <$> apply (chooseL n) c cm
                               
 
 instance Injection Expr GenericExpr where  
@@ -46,18 +46,18 @@ instance Walker Context Maybe Expr where
   allR r = rewrite $ \ c e -> case e of
                                  Lit n     -> pure (Lit n)
                                  Var v     -> pure (Var v)
-                                 Add e1 e2 -> liftA2 Add  (apply (extractR r) c e1) 
-                                                          (apply (extractR r) c e2)
-                                 ESeq cm e -> liftA2 ESeq (apply (extractR r) c cm) 
-                                                          (apply (extractR r) (updateContext cm c) e)
+                                 Add e1 e2 -> Add <$> apply (extractR r) c e1 
+                                                  <*> apply (extractR r) c e2
+                                 ESeq cm e -> ESeq <$> apply (extractR r) c cm 
+                                                   <*> apply (extractR r) (updateContext cm c) e
                                          
   crushT t = translate $ \ c e -> case e of                     
                                      Lit n     -> pure mempty
                                      Var v     -> pure mempty
-                                     Add e1 e2 -> liftA2 mappend (apply (extractT t) c e1) 
-                                                                 (apply (extractT t) c e2)
-                                     ESeq cm e -> liftA2 mappend (apply (extractT t) c cm) 
-                                                                 (apply (extractT t) (updateContext cm c) e)
+                                     Add e1 e2 -> mappend <$> apply (extractT t) c e1 
+                                                          <*> apply (extractT t) c e2
+                                     ESeq cm e -> mappend <$> apply (extractT t) c cm 
+                                                          <*> apply (extractT t) (updateContext cm c) e
   
   chooseL n = lens $ \ c e -> case e of
                                 Lit n      ->  empty
@@ -67,8 +67,8 @@ instance Walker Context Maybe Expr where
                                                  1 -> pure ((c,GExpr e2), retractWithA (Add e1))
                                                  _ -> empty
                                 ESeq cm e  ->  case n of
-                                                   0 -> pure ((c,                    GCmd cm), retractWithA (flip ESeq e))
-                                                   1 -> pure (((updateContext cm c), GExpr e), retractWithA (ESeq cm))
+                                                   0 -> pure ((c,                  GCmd cm), retractWithA (flip ESeq e))
+                                                   1 -> pure ((updateContext cm c, GExpr e), retractWithA (ESeq cm))
                                                    _ -> empty
 
   
@@ -84,14 +84,14 @@ instance Term Cmd where
 instance Walker Context Maybe Cmd where
   
   allR r = rewrite $ \ c cm -> case cm of
-                                 Assign v e  -> liftA (Assign v) (apply (extractR r) c e)
-                                 Seq cm1 cm2 -> liftA2 Seq (apply (extractR r) c cm1) 
-                                                           (apply (extractR r) (updateContext cm1 c) cm2)
+                                 Assign v e  -> Assign v <$> apply (extractR r) c e
+                                 Seq cm1 cm2 -> Seq <$> apply (extractR r) c cm1 
+                                                    <*> apply (extractR r) (updateContext cm1 c) cm2
                                          
   crushT t = translate $ \ c cm -> case cm of                     
                                       Assign v e  -> apply (extractT t) c e
-                                      Seq cm1 cm2 -> liftA2 mappend (apply (extractT t) c cm1) 
-                                                                    (apply (extractT t) (updateContext cm1 c) cm2)
+                                      Seq cm1 cm2 -> mappend <$> apply (extractT t) c cm1 
+                                                             <*> apply (extractT t) (updateContext cm1 c) cm2
 
   chooseL n = lens $ \ c cm -> case cm of
                                  Assign v e  ->  case n of
@@ -99,5 +99,5 @@ instance Walker Context Maybe Cmd where
                                                    _ -> empty
                                  Seq cm1 cm2 ->  case n of
                                                    0 -> pure ((c,GCmd cm1), retractWithA (flip Seq cm2))
-                                                   1 -> pure (((updateContext cm1 c), GCmd cm2), retractWithA (Seq cm1))
+                                                   1 -> pure ((updateContext cm1 c, GCmd cm2), retractWithA (Seq cm1))
                                                    _ -> empty
