@@ -13,11 +13,9 @@
 module Language.KURE.Term      
         ( Injection, inject, retract  
         , Term, Generic 
-        , fromMaybeA        
-        , maybeA  
-        , retractA  
-        , retractWithA  
         , retractWith
+        , retractWithA  
+        , retractA
         , extractR
         , promoteR
         , extractT
@@ -69,28 +67,20 @@ class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
   type Generic a :: *
   
 --------------------------------------------------------------------------------
-
--- | converts a 'Maybe' into an 'Alternative'; mapping 'Nothing' to 'empty' and 'Just' to 'pure'.
-fromMaybeA :: Alternative m => Maybe a -> m a  
-fromMaybeA = maybe empty pure
-
--- | maps a function over a 'Maybe' before converting it to an 'Alternative'.
-maybeA :: Alternative m => (a -> b) -> Maybe a -> m b
-maybeA f = fromMaybeA . liftA f 
-           
--- | attempts to extract an @a@ from a @Generic a@.
-retractA :: (Alternative m, Term a) => Generic a -> m a
-retractA = fromMaybeA . retract
-
--- | attempts to extract an @a@ from a @Generic a@, and then maps a function over it.
---   can be useful when defining 'chooseL' instances.
-retractWithA :: (Alternative m, Term a) => (a -> b) -> Generic a -> m b
-retractWithA f = maybeA f . retract
-
+  
 -- | attempts to extract an @a@ from a @Generic a@, and then maps a monadic function over it.
 --   can be useful when defining 'chooseL' instances.
 retractWith :: (Alternative m, Term a) => (a -> m b) -> Generic a -> m b
 retractWith f = maybe empty f . retract
+
+-- | attempts to extract an @a@ from a @Generic a@, and then maps a function over it.
+--   can be useful when defining 'chooseL' instances.
+retractWithA :: (Alternative m, Term a) => (a -> b) -> Generic a -> m b
+retractWithA f = retractWith (pure.f)
+
+-- | attempts to extract an @a@ from a @Generic a@.
+retractA :: (Alternative m, Term a) => Generic a -> m a
+retractA = retractWithA id
 
 --------------------------------------------------------------------------------
 
