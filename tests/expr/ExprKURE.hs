@@ -28,8 +28,8 @@ instance Walker Context Maybe GenericExpr where
                                     GCmd  cm -> apply (crushT t) c cm
                                     
   chooseL n = lens $ \ c g -> case g of
-                                GExpr e ->  second (\ k -> liftA GExpr . k) <$> apply (chooseL n) c e
-                                GCmd cm ->  second (\ k -> liftA GCmd  . k) <$> apply (chooseL n) c cm
+                                GExpr e ->  (second.result.liftA) inject <$> apply (chooseL n) c e
+                                GCmd cm ->  (second.result.liftA) inject <$> apply (chooseL n) c cm
                               
 
 instance Injection Expr GenericExpr where  
@@ -101,3 +101,13 @@ instance Walker Context Maybe Cmd where
                                                    0 -> pure ((c,GCmd cm1), retractWithA (flip Seq cm2))
                                                    1 -> pure ((updateContext cm1 c, GCmd cm2), retractWithA (Seq cm1))
                                                    _ -> empty
+
+----------------------------------------------------------------
+
+-- Utilities
+
+-- One of Conal Elliott's semantic editor combinators
+result :: (b -> c) -> (a -> b) -> (a -> c)
+result = (.)
+
+----------------------------------------------------------------

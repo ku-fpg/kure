@@ -100,7 +100,7 @@ extractT t = translate $ \ c -> apply t c . inject
 
 -- | 'promoteT' promotes a 'Translate' into a 'Generic' 'Translate'; other types inside Generic cause failure.
 promoteT  :: (Alternative m, Term a) => Translate c m a b -> Translate c m (Generic a) b
-promoteT t = translate $ \ c -> maybe empty (apply t c) . retract
+promoteT t = translate $ \ c -> retractWith (apply t c)
 
 -- | 'extractR' converts a 'Rewrite' over a 'Generic' into a rewrite over a specific expression type.
 extractR :: (Alternative m, Monad m, Term a) => Rewrite c m (Generic a) -> Rewrite c m a
