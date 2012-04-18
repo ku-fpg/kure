@@ -11,7 +11,7 @@ import FibAST
 instance Term Arith where  
   type Generic Arith = Arith
   
-instance Walker () Maybe Arith where
+instance WalkerR () Maybe Arith where
   
   allR r = rewrite $ \ c e -> case e of
                                  Lit n      ->  pure (Lit n)
@@ -19,12 +19,16 @@ instance Walker () Maybe Arith where
                                  Sub e1 e2  ->  Sub <$> apply r c e1 <*> apply r c e2
                                  Fib e      ->  Fib <$> apply r c e
                                          
+instance WalkerT () Maybe Arith where
+  
   crushT t = translate $ \ c e -> case e of                     
                                     Lit n      ->  pure mempty
                                     Add e1 e2  ->  mappend <$> apply t c e1 <*> apply t c e2
                                     Sub e1 e2  ->  mappend <$> apply t c e1 <*> apply t c e2
                                     Fib e      ->  apply t c e
 
+instance WalkerL () Maybe Arith where
+  
   chooseL n = lens $ \ c e -> case e of
                                 Lit n      ->  empty
                                 Add e1 e2  ->  case n of

@@ -11,17 +11,21 @@ import Control.Applicative
 instance Term Exp where
    type Generic Exp = Exp  -- Exp is its own Generic root.
   
-instance Walker Context ExpM Exp where
+instance WalkerR Context ExpM Exp where
   
    allR r = rewrite $ \ c e -> case e of 
                                  Var v     -> pure (Var v)
                                  App e1 e2 -> App <$> apply r c e1 <*> apply r c e2
                                  Lam v e   -> Lam v <$> apply r (v:c) e
 
+instance WalkerT Context ExpM Exp where
+  
    crushT t = translate $ \ c e -> case e of
                                      Var v     -> pure mempty
                                      App e1 e2 -> mappend <$> apply t c e1 <*> apply t c e2
                                      Lam v e   -> apply t (v:c) e
+
+instance WalkerL Context ExpM Exp where
 
    chooseL n = lens $ \ c e -> case e of
                                 Var v      ->  empty
