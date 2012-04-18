@@ -123,10 +123,10 @@ class (Applicative m, Monad m, Term a) => WalkerR c m a where
 
 -- | 'WalkerT' captures the ability to walk over a 'Term' applying translations, 
 --   using a specific context @c@ and an 'Applicative' @m@.
-class (Applicative m, Term a) => WalkerT c m a where
+class (Applicative m, Term a, Monoid b) => WalkerT c m a b where
   
   -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
-  crushT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
+  crushT :: Translate c m (Generic a) b -> Translate c m a b
 
 -------------------------------------------------------------------------------
 
@@ -162,15 +162,15 @@ innermostR r = bottomupR (tryR (r >-> innermostR r))
 -------------------------------------------------------------------------------
 
 -- | fold a tree in a top-down manner, using a single 'Translate' for each node.
-topdownT :: (WalkerT c m a, a ~ Generic a, Monoid b) => Translate c m (Generic a) b -> Translate c m (Generic a) b
+topdownT :: (WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
 topdownT t = concatT [ t, crushT (topdownT t) ]
 
 -- | fold a tree in a bottom-up manner, using a single 'Translate' for each node.
-bottomupT :: (WalkerT c m a, a ~ Generic a, Monoid b) => Translate c m (Generic a) b -> Translate c m (Generic a) b
+bottomupT :: (WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
 bottomupT t = concatT [ crushT (bottomupT t), t ]
 
 -- | attempt to apply a 'Translate' in a top-down manner, prunning at successes.
-tdpruneT :: (Alternative m, WalkerT c m a, a ~ Generic a, Monoid b) => Translate c m (Generic a) b -> Translate c m (Generic a) b
+tdpruneT :: (Alternative m, WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
 tdpruneT t = t <+ crushT (tdpruneT t)
 
 -------------------------------------------------------------------------------

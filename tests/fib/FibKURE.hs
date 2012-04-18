@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeFamilies #-}
+{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleInstances #-}
 
 module FibKURE where
 
@@ -19,7 +19,7 @@ instance WalkerR () Maybe Arith where
                                  Sub e1 e2  ->  Sub <$> apply r c e1 <*> apply r c e2
                                  Fib e      ->  Fib <$> apply r c e
                                          
-instance WalkerT () Maybe Arith where
+instance Monoid b => WalkerT () Maybe Arith b where
   
   crushT t = translate $ \ c e -> case e of                     
                                     Lit n      ->  pure mempty
