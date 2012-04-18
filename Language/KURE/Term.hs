@@ -22,17 +22,17 @@ module Language.KURE.Term
         , promoteT  
         , extractL  
         , promoteL
-        , WalkerR, allR  
+        , WalkerR, allR, allRgeneric
         , topdownR
         , bottomupR
         , tdpruneR
         , downupR
         , innermostR                   
-        , WalkerT, crushT                 
+        , WalkerT, crushT, crushTgeneric      
         , topdownT
         , bottomupT
         , tdpruneT                   
-        , WalkerL, chooseL  
+        , WalkerL, chooseL, chooseLgeneric 
         , Path  
         , pathL  
         , exhaustPathL  
@@ -43,6 +43,7 @@ import Language.KURE.Translate
 
 import Data.Monoid
 import Control.Applicative
+import Control.Arrow (second)
 
 ------------------------------------------------------------------------------------------
 
@@ -119,24 +120,11 @@ class (Applicative m, Monad m, Term a) => WalkerR c m a where
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
 
--------------------------------------------------------------------------------
-
--- | 'WalkerT' captures the ability to walk over a 'Term' applying translations, 
---   using a specific context @c@ and an 'Applicative' @m@.
-class (Applicative m, Term a, Monoid b) => WalkerT c m a b where
-  
-  -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
-  crushT :: Translate c m (Generic a) b -> Translate c m a b
-
--------------------------------------------------------------------------------
-
--- | 'WalkerL' captures the ability to construct a 'Lens' into a 'Term', 
---   using a specific context @c@ and an 'Alternative' @m@.
-class (Alternative m, Monad m, Term a) => WalkerL c m a where
-
-  -- | 'chooseL' constructs a 'Lens' pointing at the n-th interesting child of this node.  
-  chooseL :: Int -> Lens c m a (Generic a)
-
+-- | 'allRgeneric' is a utility to aid with defining 'WalkerR' instances for the 'Generic' type. 
+--   See the "expr" example.  
+allRgeneric :: WalkerR c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
+allRgeneric r c a = inject <$> apply (allR r) c a
+ 
 -------------------------------------------------------------------------------
 
 -- | apply a 'Rewrite' in a top-down manner.
@@ -161,6 +149,20 @@ innermostR r = bottomupR (tryR (r >-> innermostR r))
 
 -------------------------------------------------------------------------------
 
+-- | 'WalkerT' captures the ability to walk over a 'Term' applying translations, 
+--   using a specific context @c@ and an 'Applicative' @m@.
+class (Applicative m, Term a, Monoid b) => WalkerT c m a b where
+  
+  -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
+  crushT :: Translate c m (Generic a) b -> Translate c m a b
+
+-- | 'crushTgeneric' is a utility to aid with defining 'WalkerT' instances for the 'Generic' type.
+--   See the "expr" example.  
+crushTgeneric :: WalkerT c m a b => Translate c m (Generic a) b -> c -> a -> m b
+crushTgeneric t = apply (crushT t)
+
+-------------------------------------------------------------------------------
+
 -- | fold a tree in a top-down manner, using a single 'Translate' for each node.
 topdownT :: (WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
 topdownT t = concatT [ t, crushT (topdownT t) ]
@@ -173,6 +175,20 @@ bottomupT t = concatT [ crushT (bottomupT t), t ]
 tdpruneT :: (Alternative m, WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
 tdpruneT t = t <+ crushT (tdpruneT t)
 
+-------------------------------------------------------------------------------
+
+-- | 'WalkerL' captures the ability to construct a 'Lens' into a 'Term', 
+--   using a specific context @c@ and an 'Alternative' @m@.
+class (Alternative m, Monad m, Term a) => WalkerL c m a where
+
+  -- | 'chooseL' constructs a 'Lens' pointing at the n-th interesting child of this node.  
+  chooseL :: Int -> Lens c m a (Generic a)
+
+-- | 'chooseLgeneric' is a utility to aid with defining 'WalkerL' instances for the 'Generic' type. 
+--   See the "expr" example.  
+chooseLgeneric :: WalkerL c m a => Int -> c -> a -> m ((c, Generic a), Generic a -> m (Generic a))
+chooseLgeneric n c a = (second.result.liftA) inject <$> apply (chooseL n) c a
+                       
 -------------------------------------------------------------------------------
 
 -- | a 'Path' is a list of 'Int's, where each 'Int' specifies which interesting child to descend to at each step.
@@ -190,5 +206,13 @@ exhaustPathL (n:ns) = tryL (chooseL n `composeL` exhaustPathL ns)
 -- | repeat as many iterations of the 'Path' as possible.
 repeatPathL :: (WalkerL c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
 repeatPathL p = tryL (pathL p `composeL` repeatPathL p)
+
+-------------------------------------------------------------------------------
+
+-- Utilities
+
+-- One of Conal Elliott's semantic editor combinators.
+result :: (b -> c) -> (a -> b) -> (a -> c)
+result = (.)
 
 -------------------------------------------------------------------------------

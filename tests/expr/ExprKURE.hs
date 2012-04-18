@@ -3,7 +3,6 @@
 module ExprKURE where
 
 import Control.Applicative
-import Control.Arrow (second)
 import Data.Monoid
 import Data.Pointed
 
@@ -19,18 +18,18 @@ instance Term GenericExpr where
   
 instance WalkerR Context Maybe GenericExpr where
   allR r = rewrite $ \ c g -> case g of
-                                GExpr e   -> GExpr <$> apply (allR r) c e
-                                GCmd  cm  -> GCmd  <$> apply (allR r) c cm
+                                GExpr e -> allRgeneric r c e
+                                GCmd cm -> allRgeneric r c cm
 
 instance Monoid b => WalkerT Context Maybe GenericExpr b where
   crushT t = translate $ \ c g -> case g of 
-                                    GExpr e  -> apply (crushT t) c e
-                                    GCmd  cm -> apply (crushT t) c cm
+                                    GExpr e -> crushTgeneric t c e
+                                    GCmd cm -> crushTgeneric t c cm
 
 instance WalkerL Context Maybe GenericExpr where
   chooseL n = lens $ \ c g -> case g of
-                                GExpr e ->  (second.result.liftA) inject <$> apply (chooseL n) c e
-                                GCmd cm ->  (second.result.liftA) inject <$> apply (chooseL n) c cm
+                                GExpr e -> chooseLgeneric n c e
+                                GCmd cm -> chooseLgeneric n c cm
                               
 
 instance Injection Expr GenericExpr where  
@@ -104,13 +103,5 @@ instance WalkerL Context Maybe Cmd where
                                                    0 -> pure ((c,GCmd cm1), retractWithA (flip Seq cm2))
                                                    1 -> pure ((updateContext cm1 c, GCmd cm2), retractWithA (Seq cm1))
                                                    _ -> empty
-
-----------------------------------------------------------------
-
--- Utilities
-
--- One of Conal Elliott's semantic editor combinators
-result :: (b -> c) -> (a -> b) -> (a -> c)
-result = (.)
 
 ----------------------------------------------------------------
