@@ -22,7 +22,7 @@ module Language.KURE.Term
         , promoteT  
         , extractL  
         , promoteL
-        , WalkerR, allR, allRgeneric
+        , WalkerR, allR, anyR, allRgeneric
         , topdownR
         , bottomupR
         , tdpruneR
@@ -119,6 +119,8 @@ class (Applicative m, Monad m, Term a) => WalkerR c m a where
   
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
+
+  anyR :: Rewrite c m (Generic a) -> Rewrite c m a
 
 -- | 'allRgeneric' is a utility to aid with defining 'WalkerR' instances for the 'Generic' type. 
 --   See the "expr" example.  

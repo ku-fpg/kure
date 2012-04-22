@@ -8,6 +8,7 @@ import Data.Monoid
 import Language.KURE
 import FibAST
 
+                                
 instance Term Arith where  
   type Generic Arith = Arith
   
@@ -19,6 +20,20 @@ instance WalkerR () Maybe Arith where
                                  Sub e1 e2  ->  Sub <$> apply r c e1 <*> apply r c e2
                                  Fib e      ->  Fib <$> apply r c e
                                          
+  anyR r = rewrite $ \ c e -> case e of
+                                 Lit n      ->  empty
+                                 Add e1 e2  ->  do (b1,e1') <- apply (attemptR r) c e1
+                                                   (b2,e2') <- apply (attemptR r) c e2
+                                                   if b1 || b2 
+                                                    then return (Add e1' e2')
+                                                    else empty     
+                                 Sub e1 e2  ->  do (b1,e1') <- apply (attemptR r) c e1
+                                                   (b2,e2') <- apply (attemptR r) c e2
+                                                   if b1 || b2 
+                                                    then return (Sub e1' e2')
+                                                    else empty  
+                                 Fib e      ->  Fib <$> apply r c e
+
 instance Monoid b => WalkerT () Maybe Arith b where
   
   crushT t = translate $ \ c e -> case e of                     

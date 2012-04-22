@@ -8,6 +8,9 @@ import FibKURE
 
 type FibRewrite = Rewrite () Maybe Arith
 
+applyFib :: FibRewrite -> Arith -> Maybe Arith
+applyFib e = apply e ()
+
 fib :: Int -> Arith
 fib = Fib . Lit
 
@@ -41,24 +44,35 @@ subLitR = rewrite $ \ () e -> case e of
 
 -- Just (Add (Fib (Sub (Lit 5) (Lit 1))) (Fib (Sub (Lit 5) (Lit 2))))
 test1 :: Maybe Arith
-test1 = apply fibUnrollR () (fib 5)
+test1 = applyFib fibUnrollR (fib 5)
 
 -- Nothing
 test2 :: Maybe Arith
-test2 = apply addLitR () (fib 5)
+test2 = applyFib addLitR (fib 5)
 
 -- Nothing
 test3 :: Maybe Arith
-test3 = apply (fibUnrollR >-> addLitR) () (fib 5)
+test3 = applyFib (fibUnrollR >-> addLitR) (fib 5)
 
 -- Just (Add (Fib (Sub (Lit 5) (Lit 1))) (Fib (Sub (Lit 5) (Lit 2))))
 test4 :: Maybe Arith
-test4 = apply (fibUnrollR >-> bottomupR (tryR addLitR)) () (fib 5)
+test4 = applyFib (fibUnrollR >-> bottomupR (tryR addLitR)) (fib 5)
 
 -- Just (Add (Fib (Sub (Lit 5) (Lit 1))) (Fib (Sub (Lit 5) (Lit 2))))
 test5 :: Maybe Arith
-test5 = apply (fibUnrollR >-> bottomupR (tryR subLitR)) () (fib 5)
+test5 = applyFib (fibUnrollR >-> bottomupR (tryR subLitR)) (fib 5)
 
 -- Just (Lit 55)
 test6 :: Maybe Arith
-test6 = apply (tryR (topdownR fibDefR) >-> bottomupR (tryR addLitR)) () (fib 10)
+test6 = applyFib (tryR (topdownR fibDefR) >-> bottomupR (tryR addLitR)) (fib 10)
+
+-- Just (Sub (Add (Lit 5) (Lit 3)) (Add (Fib (Sub (Lit 5) (Lit 1))) (Fib (Sub (Lit 5) (Lit 2)))))
+test7 :: Maybe Arith
+test7 = applyFib (anyR fibUnrollR) arith7
+
+-- Just (Sub (Lit 8) (Fib (Lit 5)))
+test8 :: Maybe Arith
+test8 = applyFib (anyR addLitR) arith7
+
+arith7 :: Arith
+arith7 = Sub (Add (Lit 5) (Lit 3)) (fib 5)
