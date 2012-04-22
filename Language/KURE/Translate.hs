@@ -36,6 +36,10 @@ module Language.KURE.Translate
         , repeatR
         , acceptR
         , (?)
+        , tryT  
+        , attemptT
+        , (<||)
+        , orR  
           -- * Prelude combinators          
         , tuple2R
         , listR
@@ -190,16 +194,32 @@ acceptR p = rewrite $ \ _ a -> if p a then pure a else empty
 
 -- | catch a failing 'Rewrite', making it into an identity.
 tryR :: Alternative m => Rewrite c m a -> Rewrite c m a
-tryR s = s <+ idR
+tryR r = r <+ idR
 
 -- | repeat a rewrite until it fails, then return the result before the failure.
 repeatR :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a
-repeatR s = tryR (s >-> repeatR s)
+repeatR r = tryR (r >-> repeatR r)
 
 -- | Guarded translate.
 (?) ::  Alternative m => Bool -> Translate c m a b -> Translate c m a b
 False ? _  = failT
 True  ? t  = t
+
+-- | catch a failing 'Translate', making it succeed with a constant value.
+tryT :: Alternative m => Translate c m a b -> b -> Translate c m a b
+tryT t b = t <+ constT b
+
+-- | catch a failing 'Translate', making it succeed with 'Nothing'.
+attemptT :: Alternative m => Translate c m a b -> Translate c m a (Maybe b)
+attemptT t = tryT (Just <$> t) Nothing
+
+-- | attempts two rewrites in sequence, succeeding if one or both succeed.
+(<||) :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a -> Rewrite c m a
+r1 <|| r2 = rewrite $ \ c a -> apply (attemptT r1) c a >>= maybe (apply r2 c a) (apply (tryR r2) c)
+  
+-- | attempt a list of rewrites in sequence, succeeding if at least one succeeds.
+orR :: (Alternative m, Monad m) => [Rewrite c m a] -> Rewrite c m a
+orR = foldl (<||) failT
 
 ------------------------------------------------------------------------------------------
 
