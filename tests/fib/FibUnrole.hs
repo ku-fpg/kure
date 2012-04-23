@@ -4,7 +4,7 @@ import Control.Applicative
 
 import Language.KURE
 import FibAST
-import FibKURE
+import FibKURE()
 
 type FibRewrite = Rewrite () Maybe Arith
 
@@ -24,6 +24,15 @@ fibDefR = rewrite $ \ () e -> case e of
                                                         )
                                    _            -> empty
                                    
+fibDefFullR :: FibRewrite
+fibDefFullR = rewrite $ \ () e -> case e of
+                                     Fib (Lit 0)  -> pure (Lit 0)
+                                     Fib (Lit 1)  -> pure (Lit 1)
+                                     Fib (Lit n)  -> pure (Add (Fib (Sub e (Lit 1))) 
+                                                               (Fib (Sub e (Lit 2)))
+                                                          )
+                                     _            -> empty
+
 fibUnrollR :: FibRewrite
 fibUnrollR = rewrite $ \ () e -> case e of
                                    Fib e  -> pure (Add (Fib (Sub e (Lit 1))) 
@@ -56,15 +65,19 @@ test3 = applyFib (fibUnrollR >-> addLitR) (fib 5)
 
 -- Just (Add (Fib (Sub (Lit 5) (Lit 1))) (Fib (Sub (Lit 5) (Lit 2))))
 test4 :: Maybe Arith
-test4 = applyFib (fibUnrollR >-> bottomupR (tryR addLitR)) (fib 5)
+test4 = applyFib (fibUnrollR >-> allbuR (tryR addLitR)) (fib 5)
 
--- Just (Add (Fib (Sub (Lit 5) (Lit 1))) (Fib (Sub (Lit 5) (Lit 2))))
-test5 :: Maybe Arith
-test5 = applyFib (fibUnrollR >-> bottomupR (tryR subLitR)) (fib 5)
+-- Nothing
+test5a :: Maybe Arith
+test5a = applyFib (fibUnrollR >-> allbuR subLitR) (fib 5)
+
+-- Just (Add (Fib (Lit 4)) (Fib (Lit 3))
+test5b :: Maybe Arith
+test5b = applyFib (fibUnrollR >-> anybuR subLitR) (fib 5)
 
 -- Just (Lit 55)
 test6 :: Maybe Arith
-test6 = applyFib (tryR (topdownR fibDefR) >-> bottomupR (tryR addLitR)) (fib 10)
+test6 = applyFib (tryR (alltdR fibDefR) >-> allbuR (tryR addLitR)) (fib 10)
 
 -- Just (Sub (Add (Lit 5) (Lit 3)) (Add (Fib (Sub (Lit 5) (Lit 1))) (Fib (Sub (Lit 5) (Lit 2)))))
 test7 :: Maybe Arith
@@ -74,5 +87,14 @@ test7 = applyFib (anyR fibUnrollR) arith7
 test8 :: Maybe Arith
 test8 = applyFib (anyR addLitR) arith7
 
+-- Nothing
+test9 :: Maybe Arith
+test9 = applyFib (anybuR subLitR) arith7
+
+-- Just (Lit 55)
+test10 :: Maybe Arith
+test10 = applyFib (innermostR (addLitR >+> subLitR >+> fibDefFullR)) (fib 10)
+
 arith7 :: Arith
 arith7 = Sub (Add (Lit 5) (Lit 3)) (fib 5)
+

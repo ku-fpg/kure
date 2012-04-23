@@ -30,18 +30,19 @@ module Language.KURE.Translate
         , concatT
         , emptyT
         , readerT
-        , (?)
+        , whenT
         , tryT  
         , attemptT
           -- * Rewrites
         , Rewrite  
         , rewrite  
         , idR
+        , guardR  
         , acceptR
         , tryR  
         , attemptR  
         , repeatR  
-        , (<||)
+        , (>+>)
         , orR  
           -- * Prelude combinators          
         , tuple2R
@@ -70,8 +71,7 @@ import Control.Monad
 import Control.Category
 import Control.Arrow
 
-infixl 3 <+, >->
-infixr 3 ?
+infixl 3 <+, >->, >+>
 
 ------------------------------------------------------------------------------------------
 
@@ -191,14 +191,19 @@ emptyT = constT mempty
 readerT :: (a -> Translate c m a b) -> Translate c m a b
 readerT f = translate $ \ c a -> apply (f a) c a
 
+-- | guarded translate.
+whenT ::  Alternative m => Bool -> Translate c m a b -> Translate c m a b
+whenT False _  = failT
+whenT True  t  = t
+
+-- | guarded rewrite.
+guardR :: Alternative m => Bool -> Rewrite c m a
+guardR False = failT
+guardR True  = idR
+
 -- | look at the argument to a 'Rewrite', and choose to be either a failure or trivial success.
 acceptR :: Alternative m => (a -> Bool) -> Rewrite c m a
 acceptR p = rewrite $ \ _ a -> if p a then pure a else empty
-
--- | Guarded translate.
-(?) ::  Alternative m => Bool -> Translate c m a b -> Translate c m a b
-False ? _  = failT
-True  ? t  = t
 
 -- | catch a failing 'Translate', making it succeed with a constant value.
 tryT :: Alternative m => Translate c m a b -> b -> Translate c m a b
@@ -222,12 +227,12 @@ repeatR :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a
 repeatR r = tryR (r >-> repeatR r)
 
 -- | attempts two 'Rewrite's in sequence, succeeding if one or both succeed.
-(<||) :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a -> Rewrite c m a
-r1 <|| r2 = rewrite $ \ c a -> apply (attemptT r1) c a >>= maybe (apply r2 c a) (apply (tryR r2) c)
+(>+>) :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a -> Rewrite c m a
+r1 >+> r2 = rewrite $ \ c a -> apply (attemptT r1) c a >>= maybe (apply r2 c a) (apply (tryR r2) c)
   
 -- | attempt a list of 'Rewrite's in sequence, succeeding if at least one succeeds.
 orR :: (Alternative m, Monad m) => [Rewrite c m a] -> Rewrite c m a
-orR = foldl (<||) failT
+orR = foldl (>+>) failT
 
 ------------------------------------------------------------------------------------------
 

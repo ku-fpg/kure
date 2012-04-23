@@ -13,26 +13,35 @@ instance Term Exp where
   
 instance WalkerR Context ExpM Exp where
   
-   allR r = rewrite $ \ c e -> case e of 
-                                 Var v     -> pure (Var v)
-                                 App e1 e2 -> App <$> apply r c e1 <*> apply r c e2
-                                 Lam v e   -> Lam v <$> apply r (v:c) e
+   allR r = rewrite $ \ c ex -> case ex of 
+                                  Var v     -> pure (Var v)
+                                  App e1 e2 -> App <$> apply r c e1 <*> apply r c e2
+                                  Lam v e   -> Lam v <$> apply r (v:c) e
+
+   anyR r = rewrite $ \ c ex -> case ex of 
+                                  Var _     -> empty
+                                  App e1 e2 -> do (b1,e1') <- apply (attemptR r) c e1
+                                                  (b2,e2') <- apply (attemptR r) c e2
+                                                  if b1 || b2 
+                                                   then return (App e1' e2')
+                                                   else empty
+                                  Lam v e   -> Lam v <$> apply r (v:c) e
 
 instance Monoid b => WalkerT Context ExpM Exp b where
   
-   crushT t = translate $ \ c e -> case e of
-                                     Var v     -> pure mempty
-                                     App e1 e2 -> mappend <$> apply t c e1 <*> apply t c e2
-                                     Lam v e   -> apply t (v:c) e
+   crushT t = translate $ \ c ex -> case ex of
+                                      Var _     -> pure mempty
+                                      App e1 e2 -> mappend <$> apply t c e1 <*> apply t c e2
+                                      Lam v e   -> apply t (v:c) e
 
 instance WalkerL Context ExpM Exp where
 
-   chooseL n = lens $ \ c e -> case e of
-                                Var v      ->  empty
-                                App e1 e2  ->  case n of
-                                                 0 -> pure ((c,e1), \ e1' -> pure (App e1' e2))
-                                                 1 -> pure ((c,e2), \ e2' -> pure (App e1 e2'))
-                                                 _ -> empty
-                                Lam v e    ->  case n of
-                                                 0 -> pure ((v:c,e), \ e' -> pure (Lam v e'))
-                                                 _ -> empty
+   chooseL n = lens $ \ c ex -> case ex of
+                                  Var _      ->  empty
+                                  App e1 e2  ->  case n of
+                                                   0 -> pure ((c,e1), \ e1' -> pure (App e1' e2))
+                                                   1 -> pure ((c,e2), \ e2' -> pure (App e1 e2'))
+                                                   _ -> empty
+                                  Lam v e    ->  case n of
+                                                   0 -> pure ((v:c,e), \ e' -> pure (Lam v e'))
+                                                   _ -> empty

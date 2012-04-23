@@ -14,14 +14,14 @@ instance Term Arith where
   
 instance WalkerR () Maybe Arith where
   
-  allR r = rewrite $ \ c e -> case e of
+  allR r = rewrite $ \ c ex -> case ex of
                                  Lit n      ->  pure (Lit n)
                                  Add e1 e2  ->  Add <$> apply r c e1 <*> apply r c e2
                                  Sub e1 e2  ->  Sub <$> apply r c e1 <*> apply r c e2
                                  Fib e      ->  Fib <$> apply r c e
                                          
-  anyR r = rewrite $ \ c e -> case e of
-                                 Lit n      ->  empty
+  anyR r = rewrite $ \ c ex -> case ex of
+                                 Lit _      ->  empty
                                  Add e1 e2  ->  do (b1,e1') <- apply (attemptR r) c e1
                                                    (b2,e2') <- apply (attemptR r) c e2
                                                    if b1 || b2 
@@ -36,24 +36,24 @@ instance WalkerR () Maybe Arith where
 
 instance Monoid b => WalkerT () Maybe Arith b where
   
-  crushT t = translate $ \ c e -> case e of                     
-                                    Lit n      ->  pure mempty
-                                    Add e1 e2  ->  mappend <$> apply t c e1 <*> apply t c e2
-                                    Sub e1 e2  ->  mappend <$> apply t c e1 <*> apply t c e2
-                                    Fib e      ->  apply t c e
+  crushT t = translate $ \ c ex -> case ex of                     
+                                     Lit _      ->  pure mempty
+                                     Add e1 e2  ->  mappend <$> apply t c e1 <*> apply t c e2
+                                     Sub e1 e2  ->  mappend <$> apply t c e1 <*> apply t c e2
+                                     Fib e      ->  apply t c e
 
 instance WalkerL () Maybe Arith where
   
-  chooseL n = lens $ \ c e -> case e of
-                                Lit n      ->  empty
-                                Add e1 e2  ->  case n of
-                                                 0 -> pure ((c,e1), \ e1' -> pure (Add e1' e2))
-                                                 1 -> pure ((c,e2), \ e2' -> pure (Add e1 e2'))
-                                                 _ -> empty
-                                Sub e1 e2  ->  case n of
-                                                 0 -> pure ((c,e1), \ e1' -> pure (Sub e1' e2))
-                                                 1 -> pure ((c,e2), \ e2' -> pure (Sub e1 e2'))
-                                                 _ -> empty
-                                Fib e      ->  case n of
-                                                 0 -> pure ((c,e), \ e' -> pure (Fib e'))
-                                                 _ -> empty
+  chooseL n = lens $ \ c ex -> case ex of
+                                 Lit _      ->  empty
+                                 Add e1 e2  ->  case n of
+                                                  0 -> pure ((c,e1), \ e1' -> pure (Add e1' e2))
+                                                  1 -> pure ((c,e2), \ e2' -> pure (Add e1 e2'))
+                                                  _ -> empty
+                                 Sub e1 e2  ->  case n of
+                                                  0 -> pure ((c,e1), \ e1' -> pure (Sub e1' e2))
+                                                  1 -> pure ((c,e2), \ e2' -> pure (Sub e1 e2'))
+                                                  _ -> empty
+                                 Fib e      ->  case n of
+                                                  0 -> pure ((c,e), \ e' -> pure (Fib e'))
+                                                  _ -> empty
