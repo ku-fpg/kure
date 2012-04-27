@@ -28,15 +28,15 @@ fibDefFullR :: FibRewrite
 fibDefFullR = rewrite $ \ () e -> case e of
                                      Fib (Lit 0)  -> pure (Lit 0)
                                      Fib (Lit 1)  -> pure (Lit 1)
-                                     Fib (Lit n)  -> pure (Add (Fib (Sub e (Lit 1))) 
-                                                               (Fib (Sub e (Lit 2)))
+                                     Fib (Lit n)  -> pure (Add (Fib (Sub (Lit n) (Lit 1))) 
+                                                               (Fib (Sub (Lit n) (Lit 2)))
                                                           )
                                      _            -> empty
 
 fibUnrollR :: FibRewrite
 fibUnrollR = rewrite $ \ () e -> case e of
-                                   Fib e  -> pure (Add (Fib (Sub e (Lit 1))) 
-                                                       (Fib (Sub e (Lit 2)))
+                                   Fib n  -> pure (Add (Fib (Sub n (Lit 1))) 
+                                                       (Fib (Sub n (Lit 2)))
                                                   )
                                    _      -> empty                                   
 
