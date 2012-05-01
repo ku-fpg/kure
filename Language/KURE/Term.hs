@@ -99,8 +99,8 @@ promoteT t = translate $ \ c -> retractWith (apply t c)
 extractR :: (Alternative m, Monad m, Term a) => Rewrite c m (Generic a) -> Rewrite c m a
 extractR r =  extractT r >>= retractA
   
--- | 'promoteR' promotes a 'Rewrite' into a 'Generic' 'Rewrite'; other types inside Generic cause failure.
---   'try' can be used to convert a failure-by-default promoteR into a 'id-by-default' promotion.
+-- | 'promoteR' promotes a 'Rewrite' into a 'Generic' 'Rewrite'; other types inside 'Generic' cause failure.
+--   'tryR' can be used to convert a failure-by-default 'promoteR' into a 'id-by-default' promotion.
 promoteR  :: (Alternative m, Term a) => Rewrite c m a -> Rewrite c m (Generic a)
 promoteR = liftA inject . promoteT
 
