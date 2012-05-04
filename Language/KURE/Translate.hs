@@ -26,7 +26,7 @@ module Language.KURE.Translate
         , contextidT
         , liftT
         , constT
-        , concatT
+        , mconcatT
         , memptyT
         , readerT
         , whenT
@@ -172,8 +172,8 @@ instance (Applicative m, Monad m) => Arrow (Translate c m) where
 -- | 'concatT' turns a list of 'Translate's that return a common 'Monoid'al result
 -- into a single 'Translate' that performs them all in sequence and combines their
 -- results with 'mconcat'
-concatT :: (Applicative m , Monoid b) => [Translate c m a b] -> Translate c m a b
-concatT = liftA mconcat . sequenceA
+mconcatT :: (Applicative m , Monoid b) => [Translate c m a b] -> Translate c m a b
+mconcatT = liftA mconcat . sequenceA
 
 -- | 'emptyT' is an unfailing 'Translate' that always returns 'mempty'
 memptyT :: (Applicative m, Monoid b) => Translate c m a b

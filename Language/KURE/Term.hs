@@ -192,11 +192,11 @@ crushTgeneric t = apply (crushT t)
 
 -- | fold a tree in a top-down manner, using a single 'Translate' for each node.
 crushtdT :: (WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-crushtdT t = concatT [ t, crushT (crushtdT t) ]
+crushtdT t = mconcatT [ t, crushT (crushtdT t) ]
 
 -- | fold a tree in a bottom-up manner, using a single 'Translate' for each node.
 crushbuT :: (WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-crushbuT t = concatT [ crushT (crushbuT t), t ]
+crushbuT t = mconcatT [ crushT (crushbuT t), t ]
 
 -- | attempt to apply a 'Translate' in a top-down manner, prunning at successes.
 tdpruneT :: (Alternative m, WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
