@@ -22,13 +22,12 @@ module Language.KURE.Translate
         , apply  
         , (<+)
         , (>->)
-        , failT
         , contextT
         , contextidT
         , liftT
         , constT
         , concatT
-        , emptyT
+        , memptyT
         , readerT
         , whenT
         , tryT  
@@ -54,8 +53,7 @@ module Language.KURE.Translate
           -- * Lenses
         , Lens  
         , lens
-        , idL  
-        , failL  
+        , idL
         , tryL  
         , composeL  
         , sequenceL
@@ -110,10 +108,6 @@ liftT f = translate (\ _ -> pure . f)
 constT :: Applicative m => b -> Translate c m a b
 constT b = translate (\ _ _ -> pure b)
 
--- | failing translation.
-failT :: Alternative m => Translate c m a b
-failT = translate (\ _ _ -> empty)
-
 -- | like a catch, '<+' does the first 'Translate', and if it fails, then does the second 'Translate'.
 (<+) :: Alternative m => Translate c m a b -> Translate c m a b -> Translate c m a b
 t1 <+ t2 = translate $ \ c a -> apply t1 c a <|> apply t2 c a
@@ -155,7 +149,7 @@ instance Monad m => Monad (Translate c m a) where
                                       apply (f b) c a
                                      
 -- fail :: String -> Translate c m a b
-   fail msg = translate $ \ _ _ -> fail msg
+   fail msg = translate (\ _ _ -> fail msg)
 
 instance (Applicative m, Monad m) => Category (Translate c m) where
 
@@ -182,8 +176,8 @@ concatT :: (Applicative m , Monoid b) => [Translate c m a b] -> Translate c m a 
 concatT = liftA mconcat . sequenceA
 
 -- | 'emptyT' is an unfailing 'Translate' that always returns 'mempty'
-emptyT :: (Applicative m, Monoid b) => Translate c m a b
-emptyT = constT mempty
+memptyT :: (Applicative m, Monoid b) => Translate c m a b
+memptyT = constT mempty
 
 ------------------------------------------------------------------------------------------
 
@@ -193,12 +187,12 @@ readerT f = translate $ \ c a -> apply (f a) c a
 
 -- | guarded translate.
 whenT ::  Alternative m => Bool -> Translate c m a b -> Translate c m a b
-whenT False _  = failT
+whenT False _  = empty
 whenT True  t  = t
 
 -- | guarded rewrite.
 guardR :: Alternative m => Bool -> Rewrite c m a
-guardR False = failT
+guardR False = empty
 guardR True  = idR
 
 -- | look at the argument to a 'Rewrite', and choose to be either a failure or trivial success.
@@ -232,7 +226,7 @@ r1 >+> r2 = rewrite $ \ c a -> apply (attemptT r1) c a >>= maybe (apply r2 c a) 
   
 -- | attempt a list of 'Rewrite's in sequence, succeeding if at least one succeeds.
 orR :: (Alternative m, Monad m) => [Rewrite c m a] -> Rewrite c m a
-orR = foldl (>+>) failT
+orR = foldl (>+>) empty
 
 ------------------------------------------------------------------------------------------
 
@@ -267,10 +261,6 @@ lens = translate
 -- | identity lens.
 idL :: Applicative m => Lens c m a a
 idL = lens $ \ c a -> pure ((c,a), pure)
-
--- | failing lens.
-failL :: Alternative m => Lens c m a b
-failL = empty
 
 -- | catch a failing endo'Lens', making it into an identity.
 tryL :: Alternative m => Lens c m a a -> Lens c m a a

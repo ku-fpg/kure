@@ -144,7 +144,7 @@ appR r1 r2 = appG >-> rewrite (\ c (App e1 e2) -> App <$> apply r1 c e1 <*> appl
 
 lamR :: R Exp -> R Exp
 lamR r = lamG >-> rewrite (\ c (Lam n e) -> Lam n <$> apply r c e)
-                                           
+
 varR :: R Exp
 varR = varG
 
@@ -155,7 +155,7 @@ lamT :: (Monoid r) => T Exp r -> T Exp r
 lamT t = lamG >-> translate (\ c (Lam _ e) -> apply t c e)
                                            
 varT :: (Monoid r) => T Exp r
-varT = varG >-> emptyT
+varT = varG >-> memptyT
 
 
 ------------------------------------------------------------------------
