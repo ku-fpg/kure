@@ -23,7 +23,7 @@ module Language.KURE.Translate
         , (<+)
         , (>->)
         , contextT
-        , contextidT
+        , exposeContextT
         , liftT
         , constT
         , mconcatT
@@ -32,6 +32,7 @@ module Language.KURE.Translate
         , whenT
         , tryT  
         , attemptT
+        , testT  
           -- * Rewrites
         , Rewrite  
         , rewrite  
@@ -63,6 +64,7 @@ module Language.KURE.Translate
 
 import Prelude hiding (id, (.))
 import Data.Monoid
+import Data.Maybe (isJust)
 import Data.Traversable (sequenceA)
 import Control.Applicative
 import Control.Monad
@@ -93,14 +95,15 @@ rewrite = translate
 idR :: Applicative m => Rewrite c m a
 idR = rewrite (\ _ -> pure)
       
--- | extract the current context
+-- | extract the current context.
 contextT :: Applicative m => Translate c m a c
 contextT = translate (\ c _ -> pure c)
 
-contextidT :: Applicative m => Translate c m a (c,a)
-contextidT = translate (\ c a -> pure (c,a))
+-- | expose the current context along with the expression.
+exposeContextT :: Applicative m => Translate c m a (c,a)
+exposeContextT = translate (\ c a -> pure (c,a))
 
--- | lift a function into a 'Translate'
+-- | lift a function into a 'Translate'.
 liftT :: Applicative m => (a -> b) -> Translate c m a b
 liftT f = translate (\ _ -> pure . f)
 
@@ -200,8 +203,8 @@ acceptR :: Alternative m => (a -> Bool) -> Rewrite c m a
 acceptR p = rewrite $ \ _ a -> if p a then pure a else empty
 
 -- | catch a failing 'Translate', making it succeed with a constant value.
-tryT :: Alternative m => Translate c m a b -> b -> Translate c m a b
-tryT t b = t <+ constT b
+tryT :: Alternative m => b -> Translate c m a b -> Translate c m a b
+tryT b t = t <+ constT b
 
 -- | catch a failing 'Rewrite', making it into an identity.
 tryR :: Alternative m => Rewrite c m a -> Rewrite c m a
@@ -209,12 +212,16 @@ tryR r = r <+ idR
 
 -- | catch a failing 'Translate', making it succeed with 'Nothing'.
 attemptT :: Alternative m => Translate c m a b -> Translate c m a (Maybe b)
-attemptT t = tryT (Just <$> t) Nothing
+attemptT t = tryT Nothing (Just <$> t)
 
 -- | catch a failing 'Rewrite', making it succeed with a Boolean flag.
 --   Useful when defining @anyR@ instances.
 attemptR :: Alternative m => Rewrite c m a -> Translate c m a (Bool,a)
 attemptR r = fmap (True,) r <+ fmap (False,) idR
+
+-- | determine if a 'Translate' could succeed
+testT :: Alternative m => Translate c m a b -> Translate c m a Bool
+testT t = isJust <$> attemptT t
 
 -- | repeat a 'Rewrite' until it fails, then return the result before the failure.
 repeatR :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a
@@ -231,20 +238,20 @@ orR = foldl (>+>) empty
 ------------------------------------------------------------------------------------------
 
 -- | Equivalent to (***), but with less class constraints
-tuple2R :: Applicative m => Rewrite c m a -> Rewrite c m b -> Rewrite c m (a, b)
-tuple2R r1 r2 = rewrite $ \ c (a,b) -> liftA2 (,) (apply r1 c a) (apply r2 c b)
+tuple2R :: Applicative m => Rewrite c m a -> Rewrite c m b -> Rewrite c m (a,b)
+tuple2R r1 r2 = rewrite $ \ c (a,b) -> (,) <$> apply r1 c a <*> apply r2 c b
     
 listR :: Applicative m => Rewrite c m a -> Rewrite c m [a]
 listR r = rewrite $ \ c -> sequenceA . map (apply r c)
 
 maybeR :: Applicative m => Rewrite c m a -> Rewrite c m (Maybe a)
-maybeR r = rewrite $ \ c -> maybe (pure Nothing) (liftA Just . apply r c)
+maybeR r = rewrite $ \ c -> maybe (pure Nothing) (fmap Just . apply r c)
 
-tuple2T :: (Applicative m, Monoid r) => Translate c m a r -> Translate c m b r -> Translate c m (a, b) r
-tuple2T t1 t2 = translate $ \ c (a,b) -> liftA2 mappend (apply t1 c a) (apply t2 c b)
+tuple2T :: (Applicative m, Monoid r) => Translate c m a r -> Translate c m b r -> Translate c m (a,b) r
+tuple2T t1 t2 = translate $ \ c (a,b) -> mappend <$> apply t1 c a <*> apply t2 c b
 
 listT :: (Applicative m, Monoid r) => Translate c m a r -> Translate c m [a] r
-listT t = translate $ \ c -> liftA mconcat . sequenceA . map (apply t c)
+listT t = translate $ \ c -> fmap mconcat . sequenceA . map (apply t c)
 
 maybeT :: (Applicative m, Monoid r) => Translate c m a r -> Translate c m (Maybe a) r
 maybeT t = translate $ \ c -> maybe (pure mempty) (apply t c)
