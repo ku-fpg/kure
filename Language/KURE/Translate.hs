@@ -24,6 +24,7 @@ module Language.KURE.Translate
         , (>->)
         , contextT
         , exposeContextT
+        , liftMT  
         , liftT
         , constT
         , mconcatT
@@ -103,9 +104,13 @@ contextT = translate (\ c _ -> pure c)
 exposeContextT :: Applicative m => Translate c m a (c,a)
 exposeContextT = translate (\ c a -> pure (c,a))
 
--- | lift a function into a 'Translate'.
+-- | lift an effectful function into a 'Translate'.
+liftMT :: (a -> m b) -> Translate c m a b
+liftMT f = translate (\ _ -> f)
+
+-- | lift a pure function into a 'Translate'.
 liftT :: Applicative m => (a -> b) -> Translate c m a b
-liftT f = translate (\ _ -> pure . f)
+liftT f = liftMT (pure . f)
 
 -- | 'constT' produces an unfailable 'Translate' that returns the first argument.
 constT :: Applicative m => b -> Translate c m a b
