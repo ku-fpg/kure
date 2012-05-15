@@ -26,7 +26,7 @@ module Language.KURE.Translate
         , exposeContextT
         , liftMT  
         , liftT
-        , constT
+        , constMT
         , mconcatT
         , memptyT
         , readerT
@@ -106,15 +106,15 @@ exposeContextT = translate (\ c a -> pure (c,a))
 
 -- | lift an effectful function into a 'Translate'.
 liftMT :: (a -> m b) -> Translate c m a b
-liftMT f = translate (\ _ -> f)
+liftMT = translate . const
 
 -- | lift a pure function into a 'Translate'.
 liftT :: Applicative m => (a -> b) -> Translate c m a b
 liftT f = liftMT (pure . f)
 
--- | 'constT' produces an unfailable 'Translate' that returns the first argument.
-constT :: Applicative m => b -> Translate c m a b
-constT b = translate (\ _ _ -> pure b)
+-- | 'constMT' lifts an effectful computation into a constant 'Translate'.
+constMT :: m b -> Translate c m a b
+constMT = liftMT . const
 
 -- | like a catch, '<+' does the first 'Translate', and if it fails, then does the second 'Translate'.
 (<+) :: Alternative m => Translate c m a b -> Translate c m a b -> Translate c m a b
@@ -134,7 +134,7 @@ instance Functor m => Functor (Translate c m a) where
 instance Applicative m => Applicative (Translate c m a) where
   
 -- pure :: b -> Translate c m a b  
-   pure = constT
+   pure = constMT . pure
    
 -- (<*>) :: Translate c m a (b -> d) -> Translate c m a b -> Translate c m a d   
    tf <*> tb = translate (\ c a -> apply tf c a <*> apply tb c a) 
@@ -142,7 +142,7 @@ instance Applicative m => Applicative (Translate c m a) where
 instance Alternative m => Alternative (Translate c m a) where
 
 -- empty :: Translate c m a b  
-   empty = translate (\ _ _ -> empty)
+   empty = constMT empty
 
 -- (<|>) :: Translate c m a b -> Translate c m a b -> Translate c m a b
    (<|>) = (<+)
@@ -150,14 +150,14 @@ instance Alternative m => Alternative (Translate c m a) where
 instance Monad m => Monad (Translate c m a) where 
   
 -- return :: b -> Translate c m a b
-   return b = translate (\ _ _ -> return b)
+   return = constMT . return
    
 -- (>>=) :: Translate c m a b -> (b -> Translate c m a d) -> Translate c m a d     
    tb >>= f = translate $ \ c a -> do b <- apply tb c a 
                                       apply (f b) c a
                                      
 -- fail :: String -> Translate c m a b
-   fail msg = translate (\ _ _ -> fail msg)
+   fail = constMT . fail
 
 instance (Applicative m, Monad m) => Category (Translate c m) where
 
@@ -185,7 +185,7 @@ mconcatT = liftA mconcat . sequenceA
 
 -- | 'emptyT' is an unfailing 'Translate' that always returns 'mempty'
 memptyT :: (Applicative m, Monoid b) => Translate c m a b
-memptyT = constT mempty
+memptyT = pure mempty
 
 ------------------------------------------------------------------------------------------
 
@@ -209,7 +209,7 @@ acceptR p = rewrite $ \ _ a -> if p a then pure a else empty
 
 -- | catch a failing 'Translate', making it succeed with a constant value.
 tryT :: Alternative m => b -> Translate c m a b -> Translate c m a b
-tryT b t = t <+ constT b
+tryT b t = t <+ pure b
 
 -- | catch a failing 'Rewrite', making it into an identity.
 tryR :: Alternative m => Rewrite c m a -> Rewrite c m a
