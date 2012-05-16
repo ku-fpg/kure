@@ -11,12 +11,10 @@
 --
 --
 
-module Language.KURE 
+module Language.KURE
 	( module Language.KURE.Translate
 	, module Language.KURE.Term
---	, module Language.KURE.Boilerplate
 	) where
 
 import Language.KURE.Translate
 import Language.KURE.Term
--- import Language.KURE.Boilerplate
