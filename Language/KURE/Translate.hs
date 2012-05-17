@@ -40,7 +40,6 @@ module Language.KURE.Translate
         , Rewrite
         , rewrite
         , idR
-        , guardR
         , acceptR
         , tryR
         , attemptR
@@ -204,14 +203,9 @@ readerT :: (a -> Translate c m a b) -> Translate c m a b
 readerT f = translate $ \ c a -> apply (f a) c a
 
 -- | guarded translate.
-guardT ::  Alternative m => Bool -> Translate c m a ()
-guardT False = empty
-guardT True  = memptyT
-
--- | guarded rewrite.
-guardR :: Alternative m => Bool -> Rewrite c m a
-guardR False = empty
-guardR True  = idR
+guardT ::  Monad m => Bool -> String -> Translate c m a ()
+guardT False msg = fail msg
+guardT True  _   = return ()
 
 -- | fail if the Boolean is false.
 whenT ::  Alternative m => Bool -> Translate c m a b -> Translate c m a b

@@ -49,6 +49,10 @@ instance Alternative ExpM where
                                           (n', Nothing) -> g n'
                                           (n', Just a)  -> (n', Just a)
 
+instance MonadPlus ExpM where
+  mzero = empty
+  mplus = (<|>)
+
 -------------------------------------------------------------------------------
 
 suggestName :: ExpM Name

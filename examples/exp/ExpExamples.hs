@@ -109,7 +109,7 @@ substExp v s = rules_var <+ rules_lam <+ rule_app
 beta_reduce :: RewriteExp
 beta_reduce = rewrite $ \ c e -> case e of
                                 App (Lam v e1) e2 -> apply (substExp v e2) (v:c) e1
-                                _                 -> empty
+                                _                 -> fail "Cannot beta-reduce, not applying a lambda."
 
 eta_expand :: Name -> RewriteExp
 eta_expand nm = rewrite $ \ c f -> do v <- freshName c
@@ -117,7 +117,7 @@ eta_expand nm = rewrite $ \ c f -> do v <- freshName c
 
 eta_reduce :: RewriteExp
 eta_reduce = do Lam v1 (App f (Var v2)) <- idR
-                guardT (v1 == v2)
+                guardT (v1 == v2) $ "Cannot eta-reduce, " ++ v1 ++ " /= " ++ v2
                 return f
 
 ------------------------------------------------------------------------
