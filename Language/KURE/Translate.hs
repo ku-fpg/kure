@@ -27,15 +27,15 @@ module Language.KURE.Translate
         , liftMT
         , liftT
         , constMT
-        , unitT
-        , readerT
-        , whenT
-        , tryT
-        , attemptT
-        , testT
         , mconcatT
         , memptyT
+        , readerT
+        , guardT
+        , whenT
+        , tryT
         , mtryT
+        , attemptT
+        , testT
           -- * Rewrites
         , Rewrite
         , rewrite
@@ -118,10 +118,6 @@ liftT f = liftMT (pure . f)
 constMT :: m b -> Translate c m a b
 constMT = liftMT . const
 
--- | 'unitT' is an unfailing translate that always returns '()'
-unitT :: Applicative m => Translate c m a ()
-unitT = pure ()
-
 -- | like a catch, '<+' does the first 'Translate', and if it fails, then does the second 'Translate'.
 (<+) :: Alternative m => Translate c m a b -> Translate c m a b -> Translate c m a b
 t1 <+ t2 = translate $ \ c a -> apply t1 c a <|> apply t2 c a
@@ -165,6 +161,14 @@ instance Monad m => Monad (Translate c m a) where
 -- fail :: String -> Translate c m a b
    fail = constMT . fail
 
+instance MonadPlus m => MonadPlus (Translate c m a) where
+
+-- mzero :: Translate c m a b
+   mzero = constMT mzero
+
+-- mplus :: Translate c m a b -> Translate c m a b -> Translate c m a b
+   mplus t1 t2 = translate $ \ c a -> apply t1 c a `mplus` apply t2 c a
+
 instance (Applicative m, Monad m) => Category (Translate c m) where
 
 --  id :: Translate c m a a
@@ -183,19 +187,36 @@ instance (Applicative m, Monad m) => Arrow (Translate c m) where
 
 ------------------------------------------------------------------------------------------
 
+-- | 'concatT' turns a list of 'Translate's that return a common 'Monoid'al result
+-- into a single 'Translate' that performs them all in sequence and combines their
+-- results with 'mconcat'
+mconcatT :: (Applicative m , Monoid b) => [Translate c m a b] -> Translate c m a b
+mconcatT = liftA mconcat . sequenceA
+
+-- | 'emptyT' is an unfailing 'Translate' that always returns 'mempty'
+memptyT :: (Applicative m, Monoid b) => Translate c m a b
+memptyT = pure mempty
+
+------------------------------------------------------------------------------------------
+
 -- | look at the argument for the translation before choosing which 'Translate' to perform.
 readerT :: (a -> Translate c m a b) -> Translate c m a b
 readerT f = translate $ \ c a -> apply (f a) c a
 
 -- | guarded translate.
-whenT ::  Alternative m => Bool -> Translate c m a b -> Translate c m a b
-whenT False _  = empty
-whenT True  t  = t
+guardT ::  Alternative m => Bool -> Translate c m a ()
+guardT False = empty
+guardT True  = memptyT
 
 -- | guarded rewrite.
 guardR :: Alternative m => Bool -> Rewrite c m a
 guardR False = empty
 guardR True  = idR
+
+-- | fail if the Boolean is false.
+whenT ::  Alternative m => Bool -> Translate c m a b -> Translate c m a b
+whenT False _  = empty
+whenT True  t  = t
 
 -- | look at the argument to a 'Rewrite', and choose to be either a failure or trivial success.
 acceptR :: Alternative m => (a -> Bool) -> Rewrite c m a
@@ -204,6 +225,10 @@ acceptR p = rewrite $ \ _ a -> if p a then pure a else empty
 -- | catch a failing 'Translate', making it succeed with a constant value.
 tryT :: Alternative m => b -> Translate c m a b -> Translate c m a b
 tryT b t = t <+ pure b
+
+-- | catch a failing 'Translate', making it succeed with 'mempty'.
+mtryT :: (Alternative m, Monoid b) => Translate c m a b -> Translate c m a b
+mtryT = tryT mempty
 
 -- | catch a failing 'Rewrite', making it into an identity.
 tryR :: Alternative m => Rewrite c m a -> Rewrite c m a
@@ -233,22 +258,6 @@ r1 >+> r2 = rewrite $ \ c a -> apply (attemptT r1) c a >>= maybe (apply r2 c a) 
 -- | attempt a list of 'Rewrite's in sequence, succeeding if at least one succeeds.
 orR :: (Alternative m, Monad m) => [Rewrite c m a] -> Rewrite c m a
 orR = foldl (>+>) empty
-
-------------------------------------------------------------------------------------------
-
--- | 'concatT' turns a list of 'Translate's that return a common 'Monoid'al result
--- into a single 'Translate' that performs them all in sequence and combines their
--- results with 'mconcat'
-mconcatT :: (Applicative m , Monoid b) => [Translate c m a b] -> Translate c m a b
-mconcatT = liftA mconcat . sequenceA
-
--- | 'emptyT' is an unfailing 'Translate' that always returns 'mempty'
-memptyT :: (Applicative m, Monoid b) => Translate c m a b
-memptyT = pure mempty
-
--- | catch a failing 'Translate', making it succeed with 'mempty'.
-mtryT :: (Alternative m, Monoid b) => Translate c m a b -> Translate c m a b
-mtryT = tryT mempty
 
 ------------------------------------------------------------------------------------------
 
