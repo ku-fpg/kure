@@ -2,11 +2,11 @@
 
 -- |
 -- Module: Language.KURE.Translate
--- Copyright: (c) 2012 The University of Kansas
+-- Copyright: (c) 2006-2012 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
--- Stability: unstable
+-- Stability: alpha
 -- Portability: ghc
 --
 -- This module defines the main KURE types: 'Translate' and 'Rewrite'.
@@ -18,48 +18,50 @@
 module Language.KURE.Translate
        (  -- * Translations
           Translate
-        , translate 
-        , apply  
+        , translate
+        , apply
         , (<+)
         , (>->)
         , contextT
-        , exposeContextT
-        , liftMT  
+        , exposeT
+        , liftMT
         , liftT
         , constMT
-        , mconcatT
-        , memptyT
+        , unitT
         , readerT
         , whenT
-        , tryT  
+        , tryT
         , attemptT
-        , testT  
+        , testT
+        , mconcatT
+        , memptyT
+        , mtryT
           -- * Rewrites
-        , Rewrite  
-        , rewrite  
+        , Rewrite
+        , rewrite
         , idR
-        , guardR  
+        , guardR
         , acceptR
-        , tryR  
-        , attemptR  
-        , repeatR  
+        , tryR
+        , attemptR
+        , repeatR
         , (>+>)
-        , orR  
-          -- * Prelude combinators          
+        , orR
+          -- * Prelude combinators
         , tuple2R
         , listR
         , maybeR
         , tuple2T
         , listT
-        , maybeT  
+        , maybeT
           -- * Lenses
-        , Lens  
+        , Lens
         , lens
         , idL
-        , tryL  
-        , composeL  
+        , tryL
+        , composeL
         , sequenceL
-        , rewriteL  
+        , rewriteL
         , translateL
 ) where
 
@@ -95,14 +97,14 @@ rewrite = translate
 -- | identity rewrite.
 idR :: Applicative m => Rewrite c m a
 idR = rewrite (\ _ -> pure)
-      
+
 -- | extract the current context.
 contextT :: Applicative m => Translate c m a c
 contextT = translate (\ c _ -> pure c)
 
--- | expose the current context along with the expression.
-exposeContextT :: Applicative m => Translate c m a (c,a)
-exposeContextT = translate (\ c a -> pure (c,a))
+-- | expose the current context and value.
+exposeT :: Applicative m => Translate c m a (c,a)
+exposeT = translate (\ c a -> pure (c,a))
 
 -- | lift an effectful function into a 'Translate'.
 liftMT :: (a -> m b) -> Translate c m a b
@@ -116,6 +118,10 @@ liftT f = liftMT (pure . f)
 constMT :: m b -> Translate c m a b
 constMT = liftMT . const
 
+-- | 'unitT' is an unfailing translate that always returns '()'
+unitT :: Applicative m => Translate c m a ()
+unitT = pure ()
+
 -- | like a catch, '<+' does the first 'Translate', and if it fails, then does the second 'Translate'.
 (<+) :: Alternative m => Translate c m a b -> Translate c m a b -> Translate c m a b
 t1 <+ t2 = translate $ \ c a -> apply t1 c a <|> apply t2 c a
@@ -127,35 +133,35 @@ t1 >-> t2 = translate $ \ c a -> apply t1 c a >>= apply t2 c
 ------------------------------------------------------------------------------------------
 
 instance Functor m => Functor (Translate c m a) where
-  
--- fmap :: (b -> d) -> Translate c m a b -> Translate c m a d  
+
+-- fmap :: (b -> d) -> Translate c m a b -> Translate c m a d
    fmap f t = translate (\ c -> fmap f . apply t c)
 
 instance Applicative m => Applicative (Translate c m a) where
-  
--- pure :: b -> Translate c m a b  
+
+-- pure :: b -> Translate c m a b
    pure = constMT . pure
-   
--- (<*>) :: Translate c m a (b -> d) -> Translate c m a b -> Translate c m a d   
-   tf <*> tb = translate (\ c a -> apply tf c a <*> apply tb c a) 
+
+-- (<*>) :: Translate c m a (b -> d) -> Translate c m a b -> Translate c m a d
+   tf <*> tb = translate (\ c a -> apply tf c a <*> apply tb c a)
 
 instance Alternative m => Alternative (Translate c m a) where
 
--- empty :: Translate c m a b  
+-- empty :: Translate c m a b
    empty = constMT empty
 
 -- (<|>) :: Translate c m a b -> Translate c m a b -> Translate c m a b
    (<|>) = (<+)
 
-instance Monad m => Monad (Translate c m a) where 
-  
+instance Monad m => Monad (Translate c m a) where
+
 -- return :: b -> Translate c m a b
    return = constMT . return
-   
--- (>>=) :: Translate c m a b -> (b -> Translate c m a d) -> Translate c m a d     
-   tb >>= f = translate $ \ c a -> do b <- apply tb c a 
+
+-- (>>=) :: Translate c m a b -> (b -> Translate c m a d) -> Translate c m a d
+   tb >>= f = translate $ \ c a -> do b <- apply tb c a
                                       apply (f b) c a
-                                     
+
 -- fail :: String -> Translate c m a b
    fail = constMT . fail
 
@@ -166,26 +172,14 @@ instance (Applicative m, Monad m) => Category (Translate c m) where
 
 --  (.) :: Translate c m b d -> Translate c m a b -> Translate c m a d
     t2 . t1 = t1 >-> t2
-      
+
 instance (Applicative m, Monad m) => Arrow (Translate c m) where
-  
--- arr :: (a -> b) -> Translate c m a b  
+
+-- arr :: (a -> b) -> Translate c m a b
    arr = liftT
 
 -- first :: (a -> b) -> Translate c m (a,z) (b,z)
    first t = translate $ \ c (a,z) -> liftA (\b -> (b,z)) (apply t c a)
-   
-------------------------------------------------------------------------------------------
-
--- | 'concatT' turns a list of 'Translate's that return a common 'Monoid'al result
--- into a single 'Translate' that performs them all in sequence and combines their
--- results with 'mconcat'
-mconcatT :: (Applicative m , Monoid b) => [Translate c m a b] -> Translate c m a b
-mconcatT = liftA mconcat . sequenceA
-
--- | 'emptyT' is an unfailing 'Translate' that always returns 'mempty'
-memptyT :: (Applicative m, Monoid b) => Translate c m a b
-memptyT = pure mempty
 
 ------------------------------------------------------------------------------------------
 
@@ -235,17 +229,33 @@ repeatR r = tryR (r >-> repeatR r)
 -- | attempts two 'Rewrite's in sequence, succeeding if one or both succeed.
 (>+>) :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a -> Rewrite c m a
 r1 >+> r2 = rewrite $ \ c a -> apply (attemptT r1) c a >>= maybe (apply r2 c a) (apply (tryR r2) c)
-  
+
 -- | attempt a list of 'Rewrite's in sequence, succeeding if at least one succeeds.
 orR :: (Alternative m, Monad m) => [Rewrite c m a] -> Rewrite c m a
 orR = foldl (>+>) empty
 
 ------------------------------------------------------------------------------------------
 
+-- | 'concatT' turns a list of 'Translate's that return a common 'Monoid'al result
+-- into a single 'Translate' that performs them all in sequence and combines their
+-- results with 'mconcat'
+mconcatT :: (Applicative m , Monoid b) => [Translate c m a b] -> Translate c m a b
+mconcatT = liftA mconcat . sequenceA
+
+-- | 'emptyT' is an unfailing 'Translate' that always returns 'mempty'
+memptyT :: (Applicative m, Monoid b) => Translate c m a b
+memptyT = pure mempty
+
+-- | catch a failing 'Translate', making it succeed with 'mempty'.
+mtryT :: (Alternative m, Monoid b) => Translate c m a b -> Translate c m a b
+mtryT = tryT mempty
+
+------------------------------------------------------------------------------------------
+
 -- | Equivalent to (***), but with less class constraints
 tuple2R :: Applicative m => Rewrite c m a -> Rewrite c m b -> Rewrite c m (a,b)
 tuple2R r1 r2 = rewrite $ \ c (a,b) -> (,) <$> apply r1 c a <*> apply r2 c b
-    
+
 listR :: Applicative m => Rewrite c m a -> Rewrite c m [a]
 listR r = rewrite $ \ c -> sequenceA . map (apply r c)
 

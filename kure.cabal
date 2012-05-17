@@ -1,5 +1,5 @@
 Name:                kure
-Version:             1.1.15
+Version:             1.2.0
 Synopsis:            Combinators for Strategic Programming
 Description:	     KURE is a DSL for building rewriting DSLs.
 	 	     KURE shares combinator names and concepts with Stratego, but unlike Stratego, KURE is strongly typed.
@@ -17,8 +17,12 @@ Stability:	     alpha
 build-type: 	     Simple
 Cabal-Version:       >= 1.6
 Extra-Source-Files:
-    test/Test.hs
-    test/Exp.hs
+    examples/fib/Fib.hs
+    examples/fib/FibKure.hs
+    examples/fib/FibExamples.hs
+    examples/exp/Exp.hs
+    examples/exp/ExpKure.hs
+    examples/exp/ExpExamples.hs
 
 Library
   Build-Depends: base >= 4.2
@@ -27,6 +31,7 @@ Library
        Language.KURE
        Language.KURE.Translate
        Language.KURE.Term
+       Language.KURE.Utilities
 
   Ghc-Options:  -Wall
 
@@ -34,25 +39,6 @@ Flag all
   Description: Enable full development tree
   Default:     False
 
-Executable test-exp
-  if flag(all)
-    buildable: True
-  else
-    buildable: False
-  endif
-  Ghc-Options:
-  Main-Is: Test.hs
-  Hs-Source-Dirs: ., tests/common, tests/exp
-
-Executable test-exp-kyb
-  if flag(all)
-    buildable: True
-  else
-    buildable: False
-  endif
-  Ghc-Options:
-  Main-Is: Test.hs
-  Hs-Source-Dirs: ., tests/common, tests/exp-kyb
 
 
 

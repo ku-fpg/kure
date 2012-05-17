@@ -3,12 +3,12 @@ module FibExamples where
 import Control.Applicative
 
 import Language.KURE
-import FibAST
+import Fib
 import FibKure
 
 -----------------------------------------------------------------------
 
-applyFib :: FibR -> Arith -> Maybe Arith
+applyFib :: RewriteA -> Arith -> Maybe Arith
 applyFib e = apply e ()
 
 -----------------------------------------------------------------------
@@ -17,7 +17,7 @@ applyFib e = apply e ()
 
 -- | Apply the definition of the fibonacci function once.
 --   Requires the argument to Fib to be a Literal.
-fibLitR :: FibR
+fibLitR :: RewriteA
 fibLitR = liftMT $ \ e -> case e of
                             Fib (Lit 0)  -> pure (Lit 0)
                             Fib (Lit 1)  -> pure (Lit 1)
@@ -27,32 +27,32 @@ fibLitR = liftMT $ \ e -> case e of
                             _            -> empty
 
 -- | Compute the addition of two literals.
-addLitR :: FibR
+addLitR :: RewriteA
 addLitR = liftMT $ \ e -> case e of
                             Add (Lit m) (Lit n) -> pure (Lit (m + n))
                             _                   -> empty
 
 -- | Compute the subtraction of two literals.
-subLitR :: FibR
+subLitR :: RewriteA
 subLitR = liftMT $ \ e -> case e of
                             Sub (Lit m) (Lit n) -> pure (Lit (m - n))
                             _                   -> empty
 
 -----------------------------------------------------------------------
 
-arithR :: FibR
+arithR :: RewriteA
 arithR = addLitR >+> subLitR
 
-anyAddR :: FibR
+anyAddR :: RewriteA
 anyAddR = anybuR addLitR
 
-anySubR :: FibR
+anySubR :: RewriteA
 anySubR = anybuR subLitR
 
-anyArithR :: FibR
+anyArithR :: RewriteA
 anyArithR = anybuR arithR
 
-evalR :: FibR
+evalR :: RewriteA
 evalR = innermostR (arithR >+> fibLitR)
 
 -----------------------------------------------------------------------

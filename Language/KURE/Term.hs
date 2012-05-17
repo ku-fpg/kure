@@ -1,26 +1,26 @@
 {-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts, KindSignatures, FlexibleInstances #-}
 -- |
 -- Module: Language.KURE.Translate
--- Copyright: (c) 2012 The University of Kansas
+-- Copyright: (c) 2006-2012 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
--- Stability: unstable
+-- Stability: alpha
 -- Portability: ghc
 --
 -- This module contains combinators that allow us to traverse an expression tree.
 
-module Language.KURE.Term      
-        ( Injection, inject, retract  
-        , Term, Generic 
+module Language.KURE.Term
+        ( Injection, inject, retract
+        , Term, Generic
         , retractWith
-        , retractWithA  
+        , retractWithA
         , retractA
         , extractR
         , promoteR
         , extractT
-        , promoteT  
-        , extractL  
+        , promoteT
+        , extractL
         , promoteL
         , WalkerR, allR, anyR, allRgeneric, anyRgeneric
         , alltdR
@@ -31,18 +31,19 @@ module Language.KURE.Term
         , anyduR
         , tdpruneR
         , innermostR
-        , WalkerT, crushT, crushTgeneric      
+        , WalkerT, crushT, crushTgeneric
         , crushtdT
         , crushbuT
-        , tdpruneT                   
-        , WalkerL, chooseL, chooseLgeneric 
-        , Path  
-        , pathL  
-        , exhaustPathL  
-        , repeatPathL  
+        , tdpruneT
+        , WalkerL, chooseL, chooseLgeneric
+        , Path
+        , pathL
+        , exhaustPathL
+        , repeatPathL
 ) where
 
 import Language.KURE.Translate
+import Language.KURE.Utilities
 
 import Data.Monoid
 import Control.Applicative
@@ -68,9 +69,9 @@ class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
   -- Simple expression types might be their own sole 'Generic', more complex examples
   -- will have a new datatype for the 'Generic', which will also be an instance of class 'Term'.
   type Generic a :: *
-  
+
 --------------------------------------------------------------------------------
-  
+
 -- | attempts to extract an @a@ from a @Generic a@, and then maps a monadic function over it.
 --   can be useful when defining 'chooseL' instances.
 retractWith :: (Alternative m, Term a) => (a -> m b) -> Generic a -> m b
@@ -98,7 +99,7 @@ promoteT t = translate $ \ c -> retractWith (apply t c)
 -- | 'extractR' converts a 'Rewrite' over a 'Generic' into a rewrite over a specific expression type.
 extractR :: (Alternative m, Monad m, Term a) => Rewrite c m (Generic a) -> Rewrite c m a
 extractR r =  extractT r >>= retractA
-  
+
 -- | 'promoteR' promotes a 'Rewrite' into a 'Generic' 'Rewrite'; other types inside 'Generic' cause failure.
 --   'tryR' can be used to convert a failure-by-default 'promoteR' into a 'id-by-default' promotion.
 promoteR  :: (Alternative m, Term a) => Rewrite c m a -> Rewrite c m (Generic a)
@@ -106,20 +107,20 @@ promoteR = liftA inject . promoteT
 
 -------------------------------------------------------------------------------
 
--- | a 'Lens' that lets you view a @Generic a@ node as an @a@ node. 
+-- | a 'Lens' that lets you view a @Generic a@ node as an @a@ node.
 extractL :: (Alternative m, Term a) => Lens c m (Generic a) a
 extractL = lens $ \ c -> retractWithA (\ a -> ((c,a), pure . inject))
 
--- | a 'Lens' that lets you view an @a@ node as a @Generic a@ node. 
+-- | a 'Lens' that lets you view an @a@ node as a @Generic a@ node.
 promoteL  :: (Alternative m, Term a) => Lens c m a (Generic a)
 promoteL = lens $ \ c a -> pure ((c, inject a), retractA)
 
 -------------------------------------------------------------------------------
 
--- | 'WalkerR' captures the ability to walk over a 'Term' applying rewrites, 
+-- | 'WalkerR' captures the ability to walk over a 'Term' applying rewrites,
 --   using a specific context @c@ and a 'Monad' @m@.
 class (Alternative m, Monad m, Term a) => WalkerR c m a where
-  
+
   -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node,
   --   succeeding if they all succeed.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
@@ -128,16 +129,16 @@ class (Alternative m, Monad m, Term a) => WalkerR c m a where
   --   suceeding if any succeed.
   anyR :: Rewrite c m (Generic a) -> Rewrite c m a
 
--- | 'allRgeneric' is a utility to aid with defining 'WalkerR' instances for the 'Generic' type. 
---   See the "expr" example.  
+-- | 'allRgeneric' is a utility to aid with defining 'WalkerR' instances for the 'Generic' type.
+--   See the "expr" example.
 allRgeneric :: WalkerR c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
 allRgeneric r c a = inject <$> apply (allR r) c a
 
--- | 'anyRgeneric' is a utility to aid with defining 'WalkerR' instances for the 'Generic' type. 
+-- | 'anyRgeneric' is a utility to aid with defining 'WalkerR' instances for the 'Generic' type.
 --   See the "expr" example.
 anyRgeneric :: WalkerR c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
 anyRgeneric r c a = inject <$> apply (anyR r) c a
- 
+
 -------------------------------------------------------------------------------
 
 -- | apply a 'Rewrite' in a top-down manner, succeeding if they all succeed.
@@ -176,15 +177,15 @@ innermostR r = allbuR (tryR (r >-> innermostR r))
 
 -------------------------------------------------------------------------------
 
--- | 'WalkerT' captures the ability to walk over a 'Term' applying translations, 
+-- | 'WalkerT' captures the ability to walk over a 'Term' applying translations,
 --   using a specific context @c@ and an 'Applicative' @m@.
 class (Applicative m, Term a, Monoid b) => WalkerT c m a b where
-  
+
   -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
   crushT :: Translate c m (Generic a) b -> Translate c m a b
 
 -- | 'crushTgeneric' is a utility to aid with defining 'WalkerT' instances for the 'Generic' type.
---   See the "expr" example.  
+--   See the "expr" example.
 crushTgeneric :: WalkerT c m a b => Translate c m (Generic a) b -> c -> a -> m b
 crushTgeneric t = apply (crushT t)
 
@@ -204,18 +205,18 @@ tdpruneT t = t <+ crushT (tdpruneT t)
 
 -------------------------------------------------------------------------------
 
--- | 'WalkerL' captures the ability to construct a 'Lens' into a 'Term', 
+-- | 'WalkerL' captures the ability to construct a 'Lens' into a 'Term',
 --   using a specific context @c@ and an 'Alternative' @m@.
 class (Alternative m, Monad m, Term a) => WalkerL c m a where
 
-  -- | 'chooseL' constructs a 'Lens' pointing at the n-th interesting child of this node.  
+  -- | 'chooseL' constructs a 'Lens' pointing at the n-th interesting child of this node.
   chooseL :: Int -> Lens c m a (Generic a)
 
--- | 'chooseLgeneric' is a utility to aid with defining 'WalkerL' instances for the 'Generic' type. 
---   See the "expr" example.  
+-- | 'chooseLgeneric' is a utility to aid with defining 'WalkerL' instances for the 'Generic' type.
+--   See the "expr" example.
 chooseLgeneric :: WalkerL c m a => Int -> c -> a -> m ((c, Generic a), Generic a -> m (Generic a))
 chooseLgeneric n c a = (second.result.liftA) inject <$> apply (chooseL n) c a
-                       
+
 -------------------------------------------------------------------------------
 
 -- | a 'Path' is a list of 'Int's, where each 'Int' specifies which interesting child to descend to at each step.
@@ -227,19 +228,11 @@ pathL = sequenceL . map chooseL
 
 -- | construct a 'Lens' that points to the last node at which the 'Path' can be followed.
 exhaustPathL :: (WalkerL c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
-exhaustPathL []     = idL 
+exhaustPathL []     = idL
 exhaustPathL (n:ns) = tryL (chooseL n `composeL` exhaustPathL ns)
 
 -- | repeat as many iterations of the 'Path' as possible.
 repeatPathL :: (WalkerL c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
 repeatPathL p = tryL (pathL p `composeL` repeatPathL p)
-
--------------------------------------------------------------------------------
-
--- Utilities
-
--- One of Conal Elliott's semantic editor combinators.
-result :: (b -> c) -> (a -> b) -> (a -> c)
-result = (.)
 
 -------------------------------------------------------------------------------

@@ -6,11 +6,11 @@ import Control.Applicative
 import Data.Monoid
 
 import Language.KURE
-import FibAST
+import Fib
 
 -- | For this simple example, the context is always empty and 'Translate' always operates on 'Arith'
-type FibT b = Translate () Maybe Arith b
-type FibR = FibT Arith
+type TranslateA b = Translate () Maybe Arith b
+type RewriteA = TranslateA Arith
 
 instance Term Arith where
   type Generic Arith = Arith
