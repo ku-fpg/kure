@@ -55,13 +55,13 @@ attemptAny3 f mba1 mba2 mba3 = do (b1,a1) <- mba1
                                    then return (f a1 a2 a3)
                                    else fail "anyR failed for all three children."
 
-attemptAnyN :: (Applicative m, Monad m) => ([a] -> b) -> [m (Bool,a)] -> m b
+attemptAnyN :: (Functor m, Monad m) => ([a] -> b) -> [m (Bool,a)] -> m b
 attemptAnyN f mbas = do (bs,as) <- unzip <$> sequence mbas
                         if or bs
                          then return (f as)
                          else fail ("anyR failed for all " ++ show (length bs) ++ " children.")
 
-attemptAny1N :: (Applicative m, Monad m) => (a1 -> [a2] -> r) -> m (Bool,a1) -> [m (Bool,a2)] -> m r
+attemptAny1N :: (Functor m, Monad m) => (a1 -> [a2] -> r) -> m (Bool,a1) -> [m (Bool,a2)] -> m r
 attemptAny1N f mba mbas = do (b ,a)  <- mba
                              (bs,as) <- unzip <$> sequence mbas
                              if or (b:bs)

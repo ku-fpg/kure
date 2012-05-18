@@ -11,10 +11,14 @@
 --
 --
 
-module Language.KURE
+module Language.KURE  -- Temperary, needs better organising
 	( module Language.KURE.Translate
 	, module Language.KURE.Term
+        , module Language.KURE.Injection
+        , module Language.KURE.Utilities
 	) where
 
+import Language.KURE.Injection
 import Language.KURE.Translate
 import Language.KURE.Term
+import Language.KURE.Utilities
