@@ -1,10 +1,10 @@
-module ExprLanguage where
+module Expr where
 
 data Cmd  = Seq Cmd Cmd | Assign Name Expr
-            deriving Show
-                     
+            deriving (Eq,Show)
+
 data Expr = Var Name | Lit Int | Add Expr Expr | ESeq Cmd Expr
-            deriving Show
+            deriving (Eq,Show)
 
 type Name = String
 

@@ -15,11 +15,25 @@ module Language.KURE.Utilities where
 import Control.Applicative
 
 import Language.KURE.Translate
+import Language.KURE.Term
+import Language.KURE.Injection
 
 -------------------------------------------------------------------------------
 
-missingChildL :: Monad m => Int -> Lens c m a b
-missingChildL n = fail ("There is no child number " ++ show n ++ ".")
+-- | These functions are to aid with defining 'WalkerR', 'WalkerT' and 'WalkerL' instances
+--   for the 'Generic' type.  See the "expr" example.
+
+allRgeneric :: WalkerR c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
+allRgeneric r c a = inject <$> apply (allR r) c a
+
+anyRgeneric :: WalkerR c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
+anyRgeneric r c a = inject <$> apply (anyR r) c a
+
+crushTgeneric :: WalkerT c m a b => Translate c m (Generic a) b -> c -> a -> m b
+crushTgeneric t = apply (crushT t)
+
+chooseLgeneric :: WalkerL c m a => Int -> c -> a -> m ((c, Generic a), Generic a -> m (Generic a))
+chooseLgeneric n c a = (second.result.liftA) inject <$> apply (chooseL n) c a
 
 -------------------------------------------------------------------------------
 
@@ -41,7 +55,6 @@ attemptAny3 f mba1 mba2 mba3 = do (b1,a1) <- mba1
                                    then return (f a1 a2 a3)
                                    else fail "anyR failed for all three children."
 
-
 attemptAnyN :: (Applicative m, Monad m) => ([a] -> b) -> [m (Bool,a)] -> m b
 attemptAnyN f mbas = do (bs,as) <- unzip <$> sequence mbas
                         if or bs
@@ -57,8 +70,17 @@ attemptAny1N f mba mbas = do (b ,a)  <- mba
 
 -------------------------------------------------------------------------------
 
--- One of Conal Elliott's semantic editor combinators.
+missingChildL :: Monad m => Int -> Lens c m a b
+missingChildL n = fail ("There is no child number " ++ show n ++ ".")
+
+-------------------------------------------------------------------------------
+
+-- Some of Conal Elliott's semantic editor combinators.
+
 result :: (b -> c) -> (a -> b) -> (a -> c)
 result = (.)
+
+second :: (a -> b) -> (c,a) -> (c,b)
+second f (c,a) = (c, f a)
 
 -------------------------------------------------------------------------------

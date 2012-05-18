@@ -1,4 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts, KindSignatures, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts #-}
+
 -- |
 -- Module: Language.KURE.Translate
 -- Copyright: (c) 2006-2012 The University of Kansas
@@ -11,18 +12,15 @@
 -- This module contains combinators that allow us to traverse an expression tree.
 
 module Language.KURE.Term
-        ( Injection, inject, retract
-        , Term, Generic
-        , retractWith
-        , retractWithA
-        , retractA
+        (
+          Term, Generic
         , extractR
         , promoteR
         , extractT
         , promoteT
         , extractL
         , promoteL
-        , WalkerR, allR, anyR, allRgeneric, anyRgeneric
+        , WalkerR, allR, anyR
         , alltdR
         , anytdR
         , allbuR
@@ -31,11 +29,11 @@ module Language.KURE.Term
         , anyduR
         , tdpruneR
         , innermostR
-        , WalkerT, crushT, crushTgeneric
+        , WalkerT, crushT
         , crushtdT
         , crushbuT
         , tdpruneT
-        , WalkerL, chooseL, chooseLgeneric
+        , WalkerL, chooseL
         , Path
         , pathL
         , exhaustPathL
@@ -43,24 +41,12 @@ module Language.KURE.Term
 ) where
 
 import Language.KURE.Translate
-import Language.KURE.Utilities
+import Language.KURE.Injection
 
 import Data.Monoid
 import Control.Applicative
-import Control.Arrow (second)
 
 ------------------------------------------------------------------------------------------
-
--- | A class of injective functions from @a@ to @b@, and their retractions.
---   The following law is expected to hold:  retract (inject a) == Just a
-class Injection a b where
-  inject  :: a -> b
-  retract :: b -> Maybe a
-
--- | There is an identity injection for all types.
-instance Injection a a where
-  inject  = id
-  retract = Just
 
 -- | 'Term's are things that syntax are built from.
 class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
@@ -69,22 +55,6 @@ class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
   -- Simple expression types might be their own sole 'Generic', more complex examples
   -- will have a new datatype for the 'Generic', which will also be an instance of class 'Term'.
   type Generic a :: *
-
---------------------------------------------------------------------------------
-
--- | attempts to extract an @a@ from a @Generic a@, and then maps a monadic function over it.
---   can be useful when defining 'chooseL' instances.
-retractWith :: (Alternative m, Term a) => (a -> m b) -> Generic a -> m b
-retractWith f = maybe empty f . retract
-
--- | attempts to extract an @a@ from a @Generic a@, and then maps a function over it.
---   can be useful when defining 'chooseL' instances.
-retractWithA :: (Alternative m, Term a) => (a -> b) -> Generic a -> m b
-retractWithA f = retractWith (pure.f)
-
--- | attempts to extract an @a@ from a @Generic a@.
-retractA :: (Alternative m, Term a) => Generic a -> m a
-retractA = retractWithA id
 
 --------------------------------------------------------------------------------
 
@@ -128,16 +98,6 @@ class (Alternative m, Monad m, Term a) => WalkerR c m a where
   -- | 'anyR' applies 'Generic' rewrites to all the interesting children of this node,
   --   suceeding if any succeed.
   anyR :: Rewrite c m (Generic a) -> Rewrite c m a
-
--- | 'allRgeneric' is a utility to aid with defining 'WalkerR' instances for the 'Generic' type.
---   See the "expr" example.
-allRgeneric :: WalkerR c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
-allRgeneric r c a = inject <$> apply (allR r) c a
-
--- | 'anyRgeneric' is a utility to aid with defining 'WalkerR' instances for the 'Generic' type.
---   See the "expr" example.
-anyRgeneric :: WalkerR c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
-anyRgeneric r c a = inject <$> apply (anyR r) c a
 
 -------------------------------------------------------------------------------
 
@@ -184,11 +144,6 @@ class (Applicative m, Term a, Monoid b) => WalkerT c m a b where
   -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
   crushT :: Translate c m (Generic a) b -> Translate c m a b
 
--- | 'crushTgeneric' is a utility to aid with defining 'WalkerT' instances for the 'Generic' type.
---   See the "expr" example.
-crushTgeneric :: WalkerT c m a b => Translate c m (Generic a) b -> c -> a -> m b
-crushTgeneric t = apply (crushT t)
-
 -------------------------------------------------------------------------------
 
 -- | fold a tree in a top-down manner, using a single 'Translate' for each node.
@@ -211,11 +166,6 @@ class (Alternative m, Monad m, Term a) => WalkerL c m a where
 
   -- | 'chooseL' constructs a 'Lens' pointing at the n-th interesting child of this node.
   chooseL :: Int -> Lens c m a (Generic a)
-
--- | 'chooseLgeneric' is a utility to aid with defining 'WalkerL' instances for the 'Generic' type.
---   See the "expr" example.
-chooseLgeneric :: WalkerL c m a => Int -> c -> a -> m ((c, Generic a), Generic a -> m (Generic a))
-chooseLgeneric n c a = (second.result.liftA) inject <$> apply (chooseL n) c a
 
 -------------------------------------------------------------------------------
 

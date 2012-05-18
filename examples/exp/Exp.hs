@@ -2,11 +2,10 @@ module Exp where
 
 import Control.Applicative
 import Control.Monad
-import Control.Arrow
 
 -------------------------------------------------------------------------------
 
-import Language.KURE.Utilities (result)
+import Language.KURE.Utilities (result,second)
 
 type Name = String
 
