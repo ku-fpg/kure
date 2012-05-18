@@ -180,10 +180,10 @@ test_fix1 = (normal_order_eval, "normal order evaluation", App fix (Lam "_" x), 
 diverge :: Either String Exp
 diverge = applyExp applicative_order_eval (App fix (Lam "_" x))
 
--- test_fix2 :: ExpTest
--- test_fix2 = (anybuR (sequenceR $ replicate 3 $ anybuR beta_reduce), "applicative order evaluation - 3 step cap", App fix (Lam "_" x)
---                                                                   , Just x)
-
+test_fix2 :: ExpTest
+test_fix2 = (anybuR (sequenceR $ replicate 3 $ anybuR beta_reduce), "applicative order evaluation - 3 step cap", App fix (Lam "_" x)
+                                                                  , Just (App (Lam "g" (App g (App g (App g (App g (App g (App g (App (Lam "x" (App g xx)) (Lam "x" (App g xx))))))))))
+                                                                              (Lam "_" (Var "x"))))
 
 all_tests :: [ExpTest]
 all_tests =    [ test_eta_exp1
@@ -199,7 +199,7 @@ all_tests =    [ test_eta_exp1
                , test_beta_reds3
                , test_beta_reds4
                , test_fix1
-    --           , test_fix2
+               , test_fix2
                ]
 
 checkTests :: Bool
