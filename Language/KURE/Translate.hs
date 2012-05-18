@@ -44,6 +44,7 @@ module Language.KURE.Translate
         , tryR
         , attemptR
         , repeatR
+        , sequenceR
         , (>+>)
         , orR
           -- * Prelude combinators
@@ -244,6 +245,10 @@ testT t = isJust <$> attemptT t
 -- | repeat a 'Rewrite' until it fails, then return the result before the failure.
 repeatR :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a
 repeatR r = tryR (r >-> repeatR r)
+
+-- | perform a list of 'Rewrite's in sequence, succeeding only if all 'Rewrite's succeed.
+sequenceR :: (Applicative m, Monad m) => [Rewrite c m a] -> Rewrite c m a
+sequenceR = foldl (>->) idR
 
 -- | attempts two 'Rewrite's in sequence, succeeding if one or both succeed.
 (>+>) :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a -> Rewrite c m a

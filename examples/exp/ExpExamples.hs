@@ -22,8 +22,6 @@ alphaLam frees = do Lam n e <- idR
                     n' <- constMT $ freshName $ frees ++ n : freeVars e
                     lamT (substExp n $ Var n') (\ _ -> Lam n')
 
---                                                            e' <- apply (substExp n (Var n')) (n:n':c) e
-
 substExp :: Name -> Exp -> RewriteExp
 substExp v s = rules_var <+ rules_lam <+ rule_app
  where
@@ -176,11 +174,16 @@ test_beta_reds4 :: ExpTest
 test_beta_reds4 = (applicative_order_eval, "applicative order evaluation", App (Lam "g" gx) (Lam "h" (App h (App (Lam "y" y) z)))
                                                                          , Just xz)
 
-test_fix :: ExpTest
-test_fix = (normal_order_eval, "normal order evaluation", App fix (Lam "_" x), Just x)
+test_fix1 :: ExpTest
+test_fix1 = (normal_order_eval, "normal order evaluation", App fix (Lam "_" x), Just x)
 
 diverge :: Either String Exp
 diverge = applyExp applicative_order_eval (App fix (Lam "_" x))
+
+-- test_fix2 :: ExpTest
+-- test_fix2 = (anybuR (sequenceR $ replicate 3 $ anybuR beta_reduce), "applicative order evaluation - 3 step cap", App fix (Lam "_" x)
+--                                                                   , Just x)
+
 
 all_tests :: [ExpTest]
 all_tests =    [ test_eta_exp1
@@ -195,7 +198,8 @@ all_tests =    [ test_eta_exp1
                , test_beta_reds2
                , test_beta_reds3
                , test_beta_reds4
-               , test_fix
+               , test_fix1
+    --           , test_fix2
                ]
 
 checkTests :: Bool
