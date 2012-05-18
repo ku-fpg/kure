@@ -13,6 +13,7 @@ type Name = String
 data Exp = Lam Name Exp
          | App Exp Exp
          | Var Name
+           deriving Eq
 
 instance Show Exp where
   show (Var v)   = v
@@ -23,40 +24,39 @@ instance Show Exp where
 
 type Context = [Name] -- bound variable names
 
-newtype ExpM a = ExpM {expM :: Int -> (Int, Maybe a)}
+newtype ExpM a = ExpM {expM :: Int -> (Int, Either String a)}
 
-runExpM :: ExpM a -> Maybe a
+runExpM :: ExpM a -> Either String a
 runExpM m = snd (expM m 0)
 
 instance Functor ExpM where
   fmap f (ExpM m) = ExpM ((result.second.fmap) f m)
 
 instance Monad ExpM where
-  return a = ExpM (\n -> (n,Just a))
+  return a = ExpM (\n -> (n,Right a))
   (ExpM f) >>= gg = ExpM $ \ n -> case f n of
-                                    (n', Nothing) -> (n', Nothing)
-                                    (n', Just a)  -> case gg a of
-                                                       ExpM g -> g n'
-  fail _ = empty
+                                    (n', Left msg) -> (n', Left msg)
+                                    (n', Right a)  -> expM (gg a) n'
+  fail msg = ExpM (\ n -> (n, Left msg))
+
+instance MonadPlus ExpM where
+  mzero = fail ""
+  (ExpM f) `mplus` (ExpM g) = ExpM $ \ n -> case f n of
+                                              (n', Left msg) -> g n'
+                                              (n', Right a)  -> (n', Right a)
 
 instance Applicative ExpM where
   pure  = return
   (<*>) = ap
 
 instance Alternative ExpM where
-  empty = ExpM (\ n -> (n,Nothing))
-  (ExpM f) <|> (ExpM g) = ExpM $ \ n -> case f n of
-                                          (n', Nothing) -> g n'
-                                          (n', Just a)  -> (n', Just a)
-
-instance MonadPlus ExpM where
-  mzero = empty
-  mplus = (<|>)
+  empty = mzero
+  (<|>) = mplus
 
 -------------------------------------------------------------------------------
 
 suggestName :: ExpM Name
-suggestName = ExpM (\n -> ((n+1), Just (show n)))
+suggestName = ExpM (\n -> ((n+1), Right (show n)))
 
 freshName :: Context -> ExpM Name
 freshName c = do n <- suggestName

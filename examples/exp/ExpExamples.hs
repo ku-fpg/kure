@@ -5,79 +5,16 @@ import Language.KURE
 import Exp
 import ExpKure
 
-import Data.Monoid
-import Control.Applicative
-import Data.Maybe
-import Data.List
--- import Debug.Trace
-
-------------------------------------------------------------------------
-
--- exp1 :: Exp
--- exp1 = Var "x"
-
--- exp2 :: Exp
--- exp2 = Var "y"
-
--- exp3 :: Exp
--- exp3 = Lam "x" exp1
-
--- exp4 :: Exp
--- exp4 = Lam "x" exp2
-
--- exp5 :: Exp
--- exp5 = App exp1 exp2
-
--- exp6 :: Exp
--- exp6 = App exp3 exp4
-
--- exp7 :: Exp
--- exp7 = App exp4 exp6
-
--- exp8 :: Exp
--- exp8 = Lam "z" (Var "z")
-
--- exp9 :: Exp
--- exp9 = Lam "x" exp3
-
--- exp10 :: Exp
--- exp10 = Lam "x" exp4
-
--- exp11 :: Exp
--- exp11 = Lam "x" exp5
-
-------------------------------------------------------------------------
-
--- expTest :: IO ()
--- expTest = do
--- 	let es1 = [exp1,exp2,exp3,exp4,exp5,exp6,exp7,exp8,exp9,exp10,exp11]
--- 	print "all expressions"
--- 	mapM_ print es1
-
--- 	let frees = map freeVars es1
--- 	mapM print (zip es1 frees)
-
---         sequence_ [ print (e,applyExp (substExp v ed) e)  | v <- ["x","y","z"], ed <- es1, e <- es1 ]
-
---         mapM (print . applyExp (tryR betaRedR)) es1
-
---         let fn1 = extractR (alltdR (repeatR betaRedR))
---         mapM (print . applyExp fn1) es1
-
--- 	let fn2 = liftT ( \ (Var x) -> Var ('!':x))
--- 	print (applyExp fn2 (Var "abc"))
-
--- 	let fn3 = liftT ( \ (Var x) -> Var ('!':x)) <+ pure (Var "X")
--- 	print (applyExp fn3 (Var "abc"))
+import Data.List (nub)
 
 ------------------------------------------------------------------------
 
 freeVarsT :: TranslateExp [Name]
 freeVarsT = fmap nub $ crushbuT $ mtryT $ do (c, Var v) <- exposeT
-                                             return (if v `elem` c then [] else [v])
+                                             whenT (v `notElem` c) (return [v])
 
 freeVars :: Exp -> [Name]
-freeVars = fromJust . applyExp freeVarsT
+freeVars = either error id . applyExp freeVarsT
 
 -- Only works for lambdas, fails for all others
 alphaLam :: [Name] -> RewriteExp
@@ -108,61 +45,163 @@ substExp v s = rules_var <+ rules_lam <+ rule_app
 
 beta_reduce :: RewriteExp
 beta_reduce = rewrite $ \ c e -> case e of
-                                App (Lam v e1) e2 -> apply (substExp v e2) (v:c) e1
-                                _                 -> fail "Cannot beta-reduce, not applying a lambda."
+                                   App (Lam v e1) e2 -> apply (substExp v e2) (v:c) e1
+                                   _                 -> fail "Cannot beta-reduce, not applying a lambda."
 
-eta_expand :: Name -> RewriteExp
-eta_expand nm = rewrite $ \ c f -> do v <- freshName c
-                                      return $ Lam v (App f (Var v))
+eta_expand :: RewriteExp
+eta_expand = rewrite $ \ c f -> do v <- freshName c
+                                   return $ Lam v (App f (Var v))
 
 eta_reduce :: RewriteExp
-eta_reduce = do Lam v1 (App f (Var v2)) <- idR
-                guardT (v1 == v2) $ "Cannot eta-reduce, " ++ v1 ++ " /= " ++ v2
-                return f
+eta_reduce = liftMT $ \ e -> case e of
+                               Lam v1 (App f (Var v2)) -> if v1 == v2
+                                                           then return f
+                                                           else fail $ "Cannot eta-reduce, " ++ v1 ++ " /= " ++ v2
+                               _                       -> fail "Cannot eta-reduce, not lambda-app-var."
+
+-- This might not actually be normal order evaluation
+-- Contact the  KURE maintainer if you have can correct this definition.
+normal_order_eval :: RewriteExp
+normal_order_eval = anytdR (repeatR beta_reduce)
+
+-- This might not actually be applicative order evaluation
+-- Contact the  KURE maintainer if you have can correct this definition.
+applicative_order_eval :: RewriteExp
+applicative_order_eval = anybuR (repeatR (anybuR beta_reduce))
 
 ------------------------------------------------------------------------
 
--- debugR :: String -> RewriteExp
--- debugR msg = liftT $ \ e -> trace (msg ++ " : " ++ show e) e
+type ExpTest = (RewriteExp,String,Exp,Maybe Exp)
+
+runExpTest :: ExpTest -> (Bool, String)
+runExpTest (r,_,e,me) = case (applyExp r e , me) of
+                        (Right r1 , Just r2) | r1 == r2 -> (True, show r1)
+                        (Left msg , Nothing)            -> (True, msg)
+                        (Left msg , Just _)             -> (False, msg)
+                        (Right r1 , _     )             -> (False, show r1)
+
+ppExpTest :: ExpTest -> IO ()
+ppExpTest t@(_,n,e,me) = do putStrLn $ "Rewrite: " ++ n
+                            putStrLn $ "Initial expression: " ++ show e
+                            putStrLn $ "Expected outcome: " ++ maybe "failure" show me
+                            let (b,msg) = runExpTest t
+                            putStrLn $ "Actual outcome: " ++ msg
+                            putStrLn (if b then "TEST PASSED" else "TEST FAILED")
+                            putStrLn ""
 
 ------------------------------------------------------------------------
 
-vX :: Exp
-vX = Var "x"
+x :: Exp
+x = Var "x"
 
-vY :: Exp
-vY = Var "y"
+y :: Exp
+y = Var "y"
 
-vZ :: Exp
-vZ = Var "z"
+z :: Exp
+z = Var "z"
+
+g :: Exp
+g = Var "g"
+
+h :: Exp
+h = Var "h"
+
+gx :: Exp
+gx = App g x
+
+gy :: Exp
+gy = App g y
+
+gz :: Exp
+gz = App g z
+
+hz :: Exp
+hz = App h z
+
+g0 :: Exp
+g0 = App g (Var "0")
+
+xx :: Exp
+xx = App x x
+
+yy :: Exp
+yy = App y y
+
+xz :: Exp
+xz = App x z
+
+fix :: Exp
+fix = Lam "g" (App body body)
+  where
+    body = Lam "x" (App g xx)
 
 ------------------------------------------------------------------------
 
--- exp3 :: Exp
--- exp3 = Lam "x" exp1
+test_eta_exp1 :: ExpTest
+test_eta_exp1 = (eta_expand, "eta-expand", g, Just (Lam "0" g0))
 
--- exp4 :: Exp
--- exp4 = Lam "x" exp2
+test_eta_exp2 :: ExpTest
+test_eta_exp2 = (eta_expand, "eta-expand", App (Lam "g" gx) (Lam "y" yy), Just (Lam "0" (App (App (Lam "g" gx) (Lam "y" yy)) (Var "0"))))
 
--- exp5 :: Exp
--- exp5 = App exp1 exp2
+test_eta_red1 :: ExpTest
+test_eta_red1 = (eta_reduce, "eta-reduce", Lam "x" gx , Just g)
 
--- exp6 :: Exp
--- exp6 = App exp3 exp4
+test_eta_red2 :: ExpTest
+test_eta_red2 = (eta_reduce, "eta-reduce", Lam "x" gy, Nothing)
 
--- exp7 :: Exp
--- exp7 = App exp4 exp6
+test_eta_red3 :: ExpTest
+test_eta_red3 = (eta_reduce, "eta-reduce", g, Nothing)
 
--- exp8 :: Exp
--- exp8 = Lam "z" (Var "z")
+test_beta_red1 :: ExpTest
+test_beta_red1 = (beta_reduce, "beta-reduce", App (Lam "x" gx) z, Just gz)
 
--- exp9 :: Exp
--- exp9 = Lam "x" exp3
+test_beta_red2 :: ExpTest
+test_beta_red2 = (beta_reduce, "beta-reduce", App (Lam "x" gy) z, Just gy)
 
--- exp10 :: Exp
--- exp10 = Lam "x" exp4
+test_beta_red3 :: ExpTest
+test_beta_red3 = (beta_reduce, "beta-reduce", App x (Lam "y" gy), Nothing)
 
--- exp11 :: Exp
--- exp11 = Lam "x" exp5
+test_beta_reds1 :: ExpTest
+test_beta_reds1 = (anybuR beta_reduce, "any bottom-up beta-reduce", gx, Nothing)
+
+test_beta_reds2 :: ExpTest
+test_beta_reds2 = (anybuR beta_reduce, "any bottom-up beta-reduce", App (Lam "g" gx) (Lam "h" (App h (App (Lam "y" y) z)))
+                                                                  , Just (App (Lam "h" hz) x))
+
+test_beta_reds3 :: ExpTest
+test_beta_reds3 = (normal_order_eval, "normal order evaluation", App (Lam "g" gx) (Lam "h" (App h (App (Lam "y" y) z)))
+                                                               , Just xz)
+
+test_beta_reds4 :: ExpTest
+test_beta_reds4 = (applicative_order_eval, "applicative order evaluation", App (Lam "g" gx) (Lam "h" (App h (App (Lam "y" y) z)))
+                                                                         , Just xz)
+
+test_fix :: ExpTest
+test_fix = (normal_order_eval, "normal order evaluation", App fix (Lam "_" x), Just x)
+
+diverge :: Either String Exp
+diverge = applyExp applicative_order_eval (App fix (Lam "_" x))
+
+all_tests :: [ExpTest]
+all_tests =    [ test_eta_exp1
+               , test_eta_exp2
+               , test_eta_red1
+               , test_eta_red2
+               , test_eta_red3
+               , test_beta_red1
+               , test_beta_red2
+               , test_beta_red3
+               , test_beta_reds1
+               , test_beta_reds2
+               , test_beta_reds3
+               , test_beta_reds4
+               , test_fix
+               ]
+
+checkTests :: Bool
+checkTests = all (fst . runExpTest) all_tests
+
+main :: IO ()
+main = mapM_ ppExpTest all_tests
 
 ------------------------------------------------------------------------

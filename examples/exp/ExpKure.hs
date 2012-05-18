@@ -14,7 +14,7 @@ import Exp
 type TranslateExp b = Translate Context ExpM Exp b
 type RewriteExp     = TranslateExp Exp
 
-applyExp :: TranslateExp b -> Exp -> Maybe b
+applyExp :: TranslateExp b -> Exp -> Either String b
 applyExp f = runExpM . apply f []
 
 -------------------------------------------------------------------------------
