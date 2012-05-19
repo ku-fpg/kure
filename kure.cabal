@@ -23,6 +23,9 @@ Extra-Source-Files:
     examples/exp/Exp.hs
     examples/exp/ExpKure.hs
     examples/exp/ExpExamples.hs
+    examples/expr/Expr.hs
+    examples/expr/ExprKure.hs
+    examples/expr/ExprExamples.hs
 
 Library
   Build-Depends: base >= 4.2
