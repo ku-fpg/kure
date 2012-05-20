@@ -38,7 +38,10 @@ chooseLgeneric n c a = (second.result.liftA) inject <$> apply (chooseL n) c a
 -------------------------------------------------------------------------------
 
 -- | These are useful in conjunction with scoping combinators to define anyR instances.
---   See the Exp example or the HERMIT package.
+--   See the "exp" and "expr" examples, or the HERMIT package.
+
+attemptExtractR :: WalkerR c m a => Rewrite c m (Generic a) -> Translate c m a (Bool, a)
+attemptExtractR = attemptR . extractR
 
 attemptAny2 :: Monad m => (a1 -> a2 -> r) -> m (Bool,a1) -> m (Bool,a2) -> m r
 attemptAny2 f mba1 mba2 = do (b1,a1) <- mba1

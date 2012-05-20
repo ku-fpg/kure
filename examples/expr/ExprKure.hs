@@ -62,8 +62,8 @@ instance WalkerR Context Maybe Expr where
          <+ addT (extractR r) (extractR r) Add
          <+ eseqT (extractR r) (extractR r) ESeq
 
-  anyR r =  addT' (attemptR $ extractR r) (attemptR $ extractR r) (attemptAny2 Add)
-         <+ eseqT' (attemptR $ extractR r) (attemptR $ extractR r) (attemptAny2 ESeq)
+  anyR r =  addT' (attemptExtractR r) (attemptExtractR r) (attemptAny2 Add)
+         <+ eseqT' (attemptExtractR r) (attemptExtractR r) (attemptAny2 ESeq)
          <+ fail "anyR failed"
 
 instance Monoid b => WalkerT Context Maybe Expr b where
@@ -97,7 +97,7 @@ instance WalkerR Context Maybe Cmd where
   allR r =  seqT (extractR r) (extractR r) Seq
          <+ assignT (extractR r) Assign
 
-  anyR r =  seqT' (attemptR $ extractR r) (attemptR $ extractR r) (attemptAny2 Seq)
+  anyR r =  seqT' (attemptExtractR r) (attemptExtractR r) (attemptAny2 Seq)
          <+ assignT (extractR r) Assign
          <+ fail "anyR failed"
 
