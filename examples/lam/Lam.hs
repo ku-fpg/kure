@@ -1,4 +1,4 @@
-module Exp where
+module Lam where
 
 import Control.Applicative
 import Control.Monad
@@ -23,41 +23,41 @@ instance Show Exp where
 
 type Context = [Name] -- bound variable names
 
-newtype ExpM a = ExpM {expM :: Int -> (Int, Either String a)}
+newtype LamM a = LamM {expM :: Int -> (Int, Either String a)}
 
-runExpM :: ExpM a -> Either String a
-runExpM m = snd (expM m 0)
+runLamM :: LamM a -> Either String a
+runLamM m = snd (expM m 0)
 
-instance Functor ExpM where
-  fmap f (ExpM m) = ExpM ((result.second.fmap) f m)
+instance Functor LamM where
+  fmap f (LamM m) = LamM ((result.second.fmap) f m)
 
-instance Monad ExpM where
-  return a = ExpM (\n -> (n,Right a))
-  (ExpM f) >>= gg = ExpM $ \ n -> case f n of
+instance Monad LamM where
+  return a = LamM (\n -> (n,Right a))
+  (LamM f) >>= gg = LamM $ \ n -> case f n of
                                     (n', Left msg) -> (n', Left msg)
                                     (n', Right a)  -> expM (gg a) n'
-  fail msg = ExpM (\ n -> (n, Left msg))
+  fail msg = LamM (\ n -> (n, Left msg))
 
-instance MonadPlus ExpM where
+instance MonadPlus LamM where
   mzero = fail ""
-  (ExpM f) `mplus` (ExpM g) = ExpM $ \ n -> case f n of
+  (LamM f) `mplus` (LamM g) = LamM $ \ n -> case f n of
                                               (n', Left msg) -> g n'
                                               (n', Right a)  -> (n', Right a)
 
-instance Applicative ExpM where
+instance Applicative LamM where
   pure  = return
   (<*>) = ap
 
-instance Alternative ExpM where
+instance Alternative LamM where
   empty = mzero
   (<|>) = mplus
 
 -------------------------------------------------------------------------------
 
-suggestName :: ExpM Name
-suggestName = ExpM (\n -> ((n+1), Right (show n)))
+suggestName :: LamM Name
+suggestName = LamM (\n -> ((n+1), Right (show n)))
 
-freshName :: Context -> ExpM Name
+freshName :: Context -> LamM Name
 freshName c = do n <- suggestName
                  if n `elem` c
                   then freshName c

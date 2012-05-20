@@ -1,9 +1,9 @@
-module ExpExamples where
+module LamExamples where
 
 import Language.KURE
 
-import Exp
-import ExpKure
+import Lam
+import LamKure
 
 import Data.List (nub)
 
@@ -58,31 +58,31 @@ eta_reduce = liftMT $ \ e -> case e of
                                _                       -> fail "Cannot eta-reduce, not lambda-app-var."
 
 -- This might not actually be normal order evaluation
--- Contact the  KURE maintainer if you have can correct this definition.
+-- Contact the  KURE maintainer if you can correct this definition.
 normal_order_eval :: RewriteExp
 normal_order_eval = anytdR (repeatR beta_reduce)
 
 -- This might not actually be applicative order evaluation
--- Contact the  KURE maintainer if you have can correct this definition.
+-- Contact the  KURE maintainer if you can correct this definition.
 applicative_order_eval :: RewriteExp
 applicative_order_eval = anybuR (repeatR (anybuR beta_reduce))
 
 ------------------------------------------------------------------------
 
-type ExpTest = (RewriteExp,String,Exp,Maybe Exp)
+type LamTest = (RewriteExp,String,Exp,Maybe Exp)
 
-runExpTest :: ExpTest -> (Bool, String)
-runExpTest (r,_,e,me) = case (applyExp r e , me) of
+runLamTest :: LamTest -> (Bool, String)
+runLamTest (r,_,e,me) = case (applyExp r e , me) of
                         (Right r1 , Just r2) | r1 == r2 -> (True, show r1)
                         (Left msg , Nothing)            -> (True, msg)
                         (Left msg , Just _)             -> (False, msg)
                         (Right r1 , _     )             -> (False, show r1)
 
-ppExpTest :: ExpTest -> IO ()
-ppExpTest t@(_,n,e,me) = do putStrLn $ "Rewrite: " ++ n
+ppLamTest :: LamTest -> IO ()
+ppLamTest t@(_,n,e,me) = do putStrLn $ "Rewrite: " ++ n
                             putStrLn $ "Initial expression: " ++ show e
                             putStrLn $ "Expected outcome: " ++ maybe "failure" show me
-                            let (b,msg) = runExpTest t
+                            let (b,msg) = runLamTest t
                             putStrLn $ "Actual outcome: " ++ msg
                             putStrLn (if b then "TEST PASSED" else "TEST FAILED")
                             putStrLn ""
@@ -135,57 +135,58 @@ fix = Lam "g" (App body body)
 
 ------------------------------------------------------------------------
 
-test_eta_exp1 :: ExpTest
+test_eta_exp1 :: LamTest
 test_eta_exp1 = (eta_expand, "eta-expand", g, Just (Lam "0" g0))
 
-test_eta_exp2 :: ExpTest
+test_eta_exp2 :: LamTest
 test_eta_exp2 = (eta_expand, "eta-expand", App (Lam "g" gx) (Lam "y" yy), Just (Lam "0" (App (App (Lam "g" gx) (Lam "y" yy)) (Var "0"))))
 
-test_eta_red1 :: ExpTest
+test_eta_red1 :: LamTest
 test_eta_red1 = (eta_reduce, "eta-reduce", Lam "x" gx , Just g)
 
-test_eta_red2 :: ExpTest
+test_eta_red2 :: LamTest
 test_eta_red2 = (eta_reduce, "eta-reduce", Lam "x" gy, Nothing)
 
-test_eta_red3 :: ExpTest
+test_eta_red3 :: LamTest
 test_eta_red3 = (eta_reduce, "eta-reduce", g, Nothing)
 
-test_beta_red1 :: ExpTest
+test_beta_red1 :: LamTest
 test_beta_red1 = (beta_reduce, "beta-reduce", App (Lam "x" gx) z, Just gz)
 
-test_beta_red2 :: ExpTest
+test_beta_red2 :: LamTest
 test_beta_red2 = (beta_reduce, "beta-reduce", App (Lam "x" gy) z, Just gy)
 
-test_beta_red3 :: ExpTest
+test_beta_red3 :: LamTest
 test_beta_red3 = (beta_reduce, "beta-reduce", App x (Lam "y" gy), Nothing)
 
-test_beta_reds1 :: ExpTest
+test_beta_reds1 :: LamTest
 test_beta_reds1 = (anybuR beta_reduce, "any bottom-up beta-reduce", gx, Nothing)
 
-test_beta_reds2 :: ExpTest
+test_beta_reds2 :: LamTest
 test_beta_reds2 = (anybuR beta_reduce, "any bottom-up beta-reduce", App (Lam "g" gx) (Lam "h" (App h (App (Lam "y" y) z)))
                                                                   , Just (App (Lam "h" hz) x))
 
-test_beta_reds3 :: ExpTest
+test_beta_reds3 :: LamTest
 test_beta_reds3 = (normal_order_eval, "normal order evaluation", App (Lam "g" gx) (Lam "h" (App h (App (Lam "y" y) z)))
                                                                , Just xz)
 
-test_beta_reds4 :: ExpTest
+test_beta_reds4 :: LamTest
 test_beta_reds4 = (applicative_order_eval, "applicative order evaluation", App (Lam "g" gx) (Lam "h" (App h (App (Lam "y" y) z)))
                                                                          , Just xz)
 
-test_fix1 :: ExpTest
+test_fix1 :: LamTest
 test_fix1 = (normal_order_eval, "normal order evaluation", App fix (Lam "_" x), Just x)
 
 diverge :: Either String Exp
 diverge = applyExp applicative_order_eval (App fix (Lam "_" x))
 
-test_fix2 :: ExpTest
+test_fix2 :: LamTest
 test_fix2 = (anybuR (sequenceR $ replicate 3 $ anybuR beta_reduce), "applicative order evaluation - 3 step cap", App fix (Lam "_" x)
                                                                   , Just (App (Lam "g" (App g (App g (App g (App g (App g (App g (App (Lam "x" (App g xx)) (Lam "x" (App g xx))))))))))
-                                                                              (Lam "_" (Var "x"))))
+                                                                              (Lam "_" x))
+                                                                  )
 
-all_tests :: [ExpTest]
+all_tests :: [LamTest]
 all_tests =    [ test_eta_exp1
                , test_eta_exp2
                , test_eta_red1
@@ -203,9 +204,9 @@ all_tests =    [ test_eta_exp1
                ]
 
 checkTests :: Bool
-checkTests = all (fst . runExpTest) all_tests
+checkTests = all (fst . runLamTest) all_tests
 
 main :: IO ()
-main = mapM_ ppExpTest all_tests
+main = mapM_ ppLamTest all_tests
 
 ------------------------------------------------------------------------

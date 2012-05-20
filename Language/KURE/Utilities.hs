@@ -37,8 +37,8 @@ chooseLgeneric n c a = (second.result.liftA) inject <$> apply (chooseL n) c a
 
 -------------------------------------------------------------------------------
 
--- | These are useful in conjunction with scoping combinators to define anyR instances.
---   See the "exp" and "expr" examples, or the HERMIT package.
+-- | These are useful in conjunction with scoping combinators to define 'anyR' instances.
+--   See the "lam" and "expr" examples, or the HERMIT package.
 
 attemptExtractR :: WalkerR c m a => Rewrite c m (Generic a) -> Translate c m a (Bool, a)
 attemptExtractR = attemptR . extractR
@@ -78,8 +78,8 @@ missingChildL n = fail ("There is no child number " ++ show n ++ ".")
 
 -------------------------------------------------------------------------------
 
--- | These functions are helpful when defining WalkerL instances in combination with scoping combinators.
---   See the Expr example.
+-- | These functions are helpful when defining 'WalkerL' instances in combination with scoping combinators.
+--   See the "lam" and "expr" examples, or the HERMIT package.
 --   Unfortunately they increase quadratically with the number of fields of the constructor.
 --   It would be nice if they were further expanded to include the calls of idR and exposeT;
 --   however this would create a plethora of additional cases as the number (and positions)
