@@ -7,6 +7,7 @@ import Control.Applicative
 
 import Language.KURE
 import Language.KURE.Utilities
+
 import Exp
 
 -------------------------------------------------------------------------------
@@ -20,7 +21,7 @@ applyExp f = runExpM . apply f []
 -------------------------------------------------------------------------------
 
 instance Term Exp where
-   type Generic Exp = Exp  -- Exp is its own Generic root.
+   type Generic Exp = Exp  -- Exp is its own Generic
 
 instance WalkerR Context ExpM Exp where
    allR r =    varT Var
@@ -29,6 +30,7 @@ instance WalkerR Context ExpM Exp where
 
    anyR r =    lamT r Lam
             <+ appT' (attemptR r) (attemptR r) (attemptAny2 App)
+            <+ fail "anyR failed"
 
 instance Monoid b => WalkerT Context ExpM Exp b where
    crushT t =    varT (const mempty)
@@ -36,12 +38,13 @@ instance Monoid b => WalkerT Context ExpM Exp b where
               <+ appT t t mappend
 
 instance WalkerL Context ExpM Exp where
-   chooseL 0 =    appT exposeT idR (\ cx e2 -> (cx, \ e1 -> pure $ App e1 e2) )
-               <+ lamT exposeT     (\ v cx  -> (cx, \ e1 -> pure $ Lam v e1 ) )
+   chooseL n = case n of
+                 0 ->    appT exposeT idR (chooseL0of2 App)
+                      <+ lamT exposeT (chooseL1of2 Lam)
 
-   chooseL 1 =    appT idR exposeT (\ e1 cx -> (cx, \ e2 -> pure $ App e1 e2) )
+                 1 ->    appT idR exposeT (chooseL1of2 App)
 
-   chooseL n =    missingChildL n
+                 _ -> missingChildL n
 
 -------------------------------------------------------------------------------
 

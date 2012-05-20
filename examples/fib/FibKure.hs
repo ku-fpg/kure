@@ -8,9 +8,13 @@ import Data.Monoid
 import Language.KURE
 import Fib
 
+--------------------------------------------------------------------------------------
+
 -- | For this simple example, the context is always empty and 'Translate' always operates on 'Arith'
 type TranslateA b = Translate () Maybe Arith b
 type RewriteA = TranslateA Arith
+
+--------------------------------------------------------------------------------------
 
 instance Term Arith where
   type Generic Arith = Arith
@@ -37,6 +41,8 @@ instance WalkerR () Maybe Arith where
                                                     else empty
                                  Fib e      ->  Fib <$> apply r c e
 
+--------------------------------------------------------------------------------------
+
 instance Monoid b => WalkerT () Maybe Arith b where
 
   crushT t = translate $ \ c e -> case e of
@@ -44,6 +50,8 @@ instance Monoid b => WalkerT () Maybe Arith b where
                                     Add e1 e2  ->  mappend <$> apply t c e1 <*> apply t c e2
                                     Sub e1 e2  ->  mappend <$> apply t c e1 <*> apply t c e2
                                     Fib e1     ->  apply t c e1
+
+--------------------------------------------------------------------------------------
 
 instance WalkerL () Maybe Arith where
 
@@ -60,3 +68,5 @@ instance WalkerL () Maybe Arith where
                                 Fib e1     ->  case n of
                                                  0 -> pure ((c,e1), \ e1' -> pure (Fib e1'))
                                                  _ -> empty
+
+--------------------------------------------------------------------------------------

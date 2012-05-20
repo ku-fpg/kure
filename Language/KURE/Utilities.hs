@@ -7,15 +7,15 @@
 -- Stability: alpha
 -- Portability: ghc
 --
--- This module contains several utility functions that are either used internally within KURE,
--- or that can be useful to users of KURE.
+-- This module contains several utility functions that can be useful to users of KURE,
+-- when definining instances of the KURE classes.
 
 module Language.KURE.Utilities where
 
 import Control.Applicative
 
 import Language.KURE.Translate
-import Language.KURE.Term
+import Language.KURE.Walker
 import Language.KURE.Injection
 
 -------------------------------------------------------------------------------
@@ -75,7 +75,62 @@ missingChildL n = fail ("There is no child number " ++ show n ++ ".")
 
 -------------------------------------------------------------------------------
 
--- Some of Conal Elliott's semantic editor combinators.
+-- | These functions are helpful when defining WalkerL instances in combination with scoping combinators.
+--   See the Expr example.
+--   Unfortunately they increase quadratically with the number of fields of the constructor.
+--   It would be nice if they were further expanded to include the calls of idR and exposeT;
+--   however this would create a plethora of additional cases as the number (and positions)
+--   of interesting children would be additional dimensions.
+--   Note that the numbering scheme MofN is that N is the number of children (including uninteresting children)
+--   and M is the index of the chosen child, starting with index 0.  Thus M ranges from 0 to (n-1).
+
+chooseLaux :: (Alternative m, Term b) => (c,b) -> (b -> a) -> ((c, Generic b), Generic b -> m a)
+chooseLaux cb g = (second inject cb, retractWithA g)
+
+chooseL0of1 :: (Alternative m, Term b) => (b -> a) -> (c,b) -> ((c, Generic b) , Generic b -> m a)
+chooseL0of1 f cb = chooseLaux cb f
+
+chooseL0of2 :: (Alternative m, Term b0) => (b0 -> b1 -> a) -> (c,b0) -> b1 -> ((c, Generic b0) , Generic b0 -> m a)
+chooseL0of2 f cb0 b1 = chooseLaux cb0 (\ b0 -> f b0 b1)
+
+chooseL1of2 :: (Alternative m, Term b1) => (b0 -> b1 -> a) -> b0 -> (c,b1) -> ((c, Generic b1) , Generic b1 -> m a)
+chooseL1of2 f b0 cb1 = chooseLaux cb1 (\ b1 -> f b0 b1)
+
+chooseL0of3 :: (Alternative m, Term b0) => (b0 -> b1 -> b2 -> a) -> (c,b0) -> b1 -> b2 -> ((c, Generic b0) , Generic b0 -> m a)
+chooseL0of3 f cb0 b1 b2 = chooseLaux cb0 (\ b0 -> f b0 b1 b2)
+
+chooseL1of3 :: (Alternative m, Term b1) => (b0 -> b1 -> b2 -> a) -> b0 -> (c,b1) -> b2 -> ((c, Generic b1) , Generic b1 -> m a)
+chooseL1of3 f b0 cb1 b2 = chooseLaux cb1 (\ b1 -> f b0 b1 b2)
+
+chooseL2of3 :: (Alternative m, Term b2) => (b0 -> b1 -> b2 -> a) -> b0 -> b1 -> (c,b2) -> ((c, Generic b2) , Generic b2 -> m a)
+chooseL2of3 f b0 b1 cb2 = chooseLaux cb2 (\ b2 -> f b0 b1 b2)
+
+chooseL0of4 :: (Alternative m, Term b0) => (b0 -> b1 -> b2 -> b3 -> a) -> (c,b0) -> b1 -> b2 -> b3 -> ((c, Generic b0) , Generic b0 -> m a)
+chooseL0of4 f cb0 b1 b2 b3 = chooseLaux cb0 (\ b0 -> f b0 b1 b2 b3)
+
+chooseL1of4 :: (Alternative m, Term b1) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> (c,b1) -> b2 -> b3 -> ((c, Generic b1) , Generic b1 -> m a)
+chooseL1of4 f b0 cb1 b2 b3 = chooseLaux cb1 (\ b1 -> f b0 b1 b2 b3)
+
+chooseL2of4 :: (Alternative m, Term b2) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> b1 -> (c,b2) -> b3 -> ((c, Generic b2) , Generic b2 -> m a)
+chooseL2of4 f b0 b1 cb2 b3 = chooseLaux cb2 (\ b2 -> f b0 b1 b2 b3)
+
+chooseL3of4 :: (Alternative m, Term b3) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> b1 -> b2 -> (c,b3) -> ((c, Generic b3) , Generic b3 -> m a)
+chooseL3of4 f b0 b1 b2 cb3 = chooseLaux cb3 (\ b3 -> f b0 b1 b2 b3)
+
+chooseLMofN :: (Alternative m, Term b) => Int -> ([b] -> a) -> [(c,b)] -> ((c, Generic b) , Generic b -> m a)
+chooseLMofN m f cbs = chooseLaux (cbs !! m) (\ b' -> f $ atIndex m (const b') (map snd cbs))
+
+-------------------------------------------------------------------------------
+
+-- | modify the value in a list at specified index.
+atIndex :: Int -> (a -> a) -> [a] -> [a]
+atIndex i f as = [ if n == i then f a else a
+                 | (a,n) <- zip as [0..]
+                 ]
+
+-------------------------------------------------------------------------------
+
+-- | Some of Conal Elliott's semantic editor combinators.
 
 result :: (b -> c) -> (a -> b) -> (a -> c)
 result = (.)

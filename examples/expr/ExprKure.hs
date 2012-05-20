@@ -6,6 +6,8 @@ import Control.Applicative
 import Data.Monoid
 
 import Language.KURE
+import Language.KURE.Injection
+import Language.KURE.Utilities
 
 import Expr
 
@@ -32,7 +34,6 @@ instance WalkerR Context Maybe GenericExpr where
   anyR r = rewrite $ \ c g -> case g of
                                 GExpr e -> anyRgeneric r c e
                                 GCmd cm -> anyRgeneric r c cm
-
 
 instance Monoid b => WalkerT Context Maybe GenericExpr b where
   crushT t = translate $ \ c g -> case g of
@@ -71,12 +72,12 @@ instance Monoid b => WalkerT Context Maybe Expr b where
            <+ addT (extractT t) (extractT t) mappend
 
 instance WalkerL Context Maybe Expr where
-  chooseL 0 =  (addT  exposeT idR ( \ ce1 e2 -> (ce1, \ e1 -> pure (Add e1 e2)) ) `composeL` promoteL)
-            <+ (eseqT exposeT idR ( \ ccm e  -> (ccm, \ cm -> pure (ESeq cm e)) ) `composeL` promoteL)
+  chooseL 0 =  addT exposeT idR (chooseL0of2 Add)
+            <+ eseqT exposeT idR (chooseL0of2 ESeq)
             <+ missingChildL 0
 
-  chooseL 1 =  (addT  idR exposeT ( \ e1 ce2 -> (ce2, \ e2 -> pure (Add e1 e2)) ) `composeL` promoteL)
-            <+ (eseqT idR exposeT ( \ cm ce  -> (ce,  \ e  -> pure (ESeq cm e)) ) `composeL` promoteL)
+  chooseL 1 =  addT  idR exposeT (chooseL1of2 Add)
+            <+ eseqT idR exposeT (chooseL1of2 ESeq)
             <+ missingChildL 1
 
   chooseL n = missingChildL n
@@ -105,25 +106,13 @@ instance Monoid b => WalkerT Context Maybe Cmd b where
            <+ assignT (extractT t) (\ _ -> id)
 
 instance WalkerL Context Maybe Cmd where
-  chooseL 0 =  (seqT exposeT idR ( \ ccm1 cm2 -> (ccm1, \ cm1 -> pure (Seq cm1 cm2)) ) `composeL` promoteL)
-            <+ (assignT exposeT ( \ v ce -> (ce, \ e -> pure (Assign v e)) ) `composeL` promoteL)
+  chooseL 0 =  seqT exposeT idR (chooseL0of2 Seq)
+            <+ assignT exposeT (chooseL1of2 Assign)
 
-  chooseL 1 =  (seqT idR exposeT ( \ cm1 ccm2 -> (second inject ccm2, retractWithA (Seq cm1)) ) )
+  chooseL 1 =  seqT idR exposeT (chooseL1of2 Seq)
             <+ missingChildL 1
 
   chooseL n = missingChildL n
-
-    -- n = lens $ \ c cm -> case cm of
-    --                              Assign v e  ->  case n of
-    --                                                0 -> pure ((c,GExpr e), retractWithA (Assign v))
-    --                                                _ -> empty
-    --                              Seq cm1 cm2 ->  case n of
-    --                                                0 -> pure ((c,GCmd cm1), retractWithA (flip Seq cm2))
-    --                                                1 -> pure ((updateContext cm1 c, GCmd cm2), retractWithA (Seq cm1))
-    --                                                _ -> empty
-
--- chooseL0of1 :: (Translate c m a0 (c,b) -> ((c,b) -> ((c,b) , b -> m r))) -> (b -> r) -> Lens c m a r -- (Generic r)
--- chooseL0of1 comb f = comb exposeT (\ cb -> (cb, \ b -> pure (f b)) ) -- `composeL` promoteL
 
 ---------------------------------------------------------------------------
 

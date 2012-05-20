@@ -8,17 +8,14 @@
 -- Portability: ghc
 --
 -- This is the main import module for KURE, which exports all the major components.
---
---
+-- Note that Injection and Utilities are not exported here.
+--   Injection will only be needed once, when definining a Generic data type.
+--   Utilities are not required, but may be useful when defining Walker instances.
 
-module Language.KURE  -- Temperary, needs better organising
+module Language.KURE
 	( module Language.KURE.Translate
-	, module Language.KURE.Term
-        , module Language.KURE.Injection
-        , module Language.KURE.Utilities
+	, module Language.KURE.Walker
 	) where
 
-import Language.KURE.Injection
 import Language.KURE.Translate
-import Language.KURE.Term
-import Language.KURE.Utilities
+import Language.KURE.Walker

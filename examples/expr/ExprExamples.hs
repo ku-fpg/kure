@@ -3,6 +3,7 @@ module ExprExamples where
 import Control.Applicative
 
 import Language.KURE
+
 import Expr
 import ExprKure
 

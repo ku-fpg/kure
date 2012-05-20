@@ -1,7 +1,7 @@
 {-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts #-}
 
 -- |
--- Module: Language.KURE.Translate
+-- Module: Language.KURE.Walker
 -- Copyright: (c) 2006-2012 The University of Kansas
 -- License: BSD3
 --
@@ -11,7 +11,7 @@
 --
 -- This module contains combinators that allow us to traverse an expression tree.
 
-module Language.KURE.Term
+module Language.KURE.Walker
         (
           Term, Generic
         , extractR
