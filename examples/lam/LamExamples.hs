@@ -181,10 +181,10 @@ diverge :: Either String Exp
 diverge = applyExp applicative_order_eval (App fix (Lam "_" x))
 
 test_fix2 :: LamTest
-test_fix2 = (anybuR (sequenceR $ replicate 3 $ anybuR beta_reduce), "applicative order evaluation - 3 step cap", App fix (Lam "_" x)
-                                                                  , Just (App (Lam "g" (App g (App g (App g (App g (App g (App g (App (Lam "x" (App g xx)) (Lam "x" (App g xx))))))))))
-                                                                              (Lam "_" x))
-                                                                  )
+test_fix2 = (anybuR (andR $ replicate 3 $ anybuR beta_reduce), "applicative order evaluation - 3 step cap", App fix (Lam "_" x)
+                                                             , Just (App (Lam "g" (App g (App g (App g (App g (App g (App g (App (Lam "x" (App g xx)) (Lam "x" (App g xx))))))))))
+                                                                    (Lam "_" x))
+                                                             )
 
 all_tests :: [LamTest]
 all_tests =    [ test_eta_exp1
