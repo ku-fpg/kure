@@ -30,6 +30,7 @@ module Language.KURE.Walker
         , tdpruneR
         , innermostR
         , WalkerT, crushT
+        , numChildrenT
         , crushtdT
         , crushbuT
         , tdpruneT
@@ -145,6 +146,10 @@ class (Applicative m, Term a, Monoid b) => WalkerT c m a b where
   crushT :: Translate c m (Generic a) b -> Translate c m a b
 
 -------------------------------------------------------------------------------
+
+-- | count the number of interesting children of this node.
+numChildrenT :: WalkerT c m a (Sum Int) => Translate c m a Int
+numChildrenT = getSum <$> crushT (pure (Sum 1))
 
 -- | fold a tree in a top-down manner, using a single 'Translate' for each node.
 crushtdT :: (WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
