@@ -13,14 +13,21 @@
 
 module Language.KURE.Walker
         (
-          Term, Generic
+          Term
+        , Generic
+        , numChildren
+
         , extractR
         , promoteR
         , extractT
         , promoteT
         , extractL
         , promoteL
-        , WalkerR, allR, anyR
+
+        , Walker
+        , childR
+        , allR
+        , anyR
         , alltdR
         , anytdR
         , allbuR
@@ -29,14 +36,17 @@ module Language.KURE.Walker
         , anyduR
         , tdpruneR
         , innermostR
-        , WalkerT, allT
-        , numChildrenT
+
+        , childT
+        , allT
+        , foldtdT
+        , foldbuT
+        , tdpruneT
         , crushtdT
         , crushbuT
-        , tdpruneT
-        , WalkerL, childL
-        , childR
+
         , Path
+        , childL
         , pathL
         , exhaustPathL
         , repeatPathL
@@ -57,6 +67,8 @@ class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
   -- Simple expression types might be their own sole 'Generic', more complex examples
   -- will have a new datatype for the 'Generic', which will also be an instance of class 'Term'.
   type Generic a :: *
+
+  numChildren :: a -> Int
 
 --------------------------------------------------------------------------------
 
@@ -89,114 +101,112 @@ promoteL = lens $ \ c a -> pure ((c, inject a), retractA)
 
 -------------------------------------------------------------------------------
 
--- | 'WalkerR' captures the ability to walk over a 'Term' applying rewrites,
+-- | 'Walker' captures the ability to walk over a 'Term' applying 'Rewrite's,
 --   using a specific context @c@ and a 'Monad' @m@.
-class (Alternative m, Monad m, Term a) => WalkerR c m a where
-
-  -- | 'allR' applies 'Generic' rewrites to all the interesting children of this node,
-  --   succeeding if they all succeed.
-  allR :: Rewrite c m (Generic a) -> Rewrite c m a
-
-  -- | 'anyR' applies 'Generic' rewrites to all the interesting children of this node,
-  --   suceeding if any succeed.
-  anyR :: Rewrite c m (Generic a) -> Rewrite c m a
-
--------------------------------------------------------------------------------
-
--- | apply a 'Rewrite' in a top-down manner, succeeding if they all succeed.
-alltdR :: (WalkerR c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-alltdR r = r >-> allR (alltdR r)
-
--- | apply a 'Rewrite' in a top-down manner, succeeding if any succeed.
-anytdR :: (WalkerR c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-anytdR r = r >+> anyR (anytdR r)
-
--- | apply a 'Rewrite' in a bottom-up manner, succeeding if they all succeed.
-allbuR :: (WalkerR c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-allbuR r = allR (allbuR r) >-> r
-
--- | apply a 'Rewrite' in a bottom-up manner, succeeding if any succeed.
-anybuR :: (WalkerR c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-anybuR r = anyR (anybuR r) >+> r
-
--- | apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal,
---   succeeding if they all succeed.
-allduR :: (WalkerR c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-allduR r = r >-> allR (allduR r) >-> r
-
--- | apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal,
---   succeeding if any succeed.
-anyduR :: (WalkerR c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-anyduR r = r >+> anyR (anyduR r) >+> r
-
--- | attempt to apply a 'Rewrite' in a top-down manner, prunning at successful rewrites.
-tdpruneR :: (WalkerR c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-tdpruneR r = r <+ anyR (tdpruneR r)
-
--- | a fixed-point traveral, starting with the innermost term.
-innermostR :: (WalkerR c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-innermostR r = allbuR (tryR (r >-> innermostR r))
-
--------------------------------------------------------------------------------
-
--- | 'WalkerT' captures the ability to walk over a 'Term' applying translations,
---   using a specific context @c@ and an 'Applicative' @m@.
-class (Applicative m, Term a, Monoid b) => WalkerT c m a b where
-
-  -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
-  allT :: Translate c m (Generic a) b -> Translate c m a b
-
--------------------------------------------------------------------------------
-
--- | count the number of interesting children of this node.
-numChildrenT :: WalkerT c m a (Sum Int) => Translate c m a Int
-numChildrenT = getSum <$> allT (pure (Sum 1))
-
--- | fold a tree in a top-down manner, using a single 'Translate' for each node.
-crushtdT :: (WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-crushtdT t = mconcatT [ t, allT (crushtdT t) ]
-
--- | fold a tree in a bottom-up manner, using a single 'Translate' for each node.
-crushbuT :: (WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-crushbuT t = mconcatT [ allT (crushbuT t), t ]
-
--- | attempt to apply a 'Translate' in a top-down manner, prunning at successes.
-tdpruneT :: (Alternative m, WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-tdpruneT t = t <+ allT (tdpruneT t)
-
--------------------------------------------------------------------------------
-
--- | 'WalkerL' captures the ability to construct a 'Lens' into a 'Term',
---   using a specific context @c@ and an 'Alternative' @m@.
-class (Alternative m, Monad m, Term a) => WalkerL c m a where
+--   Default instances are provided for 'allR' and 'anyR', but they may be overridden for efficiency.
+class (Alternative m, Monad m, Term a) => Walker c m a where
 
   -- | 'childL' constructs a 'Lens' pointing at the n-th interesting child of this node.
   childL :: Int -> Lens c m a (Generic a)
 
--------------------------------------------------------------------------------
+  -- | 'allR' applies a 'Generic' 'Rewrite' to all interesting children of this node, succeeding if they all succeed.
+  allR :: Rewrite c m (Generic a) -> Rewrite c m a
+  allR r = do n <- liftT numChildren
+              andR [ childR i r | i <- [0..(n-1)] ]
+
+  -- | 'anyR' applies 'Generic' 'Rewrite' to all interesting children of this node, suceeding if any succeed.
+  anyR :: Rewrite c m (Generic a) -> Rewrite c m a
+  anyR r = do n <- liftT numChildren
+              orR [ childR i r | i <- [0..(n-1)] ]
 
 -- | apply a 'Rewrite' to a specific child.
-childR :: WalkerL c m a => Int -> Rewrite c m (Generic a) -> Rewrite c m a
-childR n = rewriteL (childL n)
+childR :: Walker c m a => Int -> Rewrite c m (Generic a) -> Rewrite c m a
+childR n = focusR (childL n)
+
+-------------------------------------------------------------------------------
+
+-- | apply a 'Translate' to a specific child.
+childT :: Walker c m a => Int -> Translate c m (Generic a) b -> Translate c m a b
+childT n = focusT (childL n)
+
+-- | 'allT' applies a 'Generic' 'Translate' to all interesting children of this node, succeeding if they all succeed.
+--   The results are combined in a 'Monoid'.
+allT :: (Walker c m a, Monoid b) => Translate c m (Generic a) b -> Translate c m a b
+allT t = do n <- liftT numChildren
+            mconcatT [ childT i t | i <- [0..(n-1)] ]
+
+-- | fold a tree in a top-down manner, using a single 'Translate' for each node.
+foldtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
+foldtdT t = mconcatT [ t, allT (foldtdT t) ]
+
+-- | fold a tree in a bottom-up manner, using a single 'Translate' for each node.
+foldbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
+foldbuT t = mconcatT [ allT (foldbuT t), t ]
+
+-- | attempt to apply a 'Translate' in a top-down manner, prunning at successes.
+tdpruneT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
+tdpruneT t = t <+ allT (tdpruneT t)
+
+-- | an always successful top-down fold, replacing failures with 'mempty'.
+crushtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
+crushtdT t = foldtdT (mtryT t)
+
+-- | -- | an always successful bottom-up fold, replacing failures with 'mempty'.
+crushbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
+crushbuT t = foldbuT (mtryT t)
+
+-------------------------------------------------------------------------------
+
+-- | apply a 'Rewrite' in a top-down manner, succeeding if they all succeed.
+alltdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+alltdR r = r >-> allR (alltdR r)
+
+-- | apply a 'Rewrite' in a top-down manner, succeeding if any succeed.
+anytdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+anytdR r = r >+> anyR (anytdR r)
+
+-- | apply a 'Rewrite' in a bottom-up manner, succeeding if they all succeed.
+allbuR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+allbuR r = allR (allbuR r) >-> r
+
+-- | apply a 'Rewrite' in a bottom-up manner, succeeding if any succeed.
+anybuR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+anybuR r = anyR (anybuR r) >+> r
+
+-- | apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal,
+--   succeeding if they all succeed.
+allduR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+allduR r = r >-> allR (allduR r) >-> r
+
+-- | apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal,
+--   succeeding if any succeed.
+anyduR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+anyduR r = r >+> anyR (anyduR r) >+> r
+
+-- | attempt to apply a 'Rewrite' in a top-down manner, prunning at successful rewrites.
+tdpruneR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+tdpruneR r = r <+ anyR (tdpruneR r)
+
+-- | a fixed-point traveral, starting with the innermost term.
+innermostR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+innermostR r = allbuR (tryR (r >-> innermostR r))
+
+-------------------------------------------------------------------------------
 
 -- | a 'Path' is a list of 'Int's, where each 'Int' specifies which interesting child to descend to at each step.
 type Path = [Int]
 
 -- | construct a 'Lens' by following a 'Path'.
-pathL :: (WalkerL c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
+pathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
 pathL = sequenceL . map childL
 
 -- | construct a 'Lens' that points to the last node at which the 'Path' can be followed.
-exhaustPathL :: (WalkerL c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
+exhaustPathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
 exhaustPathL []     = idL
 exhaustPathL (n:ns) = tryL (childL n `composeL` exhaustPathL ns)
 
 -- | repeat as many iterations of the 'Path' as possible.
-repeatPathL :: (WalkerL c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
+repeatPathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
 repeatPathL p = tryL (pathL p `composeL` repeatPathL p)
 
 -------------------------------------------------------------------------------
-
--- allR' :: (WalkerL c m a, WalkerT c m a (Sum Int), Term (Generic a), Generic (Generic a) ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m a
--- allR' r = do n <- numChildrenT
---              andR [ childR i (extractR r) | i <- [0..n] ]

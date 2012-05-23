@@ -62,8 +62,8 @@ module Language.KURE.Translate
         , tryL
         , composeL
         , sequenceL
-        , rewriteL
-        , translateL
+        , focusR
+        , focusT
 ) where
 
 import Prelude hiding (id, (.))
@@ -312,12 +312,13 @@ sequenceL :: (Applicative m, Monad m) => [Lens c m a a] -> Lens c m a a
 sequenceL = foldr composeL idL
 
 -- | apply a 'Rewrite' at a point specified by a 'Lens'.
-rewriteL :: Monad m => Lens c m a b -> Rewrite c m b -> Rewrite c m a
-rewriteL l r = rewrite $ \ c a -> do ((cb,b),kb) <- apply l c a
-                                     apply r cb b >>= kb
+focusR :: Monad m => Lens c m a b -> Rewrite c m b -> Rewrite c m a
+focusR l r = rewrite $ \ c a -> do ((cb,b),kb) <- apply l c a
+                                   apply r cb b >>= kb
 
--- | extract a 'Translate' from a 'Lens'
-translateL :: Functor m => Lens c m a b -> Translate c m a b
-translateL = fmap (snd.fst)
+-- | apply a 'Translate' at a point specified by a 'Lens'.
+focusT :: Monad m => Lens c m a b -> Translate c m b d -> Translate c m a d
+focusT l t = translate $ \ c a -> do ((cb,b),_) <- apply l c a
+                                     apply t cb b
 
 ------------------------------------------------------------------------------------------

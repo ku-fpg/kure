@@ -41,8 +41,8 @@ instance Monad LamM where
 instance MonadPlus LamM where
   mzero = fail ""
   (LamM f) `mplus` (LamM g) = LamM $ \ n -> case f n of
-                                              (n', Left msg) -> g n'
-                                              (n', Right a)  -> (n', Right a)
+                                              (n', Left _)  -> g n'
+                                              (n', Right a) -> (n', Right a)
 
 instance Applicative LamM where
   pure  = return

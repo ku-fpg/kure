@@ -3,7 +3,6 @@
 module FibKure where
 
 import Control.Applicative
-import Data.Monoid
 
 import Language.KURE
 import Fib
@@ -19,7 +18,29 @@ type RewriteA = TranslateA Arith
 instance Term Arith where
   type Generic Arith = Arith
 
-instance WalkerR () Maybe Arith where
+  numChildren (Lit _)   = 0
+  numChildren (Add _ _) = 2
+  numChildren (Sub _ _) = 2
+  numChildren (Fib _)   = 1
+
+instance Walker () Maybe Arith where
+
+  childL n = lens $ \ c e -> case e of
+                               Lit _      ->  empty
+                               Add e1 e2  ->  case n of
+                                                0 -> pure ((c,e1), \ e1' -> pure (Add e1' e2))
+                                                1 -> pure ((c,e2), \ e2' -> pure (Add e1 e2'))
+                                                _ -> empty
+                               Sub e1 e2  ->  case n of
+                                                0 -> pure ((c,e1), \ e1' -> pure (Sub e1' e2))
+                                                1 -> pure ((c,e2), \ e2' -> pure (Sub e1 e2'))
+                                                _ -> empty
+                               Fib e1     ->  case n of
+                                                0 -> pure ((c,e1), \ e1' -> pure (Fib e1'))
+                                                _ -> empty
+
+-- Using the default definitions of allR and anyR would be fine.
+-- These are given here only to serve as an example.
 
   allR r = rewrite $ \ c ex -> case ex of
                                  Lit n      ->  pure (Lit n)
@@ -40,33 +61,5 @@ instance WalkerR () Maybe Arith where
                                                     then return (Sub e1' e2')
                                                     else empty
                                  Fib e      ->  Fib <$> apply r c e
-
---------------------------------------------------------------------------------------
-
-instance Monoid b => WalkerT () Maybe Arith b where
-
-  crushT t = translate $ \ c e -> case e of
-                                    Lit _      ->  pure mempty
-                                    Add e1 e2  ->  mappend <$> apply t c e1 <*> apply t c e2
-                                    Sub e1 e2  ->  mappend <$> apply t c e1 <*> apply t c e2
-                                    Fib e1     ->  apply t c e1
-
---------------------------------------------------------------------------------------
-
-instance WalkerL () Maybe Arith where
-
-  childL n = lens $ \ c e -> case e of
-                               Lit _      ->  empty
-                               Add e1 e2  ->  case n of
-                                                0 -> pure ((c,e1), \ e1' -> pure (Add e1' e2))
-                                                1 -> pure ((c,e2), \ e2' -> pure (Add e1 e2'))
-                                                _ -> empty
-                               Sub e1 e2  ->  case n of
-                                                0 -> pure ((c,e1), \ e1' -> pure (Sub e1' e2))
-                                                1 -> pure ((c,e2), \ e2' -> pure (Sub e1 e2'))
-                                                _ -> empty
-                               Fib e1     ->  case n of
-                                                0 -> pure ((c,e1), \ e1' -> pure (Fib e1'))
-                                                _ -> empty
 
 --------------------------------------------------------------------------------------

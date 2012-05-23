@@ -10,8 +10,8 @@ import Data.List (nub)
 ------------------------------------------------------------------------
 
 freeVarsT :: TranslateExp [Name]
-freeVarsT = fmap nub $ crushbuT $ mtryT $ do (c, Var v) <- exposeT
-                                             whenT (v `notElem` c) (return [v])
+freeVarsT = fmap nub $ crushbuT $ do (c, Var v) <- exposeT
+                                     whenT (v `notElem` c) (return [v])
 
 freeVars :: Exp -> [Name]
 freeVars = either error id . applyExp freeVarsT
@@ -181,7 +181,7 @@ diverge :: Either String Exp
 diverge = applyExp applicative_order_eval (App fix (Lam "_" x))
 
 test_fix2 :: LamTest
-test_fix2 = ( anybuR (andR $ replicate 3 $ anybuR beta_reduce), "applicative order evaluation - 3 step cap", App fix (Lam "_" x)
+test_fix2 = (anybuR (andR $ replicate 3 $ anybuR beta_reduce), "applicative order evaluation - 3 step cap", App fix (Lam "_" x)
                                                              , Just (App (Lam "g" (App g (App g (App g (App g (App g (App g (App (Lam "x" (App g xx)) (Lam "x" (App g xx))))))))))
                                                                     (Lam "_" x))
                                                              )

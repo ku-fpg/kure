@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 -- |
 -- Module: Language.KURE.Utilities
 -- Copyright: (c) 2006-2012 The University of Kansas
@@ -20,27 +21,24 @@ import Language.KURE.Injection
 
 -------------------------------------------------------------------------------
 
--- | These functions are to aid with defining 'WalkerR', 'WalkerT' and 'WalkerL' instances
---   for the 'Generic' type.  See the "expr" example.
+-- | These functions are to aid with defining 'Walker' instances for the 'Generic' type.
+--   See the "expr" example.
 
-allRgeneric :: WalkerR c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
+allRgeneric :: Walker c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
 allRgeneric r c a = inject <$> apply (allR r) c a
 
-anyRgeneric :: WalkerR c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
+anyRgeneric :: Walker c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
 anyRgeneric r c a = inject <$> apply (anyR r) c a
 
-crushTgeneric :: WalkerT c m a b => Translate c m (Generic a) b -> c -> a -> m b
-crushTgeneric t = apply (crushT t)
-
-childLgeneric :: WalkerL c m a => Int -> c -> a -> m ((c, Generic a), Generic a -> m (Generic a))
+childLgeneric :: Walker c m a => Int -> c -> a -> m ((c, Generic a), Generic a -> m (Generic a))
 childLgeneric n c a = (second.result.liftA) inject <$> apply (childL n) c a
 
 -------------------------------------------------------------------------------
 
--- | These are useful in conjunction with scoping combinators to define 'anyR' instances.
+-- | These are useful in conjunction with congruence combinators to define 'anyR' instances.
 --   See the "lam" and "expr" examples, or the HERMIT package.
 
-attemptExtractR :: WalkerR c m a => Rewrite c m (Generic a) -> Translate c m a (Bool, a)
+attemptExtractR :: Walker c m a => Rewrite c m (Generic a) -> Translate c m a (Bool, a)
 attemptExtractR = attemptR . extractR
 
 attemptAny2 :: Monad m => (a1 -> a2 -> r) -> m (Bool,a1) -> m (Bool,a2) -> m r
@@ -78,7 +76,7 @@ missingChildL n = fail ("There is no child number " ++ show n ++ ".")
 
 -------------------------------------------------------------------------------
 
--- | These functions are helpful when defining 'WalkerL' instances in combination with scoping combinators.
+-- | These functions are helpful when defining 'childL' instances in combination with congruence combinators.
 --   See the "lam" and "expr" examples, or the HERMIT package.
 --   Unfortunately they increase quadratically with the number of fields of the constructor.
 --   It would be nice if they were further expanded to include the calls of idR and exposeT;

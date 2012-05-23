@@ -3,13 +3,17 @@
 module ExprKure where
 
 import Control.Applicative
-import Data.Monoid
 
 import Language.KURE
 import Language.KURE.Injection
 import Language.KURE.Utilities
 
 import Expr
+
+---------------------------------------------------------------------------
+
+-- NOTE: allR and anyR have been defined, but using these default instances would be fine
+--       (just slightly less efficient).
 
 ---------------------------------------------------------------------------
 
@@ -24,9 +28,17 @@ data GenericExpr = GExpr Expr
 instance Term GenericExpr where
   type Generic GenericExpr = GenericExpr
 
+  numChildren (GExpr e) = numChildren e
+  numChildren (GCmd c)  = numChildren c
+
 ---------------------------------------------------------------------------
 
-instance WalkerR Context Maybe GenericExpr where
+instance Walker Context Maybe GenericExpr where
+
+  childL n = lens $ \ c g -> case g of
+                               GExpr e -> childLgeneric n c e
+                               GCmd cm -> childLgeneric n c cm
+
   allR r = rewrite $ \ c g -> case g of
                                 GExpr e -> allRgeneric r c e
                                 GCmd cm -> allRgeneric r c cm
@@ -34,16 +46,6 @@ instance WalkerR Context Maybe GenericExpr where
   anyR r = rewrite $ \ c g -> case g of
                                 GExpr e -> anyRgeneric r c e
                                 GCmd cm -> anyRgeneric r c cm
-
-instance Monoid b => WalkerT Context Maybe GenericExpr b where
-  crushT t = translate $ \ c g -> case g of
-                                    GExpr e -> crushTgeneric t c e
-                                    GCmd cm -> crushTgeneric t c cm
-
-instance WalkerL Context Maybe GenericExpr where
-  childL n = lens $ \ c g -> case g of
-                               GExpr e -> childLgeneric n c e
-                               GCmd cm -> childLgeneric n c cm
 
 ---------------------------------------------------------------------------
 
@@ -56,7 +58,21 @@ instance Injection Expr GenericExpr where
 instance Term Expr where
   type Generic Expr = GenericExpr
 
-instance WalkerR Context Maybe Expr where
+  numChildren (Add _ _)  = 2
+  numChildren (ESeq _ _) = 2
+  numChildren (Var _)    = 0
+  numChildren (Lit _)    = 0
+
+
+instance Walker Context Maybe Expr where
+  childL 0 =  addT exposeT idR (childL0of2 Add)
+           <+ eseqT exposeT idR (childL0of2 ESeq)
+           <+ missingChildL 0
+  childL 1 =  addT  idR exposeT (childL1of2 Add)
+           <+ eseqT idR exposeT (childL1of2 ESeq)
+           <+ missingChildL 1
+  childL n = missingChildL n
+
   allR r =  varT Var
          <+ litT Lit
          <+ addT (extractR r) (extractR r) Add
@@ -65,22 +81,6 @@ instance WalkerR Context Maybe Expr where
   anyR r =  addT' (attemptExtractR r) (attemptExtractR r) (attemptAny2 Add)
          <+ eseqT' (attemptExtractR r) (attemptExtractR r) (attemptAny2 ESeq)
          <+ fail "anyR failed"
-
-instance Monoid b => WalkerT Context Maybe Expr b where
-  crushT t =  varT (const mempty)
-           <+ litT (const mempty)
-           <+ addT (extractT t) (extractT t) mappend
-
-instance WalkerL Context Maybe Expr where
-  childL 0 =  addT exposeT idR (childL0of2 Add)
-           <+ eseqT exposeT idR (childL0of2 ESeq)
-           <+ missingChildL 0
-
-  childL 1 =  addT  idR exposeT (childL1of2 Add)
-           <+ eseqT idR exposeT (childL1of2 ESeq)
-           <+ missingChildL 1
-
-  childL n = missingChildL n
 
 ---------------------------------------------------------------------------
 
@@ -93,26 +93,23 @@ instance Injection Cmd GenericExpr where
 instance Term Cmd where
   type Generic Cmd = GenericExpr
 
-instance WalkerR Context Maybe Cmd where
+  numChildren (Seq _ _)    = 2
+  numChildren (Assign _ _) = 2
+
+instance Walker Context Maybe Cmd where
+
+  childL 0 =  seqT exposeT idR (childL0of2 Seq)
+           <+ assignT exposeT (childL1of2 Assign)
+  childL 1 =  seqT idR exposeT (childL1of2 Seq)
+           <+ missingChildL 1
+  childL n = missingChildL n
+
   allR r =  seqT (extractR r) (extractR r) Seq
          <+ assignT (extractR r) Assign
 
   anyR r =  seqT' (attemptExtractR r) (attemptExtractR r) (attemptAny2 Seq)
          <+ assignT (extractR r) Assign
          <+ fail "anyR failed"
-
-instance Monoid b => WalkerT Context Maybe Cmd b where
-  crushT t =  seqT (extractT t) (extractT t) mappend
-           <+ assignT (extractT t) (\ _ -> id)
-
-instance WalkerL Context Maybe Cmd where
-  childL 0 =  seqT exposeT idR (childL0of2 Seq)
-           <+ assignT exposeT (childL1of2 Assign)
-
-  childL 1 =  seqT idR exposeT (childL1of2 Seq)
-           <+ missingChildL 1
-
-  childL n = missingChildL n
 
 ---------------------------------------------------------------------------
 
