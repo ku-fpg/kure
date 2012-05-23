@@ -55,18 +55,18 @@ instance Monoid b => WalkerT () Maybe Arith b where
 
 instance WalkerL () Maybe Arith where
 
-  chooseL n = lens $ \ c e -> case e of
-                                Lit _      ->  empty
-                                Add e1 e2  ->  case n of
-                                                 0 -> pure ((c,e1), \ e1' -> pure (Add e1' e2))
-                                                 1 -> pure ((c,e2), \ e2' -> pure (Add e1 e2'))
-                                                 _ -> empty
-                                Sub e1 e2  ->  case n of
-                                                 0 -> pure ((c,e1), \ e1' -> pure (Sub e1' e2))
-                                                 1 -> pure ((c,e2), \ e2' -> pure (Sub e1 e2'))
-                                                 _ -> empty
-                                Fib e1     ->  case n of
-                                                 0 -> pure ((c,e1), \ e1' -> pure (Fib e1'))
-                                                 _ -> empty
+  childL n = lens $ \ c e -> case e of
+                               Lit _      ->  empty
+                               Add e1 e2  ->  case n of
+                                                0 -> pure ((c,e1), \ e1' -> pure (Add e1' e2))
+                                                1 -> pure ((c,e2), \ e2' -> pure (Add e1 e2'))
+                                                _ -> empty
+                               Sub e1 e2  ->  case n of
+                                                0 -> pure ((c,e1), \ e1' -> pure (Sub e1' e2))
+                                                1 -> pure ((c,e2), \ e2' -> pure (Sub e1 e2'))
+                                                _ -> empty
+                               Fib e1     ->  case n of
+                                                0 -> pure ((c,e1), \ e1' -> pure (Fib e1'))
+                                                _ -> empty
 
 --------------------------------------------------------------------------------------

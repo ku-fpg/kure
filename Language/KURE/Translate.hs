@@ -36,6 +36,7 @@ module Language.KURE.Translate
         , mtryT
         , attemptT
         , testT
+        , notT
           -- * Rewrites
         , Rewrite
         , rewrite
@@ -238,9 +239,13 @@ attemptT t = tryT Nothing (Just <$> t)
 attemptR :: Alternative m => Rewrite c m a -> Translate c m a (Bool,a)
 attemptR r = fmap (True,) r <+ fmap (False,) idR
 
--- | determine if a 'Translate' could succeed
+-- | determine if a 'Translate' could succeed.
 testT :: Alternative m => Translate c m a b -> Translate c m a Bool
 testT t = isJust <$> attemptT t
+
+-- | 'notT' fails if the translate succeeds, and succeeds with @()@ if the translate fails.
+notT :: (Alternative m, Monad m) => Translate c m a b -> Translate c m a ()
+notT t = (t >-> empty) <+ memptyT
 
 -- | repeat a 'Rewrite' until it fails, then return the result before the failure.
 repeatR :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a

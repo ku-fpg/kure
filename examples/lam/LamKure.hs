@@ -38,13 +38,13 @@ instance Monoid b => WalkerT Context LamM Exp b where
               <+ appT t t mappend
 
 instance WalkerL Context LamM Exp where
-   chooseL n = case n of
-                 0 ->    appT exposeT idR (chooseL0of2 App)
-                      <+ lamT exposeT (chooseL1of2 Lam)
+   childL n = case n of
+                0 ->    appT exposeT idR (childL0of2 App)
+                     <+ lamT exposeT (childL1of2 Lam)
 
-                 1 ->    appT idR exposeT (chooseL1of2 App)
+                1 ->    appT idR exposeT (childL1of2 App)
 
-                 _ -> missingChildL n
+                _ -> missingChildL n
 
 -------------------------------------------------------------------------------
 

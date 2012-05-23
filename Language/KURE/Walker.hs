@@ -29,12 +29,13 @@ module Language.KURE.Walker
         , anyduR
         , tdpruneR
         , innermostR
-        , WalkerT, crushT
+        , WalkerT, allT
         , numChildrenT
         , crushtdT
         , crushbuT
         , tdpruneT
-        , WalkerL, chooseL
+        , WalkerL, childL
+        , childR
         , Path
         , pathL
         , exhaustPathL
@@ -143,25 +144,25 @@ innermostR r = allbuR (tryR (r >-> innermostR r))
 class (Applicative m, Term a, Monoid b) => WalkerT c m a b where
 
   -- | 'crushT' applies a 'Generic' Translate to a common, 'Monoid'al result, to all the interesting children of this node.
-  crushT :: Translate c m (Generic a) b -> Translate c m a b
+  allT :: Translate c m (Generic a) b -> Translate c m a b
 
 -------------------------------------------------------------------------------
 
 -- | count the number of interesting children of this node.
 numChildrenT :: WalkerT c m a (Sum Int) => Translate c m a Int
-numChildrenT = getSum <$> crushT (pure (Sum 1))
+numChildrenT = getSum <$> allT (pure (Sum 1))
 
 -- | fold a tree in a top-down manner, using a single 'Translate' for each node.
 crushtdT :: (WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-crushtdT t = mconcatT [ t, crushT (crushtdT t) ]
+crushtdT t = mconcatT [ t, allT (crushtdT t) ]
 
 -- | fold a tree in a bottom-up manner, using a single 'Translate' for each node.
 crushbuT :: (WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-crushbuT t = mconcatT [ crushT (crushbuT t), t ]
+crushbuT t = mconcatT [ allT (crushbuT t), t ]
 
 -- | attempt to apply a 'Translate' in a top-down manner, prunning at successes.
 tdpruneT :: (Alternative m, WalkerT c m a b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-tdpruneT t = t <+ crushT (tdpruneT t)
+tdpruneT t = t <+ allT (tdpruneT t)
 
 -------------------------------------------------------------------------------
 
@@ -169,25 +170,33 @@ tdpruneT t = t <+ crushT (tdpruneT t)
 --   using a specific context @c@ and an 'Alternative' @m@.
 class (Alternative m, Monad m, Term a) => WalkerL c m a where
 
-  -- | 'chooseL' constructs a 'Lens' pointing at the n-th interesting child of this node.
-  chooseL :: Int -> Lens c m a (Generic a)
+  -- | 'childL' constructs a 'Lens' pointing at the n-th interesting child of this node.
+  childL :: Int -> Lens c m a (Generic a)
 
 -------------------------------------------------------------------------------
+
+-- | apply a 'Rewrite' to a specific child.
+childR :: WalkerL c m a => Int -> Rewrite c m (Generic a) -> Rewrite c m a
+childR n = rewriteL (childL n)
 
 -- | a 'Path' is a list of 'Int's, where each 'Int' specifies which interesting child to descend to at each step.
 type Path = [Int]
 
 -- | construct a 'Lens' by following a 'Path'.
 pathL :: (WalkerL c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
-pathL = sequenceL . map chooseL
+pathL = sequenceL . map childL
 
 -- | construct a 'Lens' that points to the last node at which the 'Path' can be followed.
 exhaustPathL :: (WalkerL c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
 exhaustPathL []     = idL
-exhaustPathL (n:ns) = tryL (chooseL n `composeL` exhaustPathL ns)
+exhaustPathL (n:ns) = tryL (childL n `composeL` exhaustPathL ns)
 
 -- | repeat as many iterations of the 'Path' as possible.
 repeatPathL :: (WalkerL c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
 repeatPathL p = tryL (pathL p `composeL` repeatPathL p)
 
 -------------------------------------------------------------------------------
+
+-- allR' :: (WalkerL c m a, WalkerT c m a (Sum Int), Term (Generic a), Generic (Generic a) ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m a
+-- allR' r = do n <- numChildrenT
+--              andR [ childR i (extractR r) | i <- [0..n] ]

@@ -65,7 +65,7 @@ normal_order_eval = anytdR (repeatR beta_reduce)
 -- This might not actually be applicative order evaluation
 -- Contact the  KURE maintainer if you can correct this definition.
 applicative_order_eval :: RewriteExp
-applicative_order_eval = anybuR (repeatR (anybuR beta_reduce))
+applicative_order_eval = innermostR beta_reduce
 
 ------------------------------------------------------------------------
 
@@ -181,7 +181,7 @@ diverge :: Either String Exp
 diverge = applyExp applicative_order_eval (App fix (Lam "_" x))
 
 test_fix2 :: LamTest
-test_fix2 = (anybuR (andR $ replicate 3 $ anybuR beta_reduce), "applicative order evaluation - 3 step cap", App fix (Lam "_" x)
+test_fix2 = ( anybuR (andR $ replicate 3 $ anybuR beta_reduce), "applicative order evaluation - 3 step cap", App fix (Lam "_" x)
                                                              , Just (App (Lam "g" (App g (App g (App g (App g (App g (App g (App (Lam "x" (App g xx)) (Lam "x" (App g xx))))))))))
                                                                     (Lam "_" x))
                                                              )

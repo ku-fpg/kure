@@ -32,8 +32,8 @@ anyRgeneric r c a = inject <$> apply (anyR r) c a
 crushTgeneric :: WalkerT c m a b => Translate c m (Generic a) b -> c -> a -> m b
 crushTgeneric t = apply (crushT t)
 
-chooseLgeneric :: WalkerL c m a => Int -> c -> a -> m ((c, Generic a), Generic a -> m (Generic a))
-chooseLgeneric n c a = (second.result.liftA) inject <$> apply (chooseL n) c a
+childLgeneric :: WalkerL c m a => Int -> c -> a -> m ((c, Generic a), Generic a -> m (Generic a))
+childLgeneric n c a = (second.result.liftA) inject <$> apply (childL n) c a
 
 -------------------------------------------------------------------------------
 
@@ -87,41 +87,41 @@ missingChildL n = fail ("There is no child number " ++ show n ++ ".")
 --   Note that the numbering scheme MofN is that N is the number of children (including uninteresting children)
 --   and M is the index of the chosen child, starting with index 0.  Thus M ranges from 0 to (n-1).
 
-chooseLaux :: (Alternative m, Term b) => (c,b) -> (b -> a) -> ((c, Generic b), Generic b -> m a)
-chooseLaux cb g = (second inject cb, retractWithA g)
+childLaux :: (Alternative m, Term b) => (c,b) -> (b -> a) -> ((c, Generic b), Generic b -> m a)
+childLaux cb g = (second inject cb, retractWithA g)
 
-chooseL0of1 :: (Alternative m, Term b) => (b -> a) -> (c,b) -> ((c, Generic b) , Generic b -> m a)
-chooseL0of1 f cb = chooseLaux cb f
+childL0of1 :: (Alternative m, Term b) => (b -> a) -> (c,b) -> ((c, Generic b) , Generic b -> m a)
+childL0of1 f cb = childLaux cb f
 
-chooseL0of2 :: (Alternative m, Term b0) => (b0 -> b1 -> a) -> (c,b0) -> b1 -> ((c, Generic b0) , Generic b0 -> m a)
-chooseL0of2 f cb0 b1 = chooseLaux cb0 (\ b0 -> f b0 b1)
+childL0of2 :: (Alternative m, Term b0) => (b0 -> b1 -> a) -> (c,b0) -> b1 -> ((c, Generic b0) , Generic b0 -> m a)
+childL0of2 f cb0 b1 = childLaux cb0 (\ b0 -> f b0 b1)
 
-chooseL1of2 :: (Alternative m, Term b1) => (b0 -> b1 -> a) -> b0 -> (c,b1) -> ((c, Generic b1) , Generic b1 -> m a)
-chooseL1of2 f b0 cb1 = chooseLaux cb1 (\ b1 -> f b0 b1)
+childL1of2 :: (Alternative m, Term b1) => (b0 -> b1 -> a) -> b0 -> (c,b1) -> ((c, Generic b1) , Generic b1 -> m a)
+childL1of2 f b0 cb1 = childLaux cb1 (\ b1 -> f b0 b1)
 
-chooseL0of3 :: (Alternative m, Term b0) => (b0 -> b1 -> b2 -> a) -> (c,b0) -> b1 -> b2 -> ((c, Generic b0) , Generic b0 -> m a)
-chooseL0of3 f cb0 b1 b2 = chooseLaux cb0 (\ b0 -> f b0 b1 b2)
+childL0of3 :: (Alternative m, Term b0) => (b0 -> b1 -> b2 -> a) -> (c,b0) -> b1 -> b2 -> ((c, Generic b0) , Generic b0 -> m a)
+childL0of3 f cb0 b1 b2 = childLaux cb0 (\ b0 -> f b0 b1 b2)
 
-chooseL1of3 :: (Alternative m, Term b1) => (b0 -> b1 -> b2 -> a) -> b0 -> (c,b1) -> b2 -> ((c, Generic b1) , Generic b1 -> m a)
-chooseL1of3 f b0 cb1 b2 = chooseLaux cb1 (\ b1 -> f b0 b1 b2)
+childL1of3 :: (Alternative m, Term b1) => (b0 -> b1 -> b2 -> a) -> b0 -> (c,b1) -> b2 -> ((c, Generic b1) , Generic b1 -> m a)
+childL1of3 f b0 cb1 b2 = childLaux cb1 (\ b1 -> f b0 b1 b2)
 
-chooseL2of3 :: (Alternative m, Term b2) => (b0 -> b1 -> b2 -> a) -> b0 -> b1 -> (c,b2) -> ((c, Generic b2) , Generic b2 -> m a)
-chooseL2of3 f b0 b1 cb2 = chooseLaux cb2 (\ b2 -> f b0 b1 b2)
+childL2of3 :: (Alternative m, Term b2) => (b0 -> b1 -> b2 -> a) -> b0 -> b1 -> (c,b2) -> ((c, Generic b2) , Generic b2 -> m a)
+childL2of3 f b0 b1 cb2 = childLaux cb2 (\ b2 -> f b0 b1 b2)
 
-chooseL0of4 :: (Alternative m, Term b0) => (b0 -> b1 -> b2 -> b3 -> a) -> (c,b0) -> b1 -> b2 -> b3 -> ((c, Generic b0) , Generic b0 -> m a)
-chooseL0of4 f cb0 b1 b2 b3 = chooseLaux cb0 (\ b0 -> f b0 b1 b2 b3)
+childL0of4 :: (Alternative m, Term b0) => (b0 -> b1 -> b2 -> b3 -> a) -> (c,b0) -> b1 -> b2 -> b3 -> ((c, Generic b0) , Generic b0 -> m a)
+childL0of4 f cb0 b1 b2 b3 = childLaux cb0 (\ b0 -> f b0 b1 b2 b3)
 
-chooseL1of4 :: (Alternative m, Term b1) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> (c,b1) -> b2 -> b3 -> ((c, Generic b1) , Generic b1 -> m a)
-chooseL1of4 f b0 cb1 b2 b3 = chooseLaux cb1 (\ b1 -> f b0 b1 b2 b3)
+childL1of4 :: (Alternative m, Term b1) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> (c,b1) -> b2 -> b3 -> ((c, Generic b1) , Generic b1 -> m a)
+childL1of4 f b0 cb1 b2 b3 = childLaux cb1 (\ b1 -> f b0 b1 b2 b3)
 
-chooseL2of4 :: (Alternative m, Term b2) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> b1 -> (c,b2) -> b3 -> ((c, Generic b2) , Generic b2 -> m a)
-chooseL2of4 f b0 b1 cb2 b3 = chooseLaux cb2 (\ b2 -> f b0 b1 b2 b3)
+childL2of4 :: (Alternative m, Term b2) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> b1 -> (c,b2) -> b3 -> ((c, Generic b2) , Generic b2 -> m a)
+childL2of4 f b0 b1 cb2 b3 = childLaux cb2 (\ b2 -> f b0 b1 b2 b3)
 
-chooseL3of4 :: (Alternative m, Term b3) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> b1 -> b2 -> (c,b3) -> ((c, Generic b3) , Generic b3 -> m a)
-chooseL3of4 f b0 b1 b2 cb3 = chooseLaux cb3 (\ b3 -> f b0 b1 b2 b3)
+childL3of4 :: (Alternative m, Term b3) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> b1 -> b2 -> (c,b3) -> ((c, Generic b3) , Generic b3 -> m a)
+childL3of4 f b0 b1 b2 cb3 = childLaux cb3 (\ b3 -> f b0 b1 b2 b3)
 
-chooseLMofN :: (Alternative m, Term b) => Int -> ([b] -> a) -> [(c,b)] -> ((c, Generic b) , Generic b -> m a)
-chooseLMofN m f cbs = chooseLaux (cbs !! m) (\ b' -> f $ atIndex m (const b') (map snd cbs))
+childLMofN :: (Alternative m, Term b) => Int -> ([b] -> a) -> [(c,b)] -> ((c, Generic b) , Generic b -> m a)
+childLMofN m f cbs = childLaux (cbs !! m) (\ b' -> f $ atIndex m (const b') (map snd cbs))
 
 -------------------------------------------------------------------------------
 

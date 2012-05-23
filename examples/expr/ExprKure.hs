@@ -41,9 +41,9 @@ instance Monoid b => WalkerT Context Maybe GenericExpr b where
                                     GCmd cm -> crushTgeneric t c cm
 
 instance WalkerL Context Maybe GenericExpr where
-  chooseL n = lens $ \ c g -> case g of
-                                GExpr e -> chooseLgeneric n c e
-                                GCmd cm -> chooseLgeneric n c cm
+  childL n = lens $ \ c g -> case g of
+                               GExpr e -> childLgeneric n c e
+                               GCmd cm -> childLgeneric n c cm
 
 ---------------------------------------------------------------------------
 
@@ -72,15 +72,15 @@ instance Monoid b => WalkerT Context Maybe Expr b where
            <+ addT (extractT t) (extractT t) mappend
 
 instance WalkerL Context Maybe Expr where
-  chooseL 0 =  addT exposeT idR (chooseL0of2 Add)
-            <+ eseqT exposeT idR (chooseL0of2 ESeq)
-            <+ missingChildL 0
+  childL 0 =  addT exposeT idR (childL0of2 Add)
+           <+ eseqT exposeT idR (childL0of2 ESeq)
+           <+ missingChildL 0
 
-  chooseL 1 =  addT  idR exposeT (chooseL1of2 Add)
-            <+ eseqT idR exposeT (chooseL1of2 ESeq)
-            <+ missingChildL 1
+  childL 1 =  addT  idR exposeT (childL1of2 Add)
+           <+ eseqT idR exposeT (childL1of2 ESeq)
+           <+ missingChildL 1
 
-  chooseL n = missingChildL n
+  childL n = missingChildL n
 
 ---------------------------------------------------------------------------
 
@@ -106,13 +106,13 @@ instance Monoid b => WalkerT Context Maybe Cmd b where
            <+ assignT (extractT t) (\ _ -> id)
 
 instance WalkerL Context Maybe Cmd where
-  chooseL 0 =  seqT exposeT idR (chooseL0of2 Seq)
-            <+ assignT exposeT (chooseL1of2 Assign)
+  childL 0 =  seqT exposeT idR (childL0of2 Seq)
+           <+ assignT exposeT (childL1of2 Assign)
 
-  chooseL 1 =  seqT idR exposeT (chooseL1of2 Seq)
-            <+ missingChildL 1
+  childL 1 =  seqT idR exposeT (childL1of2 Seq)
+           <+ missingChildL 1
 
-  chooseL n = missingChildL n
+  childL n = missingChildL n
 
 ---------------------------------------------------------------------------
 
