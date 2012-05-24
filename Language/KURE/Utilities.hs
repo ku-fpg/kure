@@ -40,11 +40,9 @@ childLgeneric n c a = (second.result.liftA) inject <$> apply (childL n) c a
 
 -------------------------------------------------------------------------------
 
--- | These are useful in conjunction with congruence combinators to define 'anyR' instances.
---   See the "lam" and "expr" examples, or the HERMIT package.
-
-attemptExtractR :: Walker c m a => Rewrite c m (Generic a) -> Translate c m a (Bool, a)
-attemptExtractR = attemptR . extractR
+-- | These are useful when defining congruence combinators that succeed if any child rewrite succeeds.
+--   As well as being generally useful, such combinators are helpful when defining "anyR" instances.
+--   See the "lam" or "expr" examples, or the HERMIT package.
 
 attemptAny2 :: Monad m => (a1 -> a2 -> r) -> m (Bool,a1) -> m (Bool,a2) -> m r
 attemptAny2 f mba1 mba2 = do (b1,a1) <- mba1
