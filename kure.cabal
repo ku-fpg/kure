@@ -17,15 +17,15 @@ Stability:	     alpha
 build-type: 	     Simple
 Cabal-Version:       >= 1.6
 Extra-Source-Files:
-    examples/fib/Fib.hs
-    examples/fib/FibKure.hs
-    examples/fib/FibExamples.hs
-    examples/lam/Lam.hs
-    examples/lam/LamKure.hs
-    examples/lam/LamExamples.hs
-    examples/expr/Expr.hs
-    examples/expr/ExprKure.hs
-    examples/expr/ExprExamples.hs
+    examples/Fib/Fib.hs
+    examples/Fib/FibKure.hs
+    examples/Fib/FibExamples.hs
+    examples/Lam/Lam.hs
+    examples/Lam/LamKure.hs
+    examples/Lam/LamExamples.hs
+    examples/Expr/Expr.hs
+    examples/Expr/ExprKure.hs
+    examples/Expr/ExprExamples.hs
 
 Library
   Build-Depends: base >= 4.2

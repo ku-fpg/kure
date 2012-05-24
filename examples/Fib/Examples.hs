@@ -1,11 +1,11 @@
-module FibExamples where
+module Fib.Examples where
 
 import Control.Applicative
 
 import Language.KURE
 
-import Fib
-import FibKure
+import Fib.AST
+import Fib.Kure
 
 -----------------------------------------------------------------------
 

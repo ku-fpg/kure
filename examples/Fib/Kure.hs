@@ -1,11 +1,11 @@
 {-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleInstances #-}
 
-module FibKure where
+module Fib.Kure where
 
 import Control.Applicative
 
 import Language.KURE
-import Fib
+import Fib.AST
 
 --------------------------------------------------------------------------------------
 

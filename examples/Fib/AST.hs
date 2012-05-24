@@ -1,4 +1,4 @@
-module Fib where
+module Fib.AST where
 
 data Arith = Lit Int | Add Arith Arith | Sub Arith Arith | Fib Arith deriving Eq
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleInstances #-}
 
-module ExprKure where
+module Expr.Kure where
 
 import Control.Applicative
 
@@ -10,7 +10,7 @@ import Language.KURE
 import Language.KURE.Injection
 import Language.KURE.Utilities
 
-import Expr
+import Expr.AST
 
 ---------------------------------------------------------------------------
 

@@ -1,13 +1,13 @@
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses, FlexibleInstances #-}
 
-module LamKure where
+module Lam.Kure where
 
 import Control.Applicative
 
 import Language.KURE
 import Language.KURE.Utilities
 
-import Lam
+import Lam.AST
 
 -------------------------------------------------------------------------------
 

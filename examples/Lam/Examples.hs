@@ -1,9 +1,9 @@
-module LamExamples where
+module Lam.Examples where
 
 import Language.KURE
 
-import Lam
-import LamKure
+import Lam.AST
+import Lam.Kure
 
 import Data.List (nub)
 
@@ -206,7 +206,7 @@ all_tests =    [ test_eta_exp1
 checkTests :: Bool
 checkTests = all (fst . runLamTest) all_tests
 
-main :: IO ()
-main = mapM_ ppLamTest all_tests
+printTests :: IO ()
+printTests = mapM_ ppLamTest all_tests
 
 ------------------------------------------------------------------------

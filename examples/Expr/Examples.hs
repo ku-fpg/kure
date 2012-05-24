@@ -1,11 +1,11 @@
-module ExprExamples where
+module Expr.Examples where
 
 import Control.Applicative
 
 import Language.KURE
 
-import Expr
-import ExprKure
+import Expr.AST
+import Expr.Kure
 
 -----------------------------------------------------------------
 

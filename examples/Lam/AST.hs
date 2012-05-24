@@ -1,4 +1,4 @@
-module Lam where
+module Lam.AST where
 
 import Control.Applicative
 import Control.Monad
