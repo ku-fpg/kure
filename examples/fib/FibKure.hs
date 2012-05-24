@@ -39,27 +39,4 @@ instance Walker () Maybe Arith where
                                                 0 -> pure ((c,e1), \ e1' -> pure (Fib e1'))
                                                 _ -> empty
 
--- Using the default definitions of allR and anyR would be fine.
--- These are given here only to serve as an example.
-
-  allR r = rewrite $ \ c ex -> case ex of
-                                 Lit n      ->  pure (Lit n)
-                                 Add e1 e2  ->  Add <$> apply r c e1 <*> apply r c e2
-                                 Sub e1 e2  ->  Sub <$> apply r c e1 <*> apply r c e2
-                                 Fib e      ->  Fib <$> apply r c e
-
-  anyR r = rewrite $ \ c ex -> case ex of
-                                 Lit _      ->  empty
-                                 Add e1 e2  ->  do (b1,e1') <- apply (attemptR r) c e1
-                                                   (b2,e2') <- apply (attemptR r) c e2
-                                                   if b1 || b2
-                                                    then return (Add e1' e2')
-                                                    else empty
-                                 Sub e1 e2  ->  do (b1,e1') <- apply (attemptR r) c e1
-                                                   (b2,e2') <- apply (attemptR r) c e2
-                                                   if b1 || b2
-                                                    then return (Sub e1' e2')
-                                                    else empty
-                                 Fib e      ->  Fib <$> apply r c e
-
 --------------------------------------------------------------------------------------

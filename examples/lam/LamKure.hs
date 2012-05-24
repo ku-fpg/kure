@@ -50,9 +50,15 @@ lamT t f = translate $ \ c e -> case e of
                                   Lam v e1 -> f v <$> apply t (v:c) e1
                                   _        -> fail "no match for Lam"
 
-appT :: TranslateExp a1 -> TranslateExp a2 -> (a1 -> a2 -> b) -> TranslateExp b
-appT t1 t2 f = translate $ \ c e -> case e of
-         App e1 e2 -> f <$> apply t1 c e1 <*> apply t2 c e2
+appT' :: TranslateExp a1 -> TranslateExp a2 -> (LamM a1 -> LamM a2 -> LamM b) -> TranslateExp b
+appT' t1 t2 f = translate $ \ c e -> case e of
+         App e1 e2 -> f (apply t1 c e1) (apply t2 c e2)
          _         -> fail "no match for App"
+
+appT :: TranslateExp a1 -> TranslateExp a2 -> (a1 -> a2 -> b) -> TranslateExp b
+appT t1 t2 f = appT' t1 t2 (liftA2 f)
+
+appR :: RewriteExp -> RewriteExp -> RewriteExp
+appR r1 r2 = appT' (attemptR r1) (attemptR r2) (attemptAny2 App)
 
 -------------------------------------------------------------------------------

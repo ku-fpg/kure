@@ -15,6 +15,8 @@ module Language.KURE.Utilities where
 
 import Control.Applicative
 
+import Data.Monoid
+
 import Language.KURE.Translate
 import Language.KURE.Walker
 import Language.KURE.Injection
@@ -23,6 +25,9 @@ import Language.KURE.Injection
 
 -- | These functions are to aid with defining 'Walker' instances for the 'Generic' type.
 --   See the "expr" example.
+
+allTgeneric :: (Walker c m a, Monoid b) => Translate c m (Generic a) b -> c -> a -> m b
+allTgeneric t c a = inject <$> apply (allT t) c a
 
 allRgeneric :: Walker c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
 allRgeneric r c a = inject <$> apply (allR r) c a

@@ -3,6 +3,7 @@ module FibExamples where
 import Control.Applicative
 
 import Language.KURE
+
 import Fib
 import FibKure
 

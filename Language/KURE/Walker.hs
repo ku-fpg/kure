@@ -17,6 +17,7 @@ module Language.KURE.Walker
         , Generic
         , numChildren
 
+-- |    converting to and from 'Generic's
         , extractR
         , promoteR
         , extractT
@@ -24,7 +25,11 @@ module Language.KURE.Walker
         , extractL
         , promoteL
 
+-- |    selecting one child node
         , Walker
+        , childL
+
+-- |    'Rewrite's on children or descendents
         , childR
         , allR
         , anyR
@@ -37,6 +42,7 @@ module Language.KURE.Walker
         , tdpruneR
         , innermostR
 
+-- |    'Translate's on children or descendents
         , childT
         , allT
         , foldtdT
@@ -45,8 +51,8 @@ module Language.KURE.Walker
         , crushtdT
         , crushbuT
 
+-- |    Building 'Lens's
         , Path
-        , childL
         , pathL
         , exhaustPathL
         , repeatPathL
@@ -68,6 +74,7 @@ class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
   -- will have a new datatype for the 'Generic', which will also be an instance of class 'Term'.
   type Generic a :: *
 
+  -- | Count the number of interesting children.
   numChildren :: a -> Int
 
 --------------------------------------------------------------------------------
@@ -103,11 +110,19 @@ promoteL = lens $ \ c a -> pure ((c, inject a), retractA)
 
 -- | 'Walker' captures the ability to walk over a 'Term' applying 'Rewrite's,
 --   using a specific context @c@ and a 'Monad' @m@.
---   Default instances are provided for 'allR' and 'anyR', but they may be overridden for efficiency.
+--   Default instances are provided for 'allT', 'allR' and 'anyR', but they may be overridden for efficiency.
+--   For small number of interesting children this will not be an issue, but for a large number, say,
+--   for a list of children, it may be.
 class (Alternative m, Monad m, Term a) => Walker c m a where
 
   -- | 'childL' constructs a 'Lens' pointing at the n-th interesting child of this node.
   childL :: Int -> Lens c m a (Generic a)
+
+  -- | 'allT' applies a 'Generic' 'Translate' to all interesting children of this node, succeeding if they all succeed.
+  --   The results are combined in a 'Monoid'.
+  allT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
+  allT t = do n <- liftT numChildren
+              mconcatT [ childT i t | i <- [0..(n-1)] ]
 
   -- | 'allR' applies a 'Generic' 'Rewrite' to all interesting children of this node, succeeding if they all succeed.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
@@ -119,21 +134,15 @@ class (Alternative m, Monad m, Term a) => Walker c m a where
   anyR r = do n <- liftT numChildren
               orR [ childR i r | i <- [0..(n-1)] ]
 
+-- | apply a 'Translate' to a specific child.
+childT :: Walker c m a => Int -> Translate c m (Generic a) b -> Translate c m a b
+childT n = focusT (childL n)
+
 -- | apply a 'Rewrite' to a specific child.
 childR :: Walker c m a => Int -> Rewrite c m (Generic a) -> Rewrite c m a
 childR n = focusR (childL n)
 
 -------------------------------------------------------------------------------
-
--- | apply a 'Translate' to a specific child.
-childT :: Walker c m a => Int -> Translate c m (Generic a) b -> Translate c m a b
-childT n = focusT (childL n)
-
--- | 'allT' applies a 'Generic' 'Translate' to all interesting children of this node, succeeding if they all succeed.
---   The results are combined in a 'Monoid'.
-allT :: (Walker c m a, Monoid b) => Translate c m (Generic a) b -> Translate c m a b
-allT t = do n <- liftT numChildren
-            mconcatT [ childT i t | i <- [0..(n-1)] ]
 
 -- | fold a tree in a top-down manner, using a single 'Translate' for each node.
 foldtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
