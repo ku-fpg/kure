@@ -45,10 +45,17 @@ varT f = liftMT $ \ e -> case e of
         Var n -> pure (f n)
         _     -> fail "no match for Var"
 
+-------------------------------------------------------------------------------
+
 lamT :: TranslateExp a -> (Name -> a -> b) -> TranslateExp b
 lamT t f = translate $ \ c e -> case e of
                                   Lam v e1 -> f v <$> apply t (v:c) e1
                                   _        -> fail "no match for Lam"
+
+lamR :: RewriteExp -> RewriteExp
+lamR r = lamT r Lam
+
+-------------------------------------------------------------------------------
 
 appT' :: TranslateExp a1 -> TranslateExp a2 -> (LamM a1 -> LamM a2 -> LamM b) -> TranslateExp b
 appT' t1 t2 f = translate $ \ c e -> case e of

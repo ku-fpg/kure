@@ -6,45 +6,47 @@ import Lam.AST
 import Lam.Kure
 
 import Data.List (nub)
+import Control.Monad (guard)
 
 ------------------------------------------------------------------------
 
 freeVarsT :: TranslateExp [Name]
 freeVarsT = fmap nub $ crushbuT $ do (c, Var v) <- exposeT
-                                     whenT (v `notElem` c) (return [v])
+                                     guard (v `notElem` c)
+                                     return [v]
 
 freeVars :: Exp -> [Name]
 freeVars = either error id . applyExp freeVarsT
 
 -- Only works for lambdas, fails for all others
 alphaLam :: [Name] -> RewriteExp
-alphaLam frees = do Lam n e <- idR
-                    n' <- constMT $ freshName $ frees ++ n : freeVars e
-                    lamT (substExp n $ Var n') (\ _ -> Lam n')
+alphaLam frees = do Lam v e <- idR
+                    v' <- constMT $ freshName $ frees ++ v : freeVars e
+                    lamT (tryR $ substExp v (Var v')) (\ _ -> Lam v')
 
 substExp :: Name -> Exp -> RewriteExp
 substExp v s = rules_var <+ rules_lam <+ rule_app
  where
         -- From Lambda Calc Textbook, the 6 rules.
         rules_var = varT $ \ n -> if v == n
-                                   then s                                       -- Rule 1
-                                   else Var n                                   -- Rule 2
+                                   then s                           -- Rule 1
+                                   else Var n                       -- Rule 2
 
         rules_lam = do Lam n e <- idR
-                       whenT (n == v) idR                                       -- Rule 3
-                        <+ whenT (v `notElem` freeVars e) idR                   -- Rule 4a
-                        <+ whenT (n `notElem` freeVars s) (allR (substExp v s)) -- Rule 4b
-                        <+ (alphaLam (freeVars s) >-> rules_lam)                -- Rule 5
+                       guard (n /= v)                               -- Rule 3
+                       guard (v `elem` freeVars e)                  -- Rule 4a
+                       whenT (n `elem` freeVars s)
+                            (alphaLam (freeVars s) >-> rules_lam)   -- Rule 5
+                         <+ lamR (substExp v s)                     -- Rule 4b
 
         rule_app = do App _ _ <- idR
-                      allR (substExp v s)                                       -- Rule 6
+                      anyR (substExp v s)                           -- Rule 6
 
 ------------------------------------------------------------------------
 
 beta_reduce :: RewriteExp
-beta_reduce = rewrite $ \ c e -> case e of
-                                   App (Lam v e1) e2 -> apply (substExp v e2) (v:c) e1
-                                   _                 -> fail "Cannot beta-reduce, not applying a lambda."
+beta_reduce = do App (Lam v _) e2 <- idR
+                 focusT (pathL [0,0]) (tryR $ substExp v e2)
 
 eta_expand :: RewriteExp
 eta_expand = rewrite $ \ c f -> do v <- freshName c
@@ -165,6 +167,10 @@ test_beta_reds1 = (anybuR beta_reduce, "any bottom-up beta-reduce", gx, Nothing)
 test_beta_reds2 :: LamTest
 test_beta_reds2 = (anybuR beta_reduce, "any bottom-up beta-reduce", App (Lam "g" gx) (Lam "h" (App h (App (Lam "y" y) z)))
                                                                   , Just (App (Lam "h" hz) x))
+
+test_beta_reds3a :: LamTest
+test_beta_reds3a = (beta_reduce, "beta-reduce", App (Lam "g" gx) (Lam "h" (App h (App (Lam "y" y) z)))
+                                              , Just (App (Lam "h" (App h (App (Lam "y" y) z))) x))
 
 test_beta_reds3 :: LamTest
 test_beta_reds3 = (normal_order_eval, "normal order evaluation", App (Lam "g" gx) (Lam "h" (App h (App (Lam "y" y) z)))
