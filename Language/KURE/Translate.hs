@@ -44,6 +44,7 @@ module Language.KURE.Translate
         , acceptR
         , tryR
         , attemptR
+        , changedR
         , repeatR
         , (>+>)
         , orR
@@ -246,6 +247,10 @@ testT t = isJust <$> attemptT t
 -- | 'notT' fails if the translate succeeds, and succeeds with @()@ if the translate fails.
 notT :: (Alternative m, Monad m) => Translate c m a b -> Translate c m a ()
 notT t = (t >-> empty) <+ memptyT
+
+-- | makes a 'Rewrite' fail if the value result equals the initial value
+changedR :: (Alternative m, Monad m, Eq a) => Rewrite c m a -> Rewrite c m a
+changedR r = readerT (\ a -> r >-> acceptR (/=a))
 
 -- | repeat a 'Rewrite' until it fails, then return the result before the failure.
 repeatR :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a
