@@ -17,6 +17,7 @@ Stability:	     alpha
 build-type: 	     Simple
 Cabal-Version:       >= 1.6
 Extra-Source-Files:
+    examples/Examples.hs
     examples/Fib/Fib.hs
     examples/Fib/FibKure.hs
     examples/Fib/FibExamples.hs
