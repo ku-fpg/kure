@@ -31,6 +31,7 @@ module Language.KURE.Translate
         , memptyT
         , readerT
         , guardT
+        , condT
         , whenT
         , tryT
         , mtryT
@@ -207,13 +208,16 @@ readerT f = translate $ \ c a -> apply (f a) c a
 
 -- | guarded translate.
 guardT ::  Monad m => Bool -> String -> Translate c m a ()
-guardT False msg = fail msg
-guardT True  _   = return ()
+guardT b msg = if b then return () else fail msg
+
+-- | if-then-else lifted over 'Translate'.
+condT ::  Monad m => Translate c m a Bool -> Translate c m a b -> Translate c m a b -> Translate c m a b
+condT tb t1 t2  = do b <- tb
+                     if b then t1 else t2
 
 -- | fail if the Boolean is false.
 whenT ::  Alternative m => Bool -> Translate c m a b -> Translate c m a b
-whenT False _  = empty
-whenT True  t  = t
+whenT b t = if b then t else empty
 
 -- | look at the argument to a 'Rewrite', and choose to be either a failure or trivial success.
 acceptR :: Alternative m => (a -> Bool) -> Rewrite c m a
@@ -291,14 +295,14 @@ maybeT t = translate $ \ c -> maybe (pure mempty) (apply t c)
 
 ------------------------------------------------------------------------------------------
 
--- | A Lens is a way to focus in on a particular point in a structure
+-- | A 'Lens' is a way to focus in on a particular point in a structure
 type Lens c m a b = Translate c m a ((c,b), (b -> m a))
 
 -- | 'lens' is the primitive way of building a 'Lens'.
 lens :: (c -> a -> m ((c,b), (b -> m a))) -> Lens c m a b
 lens = translate
 
--- | identity lens.
+-- | identity 'Lens'.
 idL :: Applicative m => Lens c m a a
 idL = lens $ \ c a -> pure ((c,a), pure)
 

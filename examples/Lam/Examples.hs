@@ -35,9 +35,9 @@ substExp v s = rules_var <+ rules_lam <+ rule_app
         rules_lam = do Lam n e <- idR
                        guard (n /= v)                               -- Rule 3
                        guard (v `elem` freeVars e)                  -- Rule 4a
-                       whenT (n `elem` freeVars s)
-                            (alphaLam (freeVars s) >-> rules_lam)   -- Rule 5
-                         <+ lamR (substExp v s)                     -- Rule 4b
+                       if n `elem` freeVars s
+                        then alphaLam (freeVars s) >-> rules_lam    -- Rule 5
+                        else lamR (substExp v s)                    -- Rule 4b
 
         rule_app = do App _ _ <- idR
                       anyR (substExp v s)                           -- Rule 6
