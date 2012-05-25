@@ -299,8 +299,8 @@ condM mb m1 m2  = do b <- mb
                      if b then m1 else m2
 
 -- | if-then lifted over a 'Monad'.
-whenM ::  (Alternative m, Monad m) => m Bool -> m a -> m a
-whenM mb ma = condM mb ma empty
+whenM ::  Monad m => m Bool -> m a -> m a
+whenM mb ma = condM mb ma (fail "condition False")
 
 ------------------------------------------------------------------------------------------
 
@@ -330,7 +330,7 @@ attemptA ma = tryA Nothing (Just <$> ma)
 testA :: Alternative m => m a -> m Bool
 testA ma = isJust <$> attemptA ma
 
--- | 'notT' fails if the 'Alternative' succeeds, and succeeds with @()@ if it fails.
+-- | 'notT' fails if the 'Monad' succeeds, and succeeds with @()@ if it fails.
 notM :: (Alternative m, Monad m) => m a -> m ()
 notM ma = attemptA ma >>= maybe (pure ()) (const empty)
 
