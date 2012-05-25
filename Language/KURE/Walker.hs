@@ -122,7 +122,7 @@ class (Alternative m, Monad m, Term a) => Walker c m a where
   --   The results are combined in a 'Monoid'.
   allT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
   allT t = do n <- liftT numChildren
-              mconcatT [ childT i t | i <- [0..(n-1)] ]
+              mconcatA [ childT i t | i <- [0..(n-1)] ]
 
   -- | 'allR' applies a 'Generic' 'Rewrite' to all interesting children of this node, succeeding if they all succeed.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
@@ -146,11 +146,11 @@ childR n = focusR (childL n)
 
 -- | fold a tree in a top-down manner, using a single 'Translate' for each node.
 foldtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-foldtdT t = mconcatT [ t, allT (foldtdT t) ]
+foldtdT t = mconcatA [ t, allT (foldtdT t) ]
 
 -- | fold a tree in a bottom-up manner, using a single 'Translate' for each node.
 foldbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-foldbuT t = mconcatT [ allT (foldbuT t), t ]
+foldbuT t = mconcatA [ allT (foldbuT t), t ]
 
 -- | attempt to apply a 'Translate' in a top-down manner, prunning at successes.
 tdpruneT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
@@ -158,11 +158,11 @@ tdpruneT t = t <+ allT (tdpruneT t)
 
 -- | an always successful top-down fold, replacing failures with 'mempty'.
 crushtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-crushtdT t = foldtdT (mtryT t)
+crushtdT t = foldtdT (mtryA t)
 
 -- | -- | an always successful bottom-up fold, replacing failures with 'mempty'.
 crushbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-crushbuT t = foldbuT (mtryT t)
+crushbuT t = foldbuT (mtryA t)
 
 -------------------------------------------------------------------------------
 

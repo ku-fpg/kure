@@ -28,9 +28,7 @@ substExp :: Name -> Exp -> RewriteExp
 substExp v s = rules_var <+ rules_lam <+ rule_app
  where
         -- From Lambda Calc Textbook, the 6 rules.
-        rules_var = varT $ \ n -> if v == n
-                                   then s                           -- Rule 1
-                                   else Var n                       -- Rule 2
+        rules_var = whenM (varT (==v)) (return s)                   -- Rule 1
 
         rules_lam = do Lam n e <- idR
                        guard (n /= v)                               -- Rule 3

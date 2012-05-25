@@ -42,8 +42,8 @@ instance Walker Context LamM Exp where
 
 varT :: (Name -> b) -> TranslateExp b
 varT f = liftMT $ \ e -> case e of
-        Var n -> pure (f n)
-        _     -> fail "no match for Var"
+                           Var n -> pure (f n)
+                           _     -> fail "no match for Var"
 
 -------------------------------------------------------------------------------
 
@@ -65,7 +65,10 @@ appT' t1 t2 f = translate $ \ c e -> case e of
 appT :: TranslateExp a1 -> TranslateExp a2 -> (a1 -> a2 -> b) -> TranslateExp b
 appT t1 t2 f = appT' t1 t2 (liftA2 f)
 
-appR :: RewriteExp -> RewriteExp -> RewriteExp
-appR r1 r2 = appT' (attemptR r1) (attemptR r2) (attemptAny2 App)
+appAllR :: RewriteExp -> RewriteExp -> RewriteExp
+appAllR r1 r2 = appT r1 r2 App
+
+appAnyR :: RewriteExp -> RewriteExp -> RewriteExp
+appAnyR r1 r2 = appT' (attemptR r1) (attemptR r2) (attemptAny2 App)
 
 -------------------------------------------------------------------------------

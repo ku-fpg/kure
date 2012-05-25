@@ -83,14 +83,16 @@ instance Walker Context Maybe Expr where
          <+ litT (\ _ -> mempty)
          <+ addT (extractT t) (extractT t) mappend
          <+ eseqT (extractT t) (extractT t) mappend
+         <+ fail "allT failed"
 
   allR r =  varT Var
          <+ litT Lit
-         <+ addT (extractR r) (extractR r) Add
-         <+ eseqT (extractR r) (extractR r) ESeq
+         <+ addAllR (extractR r) (extractR r)
+         <+ eseqAllR (extractR r) (extractR r)
+         <+ fail "allR failed"
 
-  anyR r =  addR (extractR r) (extractR r)
-         <+ eseqR (extractR r) (extractR r)
+  anyR r =  addAnyR (extractR r) (extractR r)
+         <+ eseqAnyR (extractR r) (extractR r)
          <+ fail "anyR failed"
 
 ---------------------------------------------------------------------------
@@ -118,10 +120,10 @@ instance Walker Context Maybe Cmd where
   allT t =  seqT (extractT t) (extractT t) mappend
          <+ assignT (extractT t) (\ _ -> id)
 
-  allR r =  seqT (extractR r) (extractR r) Seq
-         <+ assignT (extractR r) Assign
+  allR r =  seqAllR (extractR r) (extractR r)
+         <+ assignR (extractR r)
 
-  anyR r =  seqR (extractR r) (extractR r)
+  anyR r =  seqAnyR (extractR r) (extractR r)
          <+ assignR (extractR r)
          <+ fail "anyR failed"
 
@@ -135,8 +137,11 @@ seqT' t1 t2 f = translate $ \ c cm -> case cm of
 seqT :: TranslateE Cmd a1 -> TranslateE Cmd a2 -> (a1 -> a2 -> b) -> TranslateE Cmd b
 seqT t1 t2 f = seqT' t1 t2 (liftA2 f)
 
-seqR :: RewriteE Cmd -> RewriteE Cmd -> RewriteE Cmd
-seqR r1 r2 = seqT' (attemptR r1) (attemptR r2) (attemptAny2 Seq)
+seqAllR :: RewriteE Cmd -> RewriteE Cmd -> RewriteE Cmd
+seqAllR r1 r2 = seqT r1 r2 Seq
+
+seqAnyR :: RewriteE Cmd -> RewriteE Cmd -> RewriteE Cmd
+seqAnyR r1 r2 = seqT' (attemptR r1) (attemptR r2) (attemptAny2 Seq)
 
 ---------------------------------------------------------------------------
 
@@ -172,8 +177,11 @@ addT' t1 t2 f = translate $ \ c e -> case e of
 addT :: TranslateE Expr a1 -> TranslateE Expr a2 -> (a1 -> a2 -> b) -> TranslateE Expr b
 addT t1 t2 f = addT' t1 t2 (liftA2 f)
 
-addR :: RewriteE Expr -> RewriteE Expr -> RewriteE Expr
-addR r1 r2 = addT' (attemptR r1) (attemptR r2) (attemptAny2 Add)
+addAllR :: RewriteE Expr -> RewriteE Expr -> RewriteE Expr
+addAllR r1 r2 = addT r1 r2 Add
+
+addAnyR :: RewriteE Expr -> RewriteE Expr -> RewriteE Expr
+addAnyR r1 r2 = addT' (attemptR r1) (attemptR r2) (attemptAny2 Add)
 
 ---------------------------------------------------------------------------
 
@@ -185,7 +193,10 @@ eseqT' t1 t2 f = translate $ \ c e -> case e of
 eseqT :: TranslateE Cmd a1 -> TranslateE Expr a2 -> (a1 -> a2 -> b) -> TranslateE Expr b
 eseqT t1 t2 f = eseqT' t1 t2 (liftA2 f)
 
-eseqR :: RewriteE Cmd -> RewriteE Expr -> RewriteE Expr
-eseqR r1 r2 = eseqT' (attemptR r1) (attemptR r2) (attemptAny2 ESeq)
+eseqAllR :: RewriteE Cmd -> RewriteE Expr -> RewriteE Expr
+eseqAllR r1 r2 = eseqT r1 r2 ESeq
+
+eseqAnyR :: RewriteE Cmd -> RewriteE Expr -> RewriteE Expr
+eseqAnyR r1 r2 = eseqT' (attemptR r1) (attemptR r2) (attemptAny2 ESeq)
 
 ---------------------------------------------------------------------------

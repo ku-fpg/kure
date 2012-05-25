@@ -16,7 +16,7 @@
 -- and the 'Translate' functions operate with 'Rewrite'.
 
 module Language.KURE.Translate
-       (  -- * Translations
+       (  -- | Translations
           Translate
         , translate
         , apply
@@ -27,18 +27,8 @@ module Language.KURE.Translate
         , liftMT
         , liftT
         , constMT
-        , mconcatT
-        , memptyT
         , readerT
-        , guardT
-        , condT
-        , whenT
-        , tryT
-        , mtryT
-        , attemptT
-        , testT
-        , notT
-          -- * Rewrites
+          -- | Rewrites
         , Rewrite
         , rewrite
         , idR
@@ -50,14 +40,14 @@ module Language.KURE.Translate
         , (>+>)
         , orR
         , andR
-          -- * Prelude combinators
+          -- | Prelude combinators
         , tuple2R
         , listR
         , maybeR
         , tuple2T
         , listT
         , maybeT
-          -- * Lenses
+          -- | Lenses
         , Lens
         , lens
         , idL
@@ -66,6 +56,18 @@ module Language.KURE.Translate
         , sequenceL
         , focusR
         , focusT
+          -- | Combinators that generalise to an arbitrary 'Monad' or 'Alternative'
+        , guardFail
+        , condM
+        , whenM
+        , notM
+        , mconcatA
+        , memptyA
+        , tryA
+        , mtryA
+        , attemptA
+        , testA
+
 ) where
 
 import Prelude hiding (id, (.))
@@ -127,7 +129,7 @@ t1 <+ t2 = translate $ \ c a -> apply t1 c a <|> apply t2 c a
 
 -- | sequencing translates.
 (>->) :: Monad m => Translate c m a b -> Translate c m b d -> Translate c m a d
-t1 >-> t2 = translate $ \ c a -> apply t1 c a >>= apply t2 c
+t1 >-> t2 = translate $ \ c -> apply t1 c >=> apply t2 c
 
 ------------------------------------------------------------------------------------------
 
@@ -190,67 +192,22 @@ instance (Applicative m, Monad m) => Arrow (Translate c m) where
 
 ------------------------------------------------------------------------------------------
 
--- | 'concatT' turns a list of 'Translate's that return a common 'Monoid'al result
--- into a single 'Translate' that performs them all in sequence and combines their
--- results with 'mconcat'
-mconcatT :: (Applicative m , Monoid b) => [Translate c m a b] -> Translate c m a b
-mconcatT = liftA mconcat . sequenceA
-
--- | 'emptyT' is an unfailing 'Translate' that always returns 'mempty'
-memptyT :: (Applicative m, Monoid b) => Translate c m a b
-memptyT = pure mempty
-
-------------------------------------------------------------------------------------------
-
 -- | look at the argument for the translation before choosing which 'Translate' to perform.
 readerT :: (a -> Translate c m a b) -> Translate c m a b
 readerT f = translate $ \ c a -> apply (f a) c a
-
--- | guarded translate.
-guardT ::  Monad m => Bool -> String -> Translate c m a ()
-guardT b msg = if b then return () else fail msg
-
--- | if-then-else lifted over 'Translate'.
-condT ::  Monad m => Translate c m a Bool -> Translate c m a b -> Translate c m a b -> Translate c m a b
-condT tb t1 t2  = do b <- tb
-                     if b then t1 else t2
-
--- | fail if the Boolean is false.
-whenT ::  Alternative m => Bool -> Translate c m a b -> Translate c m a b
-whenT b t = if b then t else empty
 
 -- | look at the argument to a 'Rewrite', and choose to be either a failure or trivial success.
 acceptR :: Alternative m => (a -> Bool) -> Rewrite c m a
 acceptR p = rewrite $ \ _ a -> if p a then pure a else empty
 
--- | catch a failing 'Translate', making it succeed with a constant value.
-tryT :: Alternative m => b -> Translate c m a b -> Translate c m a b
-tryT b t = t <+ pure b
-
--- | catch a failing 'Translate', making it succeed with 'mempty'.
-mtryT :: (Alternative m, Monoid b) => Translate c m a b -> Translate c m a b
-mtryT = tryT mempty
-
 -- | catch a failing 'Rewrite', making it into an identity.
 tryR :: Alternative m => Rewrite c m a -> Rewrite c m a
 tryR r = r <+ idR
-
--- | catch a failing 'Translate', making it succeed with 'Nothing'.
-attemptT :: Alternative m => Translate c m a b -> Translate c m a (Maybe b)
-attemptT t = tryT Nothing (Just <$> t)
 
 -- | catch a failing 'Rewrite', making it succeed with a Boolean flag.
 --   Useful when defining @anyR@ instances.
 attemptR :: Alternative m => Rewrite c m a -> Translate c m a (Bool,a)
 attemptR r = fmap (True,) r <+ fmap (False,) idR
-
--- | determine if a 'Translate' could succeed.
-testT :: Alternative m => Translate c m a b -> Translate c m a Bool
-testT t = isJust <$> attemptT t
-
--- | 'notT' fails if the translate succeeds, and succeeds with @()@ if the translate fails.
-notT :: (Alternative m, Monad m) => Translate c m a b -> Translate c m a ()
-notT t = (t >-> empty) <+ memptyT
 
 -- | makes a 'Rewrite' fail if the value result equals the initial value
 changedR :: (Alternative m, Monad m, Eq a) => Rewrite c m a -> Rewrite c m a
@@ -262,7 +219,7 @@ repeatR r = tryR (r >-> repeatR r)
 
 -- | attempts two 'Rewrite's in sequence, succeeding if one or both succeed.
 (>+>) :: (Alternative m, Monad m) => Rewrite c m a -> Rewrite c m a -> Rewrite c m a
-r1 >+> r2 = rewrite $ \ c a -> apply (attemptT r1) c a >>= maybe (apply r2 c a) (apply (tryR r2) c)
+r1 >+> r2 = rewrite $ \ c a -> apply (attemptA r1) c a >>= maybe (apply r2 c a) (apply (tryR r2) c)
 
 -- | attempt a list of 'Rewrite's in sequence, succeeding if at least one succeeds.
 orR :: (Alternative m, Monad m) => [Rewrite c m a] -> Rewrite c m a
@@ -329,5 +286,52 @@ focusR l r = rewrite $ \ c a -> do ((cb,b),kb) <- apply l c a
 focusT :: Monad m => Lens c m a b -> Translate c m b d -> Translate c m a d
 focusT l t = translate $ \ c a -> do ((cb,b),_) <- apply l c a
                                      apply t cb b
+
+------------------------------------------------------------------------------------------
+
+-- | similar to 'guard', but using 'fail' rather than 'mzero'.
+guardFail ::  Monad m => Bool -> String -> m ()
+guardFail b msg = if b then return () else fail msg
+
+-- | if-then-else lifted over a 'Monad'.
+condM ::  Monad m => m Bool -> m a -> m a -> m a
+condM mb m1 m2  = do b <- mb
+                     if b then m1 else m2
+
+-- | if-then lifted over a 'Monad'.
+whenM ::  (Alternative m, Monad m) => m Bool -> m a -> m a
+whenM mb ma = condM mb ma empty
+
+------------------------------------------------------------------------------------------
+
+-- | performs a list of 'Applicative's in order, then combines their result in a 'Monoid'.
+mconcatA :: (Applicative m , Monoid a) => [m a] -> m a
+mconcatA = liftA mconcat . sequenceA
+
+-- | 'memptyA' always succeeds with 'mempty'
+memptyA :: (Applicative m, Monoid a) => m a
+memptyA = pure mempty
+
+------------------------------------------------------------------------------------------
+
+-- | catch a failing 'Alternative', making it succeed with a constant value.
+tryA :: Alternative m => a -> m a -> m a
+tryA a ma = ma <|> pure a
+
+-- | catch a failing 'Alternative', making it succeed with 'mempty'.
+mtryA :: (Alternative m, Monoid a) => m a -> m a
+mtryA = tryA mempty
+
+-- | catch a failing 'Alternative', making it succeed with 'Nothing'.
+attemptA :: Alternative m => m a -> m (Maybe a)
+attemptA ma = tryA Nothing (Just <$> ma)
+
+-- | determine if an 'Alternative' succeeds.
+testA :: Alternative m => m a -> m Bool
+testA ma = isJust <$> attemptA ma
+
+-- | 'notT' fails if the 'Alternative' succeeds, and succeeds with @()@ if it fails.
+notM :: (Alternative m, Monad m) => m a -> m ()
+notM ma = attemptA ma >>= maybe (pure ()) (const empty)
 
 ------------------------------------------------------------------------------------------

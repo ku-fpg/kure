@@ -10,9 +10,8 @@ import Expr.Kure
 -----------------------------------------------------------------
 
 inlineR :: RewriteE Expr
-inlineR = rewrite $ \ c e -> case e of
-                               Var v -> lookup v c
-                               _     -> empty
+inlineR = do (c, Var v) <- exposeT
+             constMT (lookup v c)
 
 inlineGR :: RewriteE GenericExpr
 inlineGR = promoteR inlineR

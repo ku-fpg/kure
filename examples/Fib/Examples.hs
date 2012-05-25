@@ -14,30 +14,26 @@ applyFib e = apply e ()
 
 -----------------------------------------------------------------------
 
--- | Note that we use 'liftMT' rather than 'rewrite' as we never need the (unit) context.
-
 -- | Apply the definition of the fibonacci function once.
 --   Requires the argument to Fib to be a Literal.
 fibLitR :: RewriteA
-fibLitR = liftMT $ \ e -> case e of
-                            Fib (Lit 0)  -> pure (Lit 0)
-                            Fib (Lit 1)  -> pure (Lit 1)
-                            Fib (Lit n)  -> pure (Add (Fib (Sub (Lit n) (Lit 1)))
-                                                      (Fib (Sub (Lit n) (Lit 2)))
-                                                 )
-                            _            -> empty
+fibLitR = do Fib (Lit n) <- idR
+             case n of
+               0  ->  return (Lit 0)
+               1  ->  return (Lit 1)
+               _  ->  return (Add (Fib (Sub (Lit n) (Lit 1)))
+                                  (Fib (Sub (Lit n) (Lit 2)))
+                             )
 
 -- | Compute the addition of two literals.
 addLitR :: RewriteA
-addLitR = liftMT $ \ e -> case e of
-                            Add (Lit m) (Lit n) -> pure (Lit (m + n))
-                            _                   -> empty
+addLitR = do Add (Lit m) (Lit n) <- idR
+             return (Lit (m + n))
 
 -- | Compute the subtraction of two literals.
 subLitR :: RewriteA
-subLitR = liftMT $ \ e -> case e of
-                            Sub (Lit m) (Lit n) -> pure (Lit (m - n))
-                            _                   -> empty
+subLitR = do Sub (Lit m) (Lit n) <- idR
+             return (Lit (m - n))
 
 -----------------------------------------------------------------------
 
