@@ -5,7 +5,8 @@ import Control.Monad
 
 -------------------------------------------------------------------------------
 
-import Language.KURE.Utilities (result,second)
+import Control.Arrow (second)
+import Language.KURE.Combinators (result)
 
 type Name = String
 

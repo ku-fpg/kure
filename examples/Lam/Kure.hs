@@ -31,7 +31,7 @@ instance Walker Context LamM Exp where
                 0 ->    appT exposeT idR (childL0of2 App)
                      <+ lamT exposeT (childL1of2 Lam)
 
-                1 ->    appT idR exposeT (childL1of2 App)
+                1 ->     appT idR exposeT (childL1of2 App)
 
                 _ -> missingChildL n
 
@@ -41,9 +41,9 @@ instance Walker Context LamM Exp where
 --   Using these ensures that the context is updated consistantly.
 
 varT :: (Name -> b) -> TranslateExp b
-varT f = liftMT $ \ e -> case e of
-                           Var n -> pure (f n)
-                           _     -> fail "no match for Var"
+varT f = contextfreeT $ \ e -> case e of
+                                 Var n -> return (f n)
+                                 _     -> fail "no match for Var"
 
 -------------------------------------------------------------------------------
 

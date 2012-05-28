@@ -3,6 +3,7 @@ module Expr.Examples where
 import Control.Applicative
 
 import Language.KURE
+import Language.KURE.Injection
 
 import Expr.AST
 import Expr.Kure
@@ -11,7 +12,7 @@ import Expr.Kure
 
 inlineR :: RewriteE Expr
 inlineR = do (c, Var v) <- exposeT
-             constMT (lookup v c)
+             constT (lookup v c)
 
 inlineGR :: RewriteE GenericExpr
 inlineGR = promoteR inlineR

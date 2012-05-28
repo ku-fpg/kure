@@ -156,16 +156,16 @@ assignR r = assignT r Assign
 ---------------------------------------------------------------------------
 
 varT :: (Name -> b) -> TranslateE Expr b
-varT f = liftMT $ \ e -> case e of
-                           Var v -> pure (f v)
-                           _     -> fail "not a Var"
+varT f = contextfreeT $ \ e -> case e of
+                                 Var v -> pure (f v)
+                                 _     -> fail "not a Var"
 
 ---------------------------------------------------------------------------
 
 litT :: (Int -> b) -> TranslateE Expr b
-litT f = liftMT $ \ e -> case e of
-                           Lit v -> pure (f v)
-                           _     -> fail "not a Lit"
+litT f = contextfreeT $ \ e -> case e of
+                                 Lit v -> pure (f v)
+                                 _     -> fail "not a Lit"
 
 ---------------------------------------------------------------------------
 

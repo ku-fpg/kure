@@ -1,12 +1,14 @@
 module Lam.Examples where
 
 import Language.KURE
+import Language.KURE.Combinators
 
 import Lam.AST
 import Lam.Kure
 
 import Data.List (nub)
 import Control.Monad (guard)
+import Control.Arrow
 
 ------------------------------------------------------------------------
 
@@ -21,7 +23,7 @@ freeVars = either error id . applyExp freeVarsT
 -- Only works for lambdas, fails for all others
 alphaLam :: [Name] -> RewriteExp
 alphaLam frees = do Lam v e <- idR
-                    v' <- constMT $ freshName $ frees ++ v : freeVars e
+                    v' <- constT $ freshName $ frees ++ v : freeVars e
                     lamT (tryR $ substExp v (Var v')) (\ _ -> Lam v')
 
 substExp :: Name -> Exp -> RewriteExp
@@ -34,7 +36,7 @@ substExp v s = rules_var <+ rules_lam <+ rule_app
                        guard (n /= v)                               -- Rule 3
                        guard (v `elem` freeVars e)                  -- Rule 4a
                        if n `elem` freeVars s
-                        then alphaLam (freeVars s) >-> rules_lam    -- Rule 5
+                        then alphaLam (freeVars s) >>> rules_lam    -- Rule 5
                         else lamR (substExp v s)                    -- Rule 4b
 
         rule_app = do App _ _ <- idR
@@ -51,10 +53,9 @@ eta_expand = rewrite $ \ c f -> do v <- freshName c
                                    return $ Lam v (App f (Var v))
 
 eta_reduce :: RewriteExp
-eta_reduce = liftMT $ \ e -> case e of
-                               Lam v1 (App f (Var v2)) -> if v1 == v2
-                                                           then return f
-                                                           else fail $ "Cannot eta-reduce, " ++ v1 ++ " /= " ++ v2
+eta_reduce = contextfreeT $ \ e -> case e of
+                               Lam v1 (App f (Var v2)) -> do guardFail (v1 == v2) $ "Cannot eta-reduce, " ++ v1 ++ " /= " ++ v2
+                                                             return f
                                _                       -> fail "Cannot eta-reduce, not lambda-app-var."
 
 -- This might not actually be normal order evaluation
