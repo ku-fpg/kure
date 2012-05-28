@@ -1,7 +1,5 @@
 module Expr.Examples where
 
-import Control.Applicative
-
 import Language.KURE
 import Language.KURE.Injection
 

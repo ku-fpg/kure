@@ -1,7 +1,6 @@
 module Lam.Examples where
 
 import Language.KURE
-import Language.KURE.Combinators
 
 import Lam.AST
 import Lam.Kure

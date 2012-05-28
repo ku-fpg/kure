@@ -1,7 +1,5 @@
 module Fib.Examples where
 
-import Control.Applicative
-
 import Language.KURE
 
 import Fib.AST
