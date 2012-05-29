@@ -110,8 +110,8 @@ instance Monad m => Monad (Translate c m a) where
    return = constT . return
 
 -- (>>=) :: Translate c m a b -> (b -> Translate c m a d) -> Translate c m a d
-   tb >>= f = translate $ \ c a -> do b <- apply tb c a
-                                      apply (f b) c a
+   t >>= f = translate $ \ c a -> do b <- apply t c a
+                                     apply (f b) c a
 
 -- fail :: String -> Translate c m a b
    fail = constT . fail
