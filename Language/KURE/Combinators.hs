@@ -140,8 +140,9 @@ changedR :: (ArrowPlus (~>), ArrowApply (~>), Eq a) => (a ~> a) -> (a ~> a)
 changedR r = readerR (\ a -> r >>> acceptR (/=a))
 
 -- | repeat an 'ArrowPlus' until it fails, then return the result before the failure.
+--   requires at least the first attempt to succeed.
 repeatR :: ArrowPlus (~>) => (a ~> a) -> (a ~> a)
-repeatR r = tryR (r >>> repeatR r)
+repeatR r = r >>> tryR (repeatR r)
 
 -- | attempts two 'Arrows's in sequence, succeeding if one or both succeed.
 (>+>) :: (ArrowPlus (~>), ArrowApply (~>)) => (a ~> a) -> (a ~> a) -> (a ~> a)

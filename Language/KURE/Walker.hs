@@ -162,8 +162,8 @@ tdpruneR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite 
 tdpruneR r = r <+> anyR (tdpruneR r)
 
 -- | a fixed-point traveral, starting with the innermost term.
-innermostR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-innermostR r = allbuR (tryR (r >>> innermostR r))
+innermostR :: (Walker c m a, Generic a ~ a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+innermostR r = anybuR (r >>> tryR (innermostR r))
 
 -------------------------------------------------------------------------------
 

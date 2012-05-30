@@ -32,6 +32,7 @@ module Language.KURE.Translate
         , tryL
         , composeL
         , sequenceL
+        , pureL
         , focusR
         , focusT
 
@@ -187,6 +188,10 @@ composeL l1 l2 = lens $ \ ca a -> do ((cb,b),kb) <- apply l1 ca a
 -- | sequence a list of endo'Lens's.
 sequenceL :: MonadPlus m => [Lens c m a a] -> Lens c m a a
 sequenceL = foldr composeL idL
+
+-- | construct a 'Lens' from two pure functions.
+pureL :: Monad m => (a -> b) -> (b -> a) -> Lens c m a b
+pureL f g = lens (\ c a -> return ((c,f a), return . g))
 
 -- | apply a 'Rewrite' at a point specified by a 'Lens'.
 focusR :: Monad m => Lens c m a b -> Rewrite c m b -> Rewrite c m a
