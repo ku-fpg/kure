@@ -45,10 +45,6 @@ Library
 
   Ghc-Options:  -Wall
 
-Flag all
-  Description: Enable full development tree
-  Default:     False
-
 
 
 
