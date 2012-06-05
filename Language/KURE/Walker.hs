@@ -87,7 +87,7 @@ class (MonadPlus m, Term a) => Walker c m a where
   --   The results are combined in a 'Monoid'.
   allT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
   allT t = do n <- arr numChildren
-              mconcatM [ childT i t | i <- [0..(n-1)] ]
+              mconcat [ childT i t | i <- [0..(n-1)] ]
 
   -- | 'allR' applies a 'Generic' 'Rewrite' to all interesting children of this node, succeeding if they all succeed.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
@@ -111,11 +111,11 @@ childR n = focusR (childL n)
 
 -- | fold a tree in a top-down manner, using a single 'Translate' for each node.
 foldtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-foldtdT t = mconcatM [ t, allT (foldtdT t) ]
+foldtdT t = t `mappend` allT (foldtdT t)
 
 -- | fold a tree in a bottom-up manner, using a single 'Translate' for each node.
 foldbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-foldbuT t = mconcatM [ allT (foldbuT t), t ]
+foldbuT t = allT (foldbuT t) `mappend` t
 
 -- | attempt to apply a 'Translate' in a top-down manner, prunning at successes.
 tdpruneT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b

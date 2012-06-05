@@ -14,8 +14,7 @@
 -- Note that these combinators assume that 'mplus' behaves as a catch, for both 'fail' and 'mzero'.
 
 module Language.KURE.Combinators
-           (
-             -- | 'Monad' combinators
+           ( -- | 'Monad' combinators
              guardFail
            , condM
            , whenM
@@ -24,8 +23,6 @@ module Language.KURE.Combinators
            , attemptM
            , testM
            , notM
-           , mconcatM
-           , memptyM
              -- | 'Arrow' combinators
            , result
            , argument
@@ -46,8 +43,8 @@ import Prelude hiding (id , (.))
 import Control.Monad
 import Control.Category
 import Control.Arrow
-import Data.Monoid
 import Data.Maybe (isJust)
+import Data.Monoid
 
 infixl 3 <+, >+>
 
@@ -85,16 +82,6 @@ testM = liftM isJust . attemptM
 -- | 'notT' fails if the 'Monad' succeeds, and succeeds with @()@ if it fails.
 notM :: MonadPlus m => m a -> m ()
 notM ma = attemptM ma >>= maybe (return ()) (const mzero)
-
-------------------------------------------------------------------------------------------
-
--- | performs a list of 'Applicative's in order, then combines their result in a 'Monoid'.
-mconcatM :: (Monad m , Monoid a) => [m a] -> m a
-mconcatM = liftM mconcat . sequence
-
--- | 'memptyA' always succeeds with 'mempty'
-memptyM :: (Monad m, Monoid a) => m a
-memptyM = return mempty
 
 ------------------------------------------------------------------------------------------
 

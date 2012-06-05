@@ -43,6 +43,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Category
 import Control.Arrow
+import Data.Monoid
 
 ------------------------------------------------------------------------------------------
 
@@ -162,6 +163,15 @@ instance Monad m => ArrowApply (Translate c m) where
 -- app :: Translate c m (Translate c m a b, a) b
    app = translate $ \ c (t,a) -> apply t c a
 
+
+instance (Monad m, Monoid b) => Monoid (Translate c m a b) where
+
+-- mempty :: Translate c m a b
+   mempty = return mempty
+
+-- mappend :: Translate c m a b -> Translate c m a b -> Translate c m a b
+   mappend = liftM2 mappend
+
 ------------------------------------------------------------------------------------------
 
 -- | A 'Lens' is a way to focus in on a particular point in a structure
@@ -195,12 +205,12 @@ pureL f g = lens (\ c a -> return ((c,f a), return . g))
 
 -- | apply a 'Rewrite' at a point specified by a 'Lens'.
 focusR :: Monad m => Lens c m a b -> Rewrite c m b -> Rewrite c m a
-focusR l r = rewrite $ \ c a -> do ((cb,b),kb) <- apply l c a
-                                   apply r cb b >>= kb
+focusR l r = rewrite $ \ c a -> do ((c',b),k) <- apply l c a
+                                   apply r c' b >>= k
 
 -- | apply a 'Translate' at a point specified by a 'Lens'.
 focusT :: Monad m => Lens c m a b -> Translate c m b d -> Translate c m a d
-focusT l t = translate $ \ c a -> do ((cb,b),_) <- apply l c a
-                                     apply t cb b
+focusT l t = translate $ \ c a -> do ((c',b),_) <- apply l c a
+                                     apply t c' b
 
 ------------------------------------------------------------------------------------------
