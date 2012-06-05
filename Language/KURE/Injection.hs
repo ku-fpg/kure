@@ -40,50 +40,50 @@ instance Injection a (Maybe a) where
 
 -------------------------------------------------------------------------------
 
--- | injects a value and lifts it into a 'Monad'.
+-- | Injects a value and lifts it into a 'Monad'.
 injectM :: (Monad m, Injection a a') => a -> m a'
 injectM = return . inject
 
--- | retracts a value and lifts it into a 'MonadPlus', producing 'mzero' if the retraction fails.
+-- | Retracts a value and lifts it into a 'MonadPlus', producing 'mzero' if the retraction fails.
 retractM :: (MonadPlus m, Injection a a') => a' -> m a
 retractM = maybe mzero return . retract
 
 -------------------------------------------------------------------------------
 
--- | lifted 'inject'.
+-- | Lifted 'inject'.
 injectT :: (Monad m, Injection a a') => Translate c m a a'
 injectT = arr inject
 
--- | lifted 'retract', the 'Translate' fails if the retraction fails.
+-- | Lifted 'retract', the 'Translate' fails if the retraction fails.
 retractT :: (MonadPlus m, Injection a a') => Translate c m a' a
 retractT = contextfreeT retractM
 
--- | 'extractT' converts a 'Translate' over an injected value into a 'Translate' over a non-injected value.
+-- | Convert a 'Translate' over an injected value into a 'Translate' over a non-injected value.
 extractT :: (Monad m, Injection a a') => Translate c m a' b -> Translate c m a b
 extractT t = injectT >>> t
 
--- | 'promoteT' promotes a 'Translate' over a value into a 'Translate' over an injection of that value,
+-- | Promote a 'Translate' over a value into a 'Translate' over an injection of that value,
 --   (failing if that injected value cannot be retracted).
 promoteT  :: (MonadPlus m, Injection a a') => Translate c m a b -> Translate c m a' b
 promoteT t = retractT >>> t
 
--- | 'extractR' converts a 'Rewrite' over an injected value into a 'Rewrite' over a retraction of that value,
+-- | Convert a 'Rewrite' over an injected value into a 'Rewrite' over a retraction of that value,
 --   (failing if that injected value cannot be retracted).
 extractR :: (MonadPlus m, Injection a a') => Rewrite c m a' -> Rewrite c m a
 extractR r = injectT >>> r >>> retractT
 
--- | 'promoteR' promotes a 'Rewrite' into over a value into a 'Rewrite' over an injection of that value,
+-- | Promote a 'Rewrite' into over a value into a 'Rewrite' over an injection of that value,
 --   (failing if that injected value cannot be retracted).
 promoteR  :: (MonadPlus m, Injection a a') => Rewrite c m a -> Rewrite c m a'
 promoteR r = retractT >>> r >>> injectT
 
 -------------------------------------------------------------------------------
 
--- | a 'Lens' to the 'Injection' of a value.
+-- | A 'Lens' to the injection of a value.
 injectL  :: (MonadPlus m, Injection a a') => Lens c m a a'
 injectL = lens $ \ c a -> return ((c, inject a), retractM)
 
--- | a 'Lens' to the retraction of a value.
+-- | A 'Lens' to the retraction of a value.
 retractL :: (MonadPlus m, Injection a a') => Lens c m a' a
 retractL = lens $ \ c -> retractM >=> (\ a -> return ((c,a), injectM))
 

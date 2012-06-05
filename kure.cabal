@@ -2,14 +2,14 @@ Name:                kure
 Version:             1.8.5
 Synopsis:            Combinators for Strategic Programming
 Description:	     KURE is a DSL for building rewriting DSLs.
-	 	     KURE shares combinator names and concepts with Stratego, but unlike Stratego, KURE is strongly typed.
+	 	     KURE shares concepts with Stratego, but unlike Stratego, KURE is strongly typed.
 		     KURE is similar to Strafunski, but has a lightweight generic traversal mechanism using type families
 		     rather than SYB.
 
 Category:            Language
 License:             BSD3
 License-file:        LICENSE
-Author:              Andy Gill and Neil Sculthorpe
+Author:              Neil Sculthorpe and Andy Gill
 Maintainer:          Neil Sculthorpe <neil@ittc.ku.edu>
 Copyright:           (c) 2006-2012 The University of Kansas
 Homepage:            http://www.ittc.ku.edu/csdl/fpg/Tools/KURE

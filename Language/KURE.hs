@@ -11,9 +11,9 @@
 -- Note that Injection and Utilities are not exported here, but can be imported seperately.
 
 module Language.KURE
-	( module Language.KURE.Combinators
-        , module Language.KURE.Translate
+	( module Language.KURE.Translate
 	, module Language.KURE.Walker
+        , module Language.KURE.Combinators
 ) where
 
 import Language.KURE.Combinators

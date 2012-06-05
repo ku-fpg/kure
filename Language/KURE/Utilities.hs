@@ -42,7 +42,7 @@ childLgeneric n c a = (liftM.second.result.liftM) inject $ apply (childL n) c a
 -------------------------------------------------------------------------------
 
 -- | These are useful when defining congruence combinators that succeed if any child rewrite succeeds.
---   As well as being generally useful, such combinators are helpful when defining "anyR" instances.
+--   As well as being generally useful, such combinators are helpful when defining 'anyR' instances.
 --   See the "lam" or "expr" examples, or the HERMIT package.
 
 attemptAny2 :: Monad m => (a1 -> a2 -> r) -> m (Bool,a1) -> m (Bool,a2) -> m r
@@ -83,11 +83,13 @@ missingChildL n = fail ("There is no child number " ++ show n ++ ".")
 -- | These functions are helpful when defining 'childL' instances in combination with congruence combinators.
 --   See the "lam" and "expr" examples, or the HERMIT package.
 --   Unfortunately they increase quadratically with the number of fields of the constructor.
---   It would be nice if they were further expanded to include the calls of idR and exposeT;
+--   It would be nice if they were further expanded to include the calls of 'idR' and 'exposeT';
 --   however this would create a plethora of additional cases as the number (and positions)
 --   of interesting children would be additional dimensions.
 --   Note that the numbering scheme MofN is that N is the number of children (including uninteresting children)
 --   and M is the index of the chosen child, starting with index 0.  Thus M ranges from 0 to (n-1).
+--   TO DO: use Template Haskell to generate these.
+--   In the mean time, if you need a few more than provided here, drop me an email and I'll add them.
 
 childLaux :: (MonadPlus m, Term b) => (c,b) -> (b -> a) -> ((c, Generic b), Generic b -> m a)
 childLaux cb g = (second inject cb, liftM (inject.g) . retractM)
@@ -127,7 +129,7 @@ childLMofN m f cbs = childLaux (cbs !! m) (\ b' -> f $ atIndex m (const b') (map
 
 -------------------------------------------------------------------------------
 
--- | modify the value in a list at specified index.
+-- | Modify the value in a list at specified index.
 atIndex :: Int -> (a -> a) -> [a] -> [a]
 atIndex i f as = [ if n == i then f a else a
                  | (a,n) <- zip as [0..]
