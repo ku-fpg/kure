@@ -9,12 +9,12 @@
 -- Stability: alpha
 -- Portability: ghc
 --
--- This module provides various monadic and arrow combinators that are particularly useful for
--- the 'Translate' 'Monad'/'Arrow'.
+-- This module provides various monadic and arrow combinators that are particularly useful when
+-- working with translations.
 -- Note that these combinators assume that 'mplus' behaves as a catch, for both 'fail' and 'mzero'.
 
 module Language.KURE.Combinators
-           ( -- | 'Monad' combinators
+           ( -- * Monad Combinators
              guardFail
            , condM
            , whenM
@@ -23,7 +23,8 @@ module Language.KURE.Combinators
            , attemptM
            , testM
            , notM
-             -- | 'Arrow' combinators
+             -- * Arrow Combinators
+             -- | The names 'result' and 'argument' are taken from Conal Elliott's semantic editor combinators.
            , result
            , argument
            , idR
@@ -84,8 +85,6 @@ notM :: MonadPlus m => m a -> m ()
 notM ma = attemptM ma >>= maybe (return ()) (const mzero)
 
 ------------------------------------------------------------------------------------------
-
--- | These two names taken from Conal Elliott's semantic editor combinators.
 
 -- | Apply a pure function to the result of an 'Arrow'.
 result :: Arrow (~>) => (b -> c) -> (a ~> b) -> (a ~> c)

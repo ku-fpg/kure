@@ -10,7 +10,36 @@
 -- This module contains several utility functions that can be useful to users of KURE,
 -- when definining instances of the KURE classes.
 
-module Language.KURE.Utilities where
+module Language.KURE.Utilities
+       ( -- * Generic Combinators
+         -- $genericdoc
+         allTgeneric
+       , allRgeneric
+       , anyRgeneric
+       , childLgeneric
+         -- * Attempt Combinators
+         -- $attemptdoc
+       , attemptAny2
+       , attemptAny3
+       , attemptAnyN
+       , attemptAny1N
+         -- * Error Messages
+       , missingChildL
+         -- * Child Combinators
+         -- $childLdoc
+       , childLaux
+       , childL0of1
+       , childL0of2
+       , childL1of2
+       , childL0of3
+       , childL1of3
+       , childL2of3
+       , childL0of4
+       , childL1of4
+       , childL2of4
+       , childL3of4
+       , childLMofN
+) where
 
 import Control.Monad
 import Control.Arrow
@@ -24,8 +53,9 @@ import Language.KURE.Injection
 
 -------------------------------------------------------------------------------
 
--- | These functions are to aid with defining 'Walker' instances for the 'Generic' type.
---   See the "expr" example.
+-- $genericdoc
+-- These functions are to aid with defining 'Walker' instances for the 'Generic' type.
+-- See the \"Expr\" example.
 
 allTgeneric :: (Walker c m a, Monoid b) => Translate c m (Generic a) b -> c -> a -> m b
 allTgeneric t c a = inject `liftM` apply (allT t) c a
@@ -41,9 +71,10 @@ childLgeneric n c a = (liftM.second.result.liftM) inject $ apply (childL n) c a
 
 -------------------------------------------------------------------------------
 
--- | These are useful when defining congruence combinators that succeed if any child rewrite succeeds.
---   As well as being generally useful, such combinators are helpful when defining 'anyR' instances.
---   See the "lam" or "expr" examples, or the HERMIT package.
+-- $attemptdoc
+-- These are useful when defining congruence combinators that succeed if any child rewrite succeeds.
+-- As well as being generally useful, such combinators are helpful when defining 'anyR' instances.
+-- See the \"Lam\" or \"Expr\" examples, or the HERMIT package.
 
 attemptAny2 :: Monad m => (a1 -> a2 -> r) -> m (Bool,a1) -> m (Bool,a2) -> m r
 attemptAny2 f mba1 mba2 = do (b1,a1) <- mba1
@@ -60,13 +91,13 @@ attemptAny3 f mba1 mba2 mba3 = do (b1,a1) <- mba1
                                    then return (f a1 a2 a3)
                                    else fail "failed for all three children."
 
-attemptAnyN :: (Functor m, Monad m) => ([a] -> b) -> [m (Bool,a)] -> m b
+attemptAnyN :: Monad m => ([a] -> b) -> [m (Bool,a)] -> m b
 attemptAnyN f mbas = do (bs,as) <- unzip `liftM` sequence mbas
                         if or bs
                          then return (f as)
                          else fail ("failed for all " ++ show (length bs) ++ " children.")
 
-attemptAny1N :: (Functor m, Monad m) => (a1 -> [a2] -> r) -> m (Bool,a1) -> [m (Bool,a2)] -> m r
+attemptAny1N :: Monad m => (a1 -> [a2] -> r) -> m (Bool,a1) -> [m (Bool,a2)] -> m r
 attemptAny1N f mba mbas = do (b ,a)  <- mba
                              (bs,as) <- unzip `liftM` sequence mbas
                              if or (b:bs)
@@ -75,21 +106,28 @@ attemptAny1N f mba mbas = do (b ,a)  <- mba
 
 -------------------------------------------------------------------------------
 
+-- | A failing 'Lens' with a standard error message for when the child index is out of bounds.
+
 missingChildL :: Monad m => Int -> Lens c m a b
 missingChildL n = fail ("There is no child number " ++ show n ++ ".")
 
 -------------------------------------------------------------------------------
 
--- | These functions are helpful when defining 'childL' instances in combination with congruence combinators.
---   See the "lam" and "expr" examples, or the HERMIT package.
---   Unfortunately they increase quadratically with the number of fields of the constructor.
---   It would be nice if they were further expanded to include the calls of 'idR' and 'exposeT';
---   however this would create a plethora of additional cases as the number (and positions)
---   of interesting children would be additional dimensions.
---   Note that the numbering scheme MofN is that N is the number of children (including uninteresting children)
---   and M is the index of the chosen child, starting with index 0.  Thus M ranges from 0 to (n-1).
---   TO DO: use Template Haskell to generate these.
---   In the mean time, if you need a few more than provided here, drop me an email and I'll add them.
+-- $childLdoc
+-- These functions are helpful when defining 'childL' instances in combination with congruence combinators.
+-- See the \"Lam\" and \"Expr\" examples, or the HERMIT package.
+--
+-- Unfortunately they increase quadratically with the number of fields of the constructor.
+-- It would be nice if they were further expanded to include the calls of 'idR' and 'exposeT';
+-- however this would create a plethora of additional cases as the number (and positions)
+-- of interesting children would be additional dimensions.
+--
+-- Note that the numbering scheme MofN is that N is the number of children (including uninteresting children)
+-- and M is the index of the chosen child, starting with index 0.  Thus M ranges from 0 to (n-1).
+--
+-- TO DO: use Template Haskell to generate these.
+--
+-- In the mean time, if you need a few more than provided here, drop me an email and I'll add them.
 
 childLaux :: (MonadPlus m, Term b) => (c,b) -> (b -> a) -> ((c, Generic b), Generic b -> m a)
 childLaux cb g = (second inject cb, liftM (inject.g) . retractM)

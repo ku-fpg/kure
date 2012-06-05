@@ -11,10 +11,27 @@
 --
 -- This module provides a type class for injective functions (and their retractions),
 -- and some useful interactions with 'Translate'.
--- A particularly useful instance of Injection is from @a@ to 'Generic' @a@,
+--
+-- A particularly useful instance of 'Injection' is from @a@ to 'Generic' @a@,
 -- and that case is the primary purpose of most of these combinators.
 
-module Language.KURE.Injection where
+module Language.KURE.Injection
+       ( -- * Injection Class
+         Injection(..)
+       -- * Monad Injections
+       , injectM
+       , retractM
+       -- * Translate Injections
+       , injectT
+       , retractT
+       , extractT
+       , promoteT
+       , extractR
+       , promoteR
+       -- * Lens Injections
+       , injectL
+       , retractL
+) where
 
 import Control.Monad
 import Control.Arrow
@@ -24,7 +41,10 @@ import Language.KURE.Translate
 -------------------------------------------------------------------------------
 
 -- | A class of injective functions from @a@ to @b@, and their retractions.
---   The following law is expected to hold:  retract (inject a) == Just a
+--   The following law is expected to hold:
+--
+-- > retract (inject a) == Just a
+
 class Injection a b where
   inject  :: a -> b
   retract :: b -> Maybe a

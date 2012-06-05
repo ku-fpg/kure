@@ -1,10 +1,14 @@
 Name:                kure
 Version:             1.8.5
 Synopsis:            Combinators for Strategic Programming
-Description:	     KURE is a DSL for building rewriting DSLs.
+Description:	     The Kansas University Rewrite Engine (KURE) is a DSL for strategic rewriting.
 	 	     KURE shares concepts with Stratego, but unlike Stratego, KURE is strongly typed.
-		     KURE is similar to Strafunski, but has a lightweight generic traversal mechanism using type families
+		     KURE is similar to StrategyLib, but has a lightweight generic traversal mechanism using type families
 		     rather than SYB.
+                     The basic transformation functionality can be found in "Language.KURE.Translate",
+                     and  the traversal functionality can be found in "Language.KURE.Walker".
+                     Several basic examples of using KURE are provided in the source-code bundle.
+                     For a larger example, see the HERMIT package.
 
 Category:            Language
 License:             BSD3

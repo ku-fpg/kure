@@ -10,22 +10,24 @@
 -- This module defines the main KURE types: 'Translate', 'Rewrite' and 'Lens'.
 -- 'Rewrite' and 'Lens' are just special cases of 'Translate', and so any function that operates on 'Translate' is also
 -- applicable to 'Rewrite' and 'Lens' (although care should be taken in the 'Lens' case).
+--
 -- This module also contains 'Translate' instance declarations for the 'Monad' and 'Arrow' type-class families.
 -- Given these instances, many of the desirable combinators over 'Translate' and 'Rewrite' are special cases
 -- of existing monadic or arrow combinators.
--- The Combinators module provides some additional combinators that aren't in the standard libraries.
+-- "Language.KURE.Combinators" provides some additional combinators that aren't in the standard libraries.
 
 module Language.KURE.Translate
-       (  -- | Translations
-          Translate, Rewrite
-        , translate, rewrite
-        , apply
+       (  -- * Translations
+          Translate(..)
+        , Rewrite
+        , translate
+        , rewrite
         , contextfreeT
         , constT
         , contextT
         , exposeT
         , mapT
-          -- | Lenses
+          -- * Lenses
         , Lens
         , lens
         , idL
@@ -48,7 +50,8 @@ import Data.Monoid
 ------------------------------------------------------------------------------------------
 
 -- | 'Translate' is a translation or strategy that translates from a value in a context to a monadic value.
-data Translate c m a b = Translate {apply :: c -> a -> m b}
+data Translate c m a b = Translate { -- | Apply a 'Translate' to a value and its context.
+                                     apply :: c -> a -> m b}
 
 -- | A 'Rewrite' is a 'Translate' that shares the same source and target type.
 type Rewrite c m a = Translate c m a a

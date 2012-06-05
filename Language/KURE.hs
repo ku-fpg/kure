@@ -8,7 +8,11 @@
 -- Portability: ghc
 --
 -- This is the main import module for KURE, which exports all the major components.
--- Note that Injection and Utilities are not exported here, but can be imported seperately.
+-- The basic transformation functionality can be found in "Language.KURE.Translate",
+-- and the traversal functionality can be found in "Language.KURE.Walker".
+--
+-- Note that "Language.KURE.Injection" and "Language.KURE.Utilities" are not exported here, but can be imported seperately.
+
 
 module Language.KURE
 	( module Language.KURE.Translate
