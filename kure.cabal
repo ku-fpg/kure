@@ -22,19 +22,19 @@ build-type: 	     Simple
 Cabal-Version:       >= 1.6
 Extra-Source-Files:
     examples/Examples.hs
-    examples/Fib/Fib.hs
-    examples/Fib/FibKure.hs
-    examples/Fib/FibExamples.hs
-    examples/Lam/Lam.hs
-    examples/Lam/LamKure.hs
-    examples/Lam/LamExamples.hs
-    examples/Expr/Expr.hs
-    examples/Expr/ExprKure.hs
-    examples/Expr/ExprExamples.hs
+    examples/Fib/AST.hs
+    examples/Fib/Kure.hs
+    examples/Fib/Examples.hs
+    examples/Lam/AST.hs
+    examples/Lam/Kure.hs
+    examples/Lam/Examples.hs
+    examples/Expr/AST.hs
+    examples/Expr/Kure.hs
+    examples/Expr/Examples.hs
 
 Library
   Build-Depends: base >= 4.2
-  Ghc-Options:     -O2
+  Ghc-Options: -Wall
   Exposed-modules:
        Language.KURE
        Language.KURE.Combinators
@@ -43,7 +43,6 @@ Library
        Language.KURE.Walker
        Language.KURE.Utilities
 
-  Ghc-Options:  -Wall
 
 
 
