@@ -75,16 +75,16 @@ constT :: m b -> Translate c m a b
 constT = contextfreeT . const
 
 -- | Extract the current context.
-contextT :: Applicative m => Translate c m a c
-contextT = translate (\ c _ -> pure c)
+contextT :: Monad m => Translate c m a c
+contextT = translate (\ c _ -> return c)
 
 -- | Expose the current context and value.
-exposeT :: Applicative m => Translate c m a (c,a)
-exposeT = translate (\ c a -> pure (c,a))
+exposeT :: Monad m => Translate c m a (c,a)
+exposeT = translate (curry return)
 
 -- | Map a 'Translate' over a list.
 mapT :: Monad m => Translate c m a b -> Translate c m [a] [b]
-mapT t = translate $ \ c -> mapM (apply t c)
+mapT t = translate (mapM . apply t)
 
 ------------------------------------------------------------------------------------------
 
@@ -178,10 +178,10 @@ instance (Monad m, Monoid b) => Monoid (Translate c m a b) where
 ------------------------------------------------------------------------------------------
 
 -- | A 'Lens' is a way to focus in on a particular point in a structure.
-type Lens c m a b = Translate c m a ((c,b), (b -> m a))
+type Lens c m a b = Translate c m a ((c,b), b -> m a)
 
 -- | 'lens' is the primitive way of building a 'Lens'.
-lens :: (c -> a -> m ((c,b), (b -> m a))) -> Lens c m a b
+lens :: (c -> a -> m ((c,b), b -> m a)) -> Lens c m a b
 lens = translate
 
 -- | Identity 'Lens'.

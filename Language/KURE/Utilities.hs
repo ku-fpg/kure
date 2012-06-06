@@ -87,7 +87,7 @@ attemptAny3 :: Monad m => (a1 -> a2 -> a3 -> r) -> m (Bool,a1) -> m (Bool,a2) ->
 attemptAny3 f mba1 mba2 mba3 = do (b1,a1) <- mba1
                                   (b2,a2) <- mba2
                                   (b3,a3) <- mba3
-                                  if or [b1,b2,b3]
+                                  if b1 || b2 || b3
                                    then return (f a1 a2 a3)
                                    else fail "failed for all three children."
 

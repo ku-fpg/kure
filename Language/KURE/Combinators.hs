@@ -53,7 +53,7 @@ infixl 3 <+, >+>
 
 -- | Similar to 'guard', but using 'fail' rather than 'mzero'.
 guardFail ::  Monad m => Bool -> String -> m ()
-guardFail b msg = if b then return () else fail msg
+guardFail b msg = unless b (fail msg)
 
 -- | if-then-else lifted over a 'Monad'.
 condM ::  Monad m => m Bool -> m a -> m a -> m a
