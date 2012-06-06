@@ -2,11 +2,11 @@
 
 -- |
 -- Module: Language.KURE.Injection
--- Copyright: (c) 2006-2012 The University of Kansas
+-- Copyright: (c) 2012 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
--- Stability: alpha
+-- Stability: beta
 -- Portability: ghc
 --
 -- This module provides a type class for injective functions (and their retractions),

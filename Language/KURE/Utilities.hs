@@ -1,10 +1,10 @@
 -- |
 -- Module: Language.KURE.Utilities
--- Copyright: (c) 2006-2012 The University of Kansas
+-- Copyright: (c) 2012 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
--- Stability: alpha
+-- Stability: beta
 -- Portability: ghc
 --
 -- This module contains several utility functions that can be useful to users of KURE,

@@ -1,5 +1,5 @@
 Name:                kure
-Version:             1.8.5
+Version:             2.0.0
 Synopsis:            Combinators for Strategic Programming
 Description:	     The Kansas University Rewrite Engine (KURE) is a DSL for strategic rewriting.
 	 	     KURE shares concepts with Stratego, but unlike Stratego, KURE is strongly typed.
@@ -15,9 +15,9 @@ License:             BSD3
 License-file:        LICENSE
 Author:              Neil Sculthorpe and Andy Gill
 Maintainer:          Neil Sculthorpe <neil@ittc.ku.edu>
-Copyright:           (c) 2006-2012 The University of Kansas
+Copyright:           (c) 2012 The University of Kansas
 Homepage:            http://www.ittc.ku.edu/csdl/fpg/Tools/KURE
-Stability:	     alpha
+Stability:	     beta
 build-type: 	     Simple
 Cabal-Version:       >= 1.6
 Extra-Source-Files:
