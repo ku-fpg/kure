@@ -88,11 +88,13 @@ mapT t = translate (mapM . apply t)
 
 ------------------------------------------------------------------------------------------
 
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Functor m => Functor (Translate c m a) where
 
 -- fmap :: (b -> d) -> Translate c m a b -> Translate c m a d
    fmap f t = translate (\ c -> fmap f . apply t c)
 
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Applicative m => Applicative (Translate c m a) where
 
 -- pure :: b -> Translate c m a b
@@ -101,6 +103,7 @@ instance Applicative m => Applicative (Translate c m a) where
 -- (<*>) :: Translate c m a (b -> d) -> Translate c m a b -> Translate c m a d
    tf <*> tb = translate (\ c a -> apply tf c a <*> apply tb c a)
 
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Alternative m => Alternative (Translate c m a) where
 
 -- empty :: Translate c m a b
@@ -109,6 +112,7 @@ instance Alternative m => Alternative (Translate c m a) where
 -- (<|>) :: Translate c m a b -> Translate c m a b -> Translate c m a b
    t1 <|> t2 = translate $ \ c a -> apply t1 c a <|> apply t2 c a
 
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Monad m => Monad (Translate c m a) where
 
 -- return :: b -> Translate c m a b
@@ -121,6 +125,7 @@ instance Monad m => Monad (Translate c m a) where
 -- fail :: String -> Translate c m a b
    fail = constT . fail
 
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadPlus m => MonadPlus (Translate c m a) where
 
 -- mzero :: Translate c m a b
@@ -129,6 +134,7 @@ instance MonadPlus m => MonadPlus (Translate c m a) where
 -- mplus :: Translate c m a b -> Translate c m a b -> Translate c m a b
    mplus t1 t2 = translate $ \ c a -> apply t1 c a `mplus` apply t2 c a
 
+-- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance Monad m => Category (Translate c m) where
 
 --  id :: Translate c m a a
@@ -137,6 +143,7 @@ instance Monad m => Category (Translate c m) where
 --  (.) :: Translate c m b d -> Translate c m a b -> Translate c m a d
     t2 . t1 = translate $ \ c -> apply t1 c >=> apply t2 c
 
+-- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance Monad m => Arrow (Translate c m) where
 
 -- arr :: (a -> b) -> Translate c m a b
@@ -151,22 +158,25 @@ instance Monad m => Arrow (Translate c m) where
 -- (&&&) :: Translate c m a b1 -> Translate c m a b2 -> Translate c m a (b1,b2)
    t1 &&& t2 = translate $ \ c a -> liftM2 (,) (apply t1 c a) (apply t2 c a)
 
+-- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance MonadPlus m => ArrowZero (Translate c m) where
 
 -- zeroArrow :: Translate c m a b
    zeroArrow = mzero
 
+-- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance MonadPlus m => ArrowPlus (Translate c m) where
 
 -- (<+>) :: Translate c m a b -> Translate c m a b -> Translate c m a b
    (<+>) = mplus
 
+-- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance Monad m => ArrowApply (Translate c m) where
 
 -- app :: Translate c m (Translate c m a b, a) b
    app = translate $ \ c (t,a) -> apply t c a
 
-
+-- | Lifting through the 'Monad' and a Reader transformer, where (c,a) is the read-only environment.
 instance (Monad m, Monoid b) => Monoid (Translate c m a b) where
 
 -- mempty :: Translate c m a b
