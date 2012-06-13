@@ -154,7 +154,7 @@ instance Monad m => Arrow (Translate c m) where
 -- arr :: (a -> b) -> Translate c m a b
    arr f = contextfreeT (return . f)
 
--- first :: (a -> b) -> Translate c m (a,z) (b,z)
+-- first :: Translate c m a b -> Translate c m (a,z) (b,z)
    first t = translate $ \ c (a,z) -> liftM (\b -> (b,z)) (apply t c a)
 
 -- (***) :: Translate c m a1 b1 -> Translate c m a2 b2 -> Translate c m (a1,a2) (b1,b2)
