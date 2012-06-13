@@ -27,6 +27,7 @@ module Language.KURE.Translate
         , contextT
         , exposeT
         , mapT
+        , sideEffectR
           -- * Lenses
         , Lens
         , lens
@@ -37,7 +38,6 @@ module Language.KURE.Translate
         , pureL
         , focusR
         , focusT
-        , sideEffectR
 
 ) where
 
@@ -88,8 +88,8 @@ mapT :: Monad m => Translate c m a b -> Translate c m [a] [b]
 mapT t = translate (mapM . apply t)
 
 -- | An identity 'Rewrite' with side-effects.
-sideEffectR :: Monad m => m x -> Rewrite c m a
-sideEffectR mx = constT mx >> id
+sideEffectR :: Monad m => (c -> a -> m ()) -> Rewrite c m a
+sideEffectR f = translate f >> id
 
 ------------------------------------------------------------------------------------------
 
