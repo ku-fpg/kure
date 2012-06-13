@@ -24,11 +24,10 @@ module Language.KURE.Combinators
            , testM
            , notM
              -- * Arrow Combinators
-             -- | The names 'result' and 'argument' are taken from Conal Elliott's semantic editor combinators.
-           , result
-           , argument
+             -- ** Synonyms
            , idR
            , (<+)
+             -- ** Combinators
            , readerR
            , acceptR
            , tryR
@@ -38,6 +37,18 @@ module Language.KURE.Combinators
            , (>+>)
            , orR
            , andR
+             -- ** Basic Routing
+             -- | The names 'result' and 'argument' are taken from Conal Elliott's semantic editor combinators.
+           , result
+           , argument
+           , fstR
+           , sndR
+           , toFst
+           , toSnd
+           , swap
+           , fork
+           , forkFirst
+           , forkSecond
 ) where
 
 import Prelude hiding (id , (.))
@@ -86,16 +97,6 @@ notM ma = attemptM ma >>= maybe (return ()) (const mzero)
 
 ------------------------------------------------------------------------------------------
 
--- | Apply a pure function to the result of an 'Arrow'.
-result :: Arrow (~>) => (b -> c) -> (a ~> b) -> (a ~> c)
-result f a = a >>^ f
-
--- | Apply a pure function to the argument to an 'Arrow'.
-argument :: Arrow (~>) => (a -> b) -> (b ~> c) -> (a ~> c)
-argument f a = f ^>> a
-
--------------------------------------------------------------------------------
-
 -- | Synonym for 'id'.
 idR :: Category (~>) => (a ~> a)
 idR = id
@@ -139,7 +140,49 @@ orR :: (ArrowZero (~>), ArrowPlus (~>), ArrowApply (~>)) => [a ~> a] -> (a ~> a)
 orR = foldl (>+>) zeroArrow
 
 -- | Sequence a list of 'Arrow's, succeeding if they all succeed.
-andR :: Arrow (~>) => [a ~> a] -> (a ~> a)
+andR :: Category (~>) => [a ~> a] -> (a ~> a)
 andR = foldl (>>>) id
+
+------------------------------------------------------------------------------------------
+
+-- | Apply a pure function to the result of an 'Arrow'.
+result :: Arrow (~>) => (b -> c) -> (a ~> b) -> (a ~> c)
+result f a = a >>^ f
+
+-- | Apply a pure function to the argument to an 'Arrow'.
+argument :: Arrow (~>) => (a -> b) -> (b ~> c) -> (a ~> c)
+argument f a = f ^>> a
+
+-- | A pure 'Arrow' that projects the first element of a pair.
+fstR :: Arrow (~>) => ((a,b) ~> a)
+fstR = arr fst
+
+-- | A pure 'Arrow' that projects the second element of a pair.
+sndR :: Arrow (~>) => ((a,b) ~> b)
+sndR = arr snd
+
+-- | Apply an 'Arrow' to the first element of a pair, discarding the second element.
+toFst :: Arrow (~>) => (a ~> b) -> ((a,x) ~> b)
+toFst f = fstR >>> f
+
+-- | Apply an 'Arrow' to the second element of a pair, discarding the first element.
+toSnd :: Arrow (~>) => (a ~> b) -> ((x,a) ~> b)
+toSnd f = sndR >>> f
+
+-- | A pure 'Arrow' that swaps the elements of a pair.
+swap :: Arrow (~>) => ((a,b) ~> (b,a))
+swap = arr (\(a,b) -> (b,a))
+
+-- | A pure 'Arrow' that duplicates its argument.
+fork :: Arrow (~>) => (a ~> (a,a))
+fork = arr (\a -> (a,a))
+
+-- | Tag the result of an 'Arrow' with its argument.
+forkFirst :: Arrow (~>) => (a ~> b) -> (a ~> (b , a))
+forkFirst sf = fork >>> first sf
+
+-- | Tag the result of an 'Arrow' with its argument.
+forkSecond :: Arrow (~>) => (a ~> b) -> (a ~> (a , b))
+forkSecond sf = fork >>> second sf
 
 -------------------------------------------------------------------------------
