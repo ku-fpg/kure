@@ -17,9 +17,11 @@
 module Language.KURE
 	( module Language.KURE.Translate
 	, module Language.KURE.Walker
+        , module Language.KURE.CategoryPlus
         , module Language.KURE.Combinators
 ) where
 
+import Language.KURE.CategoryPlus
 import Language.KURE.Combinators
 import Language.KURE.Translate
 import Language.KURE.Walker

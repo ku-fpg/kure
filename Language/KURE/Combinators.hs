@@ -24,10 +24,8 @@ module Language.KURE.Combinators
            , testM
            , notM
              -- * Arrow Combinators
-             -- ** Synonyms
-           , idR
-           , (<+)
              -- ** Combinators
+           , idR
            , readerR
            , acceptR
            , tryR
@@ -57,8 +55,9 @@ import Control.Category
 import Control.Arrow
 import Data.Maybe (isJust)
 import Data.Monoid
+import Language.KURE.CategoryPlus
 
-infixl 3 <+, >+>
+infixl 3 >+>
 
 ------------------------------------------------------------------------------------------
 
@@ -101,10 +100,6 @@ notM ma = attemptM ma >>= maybe (return ()) (const mzero)
 idR :: Category (~>) => (a ~> a)
 idR = id
 
--- | Synonym for '<+>'.
-(<+) :: ArrowPlus (~>) => (a ~> b) -> (a ~> b) -> (a ~> b)
-(<+) = (<+>)
-
 -- | Look at the argument to the 'Arrow' before choosing which 'Arrow' to use.
 readerR :: ArrowApply (~>) => (a -> (a ~> b)) -> (a ~> b)
 readerR f = (f &&& id) ^>> app
@@ -114,8 +109,8 @@ acceptR :: (ArrowZero (~>), ArrowApply (~>)) => (a -> Bool) -> (a ~> a)
 acceptR p = readerR $ \ a -> if p a then id else zeroArrow
 
 -- | Catch a failing 'ArrowPlus', making it into an identity.
-tryR :: ArrowPlus (~>) => (a ~> a) -> (a ~> a)
-tryR r = r <+> id
+tryR :: CategoryPlus (~>) => (a ~> a) -> (a ~> a)
+tryR r = r <+ id
 
 -- | Catch a failing 'ArrowPlus', making it succeed with a Boolean flag.
 --   Useful when defining 'anyR' instances.
@@ -128,15 +123,15 @@ changedR r = readerR (\ a -> r >>> acceptR (/=a))
 
 -- | Repeat an 'ArrowPlus' until it fails, then return the result before the failure.
 --   Requires at least the first attempt to succeed.
-repeatR :: ArrowPlus (~>) => (a ~> a) -> (a ~> a)
+repeatR :: CategoryPlus (~>) => (a ~> a) -> (a ~> a)
 repeatR r = r >>> tryR (repeatR r)
 
--- | Attempts two 'Arrows's in sequence, succeeding if one or both succeed.
-(>+>) :: (ArrowPlus (~>), ArrowApply (~>)) => (a ~> a) -> (a ~> a) -> (a ~> a)
+-- | Attempts two 'Arrow's in sequence, succeeding if one or both succeed.
+(>+>) :: (CategoryPlus (~>), ArrowPlus (~>), ArrowApply (~>)) => (a ~> a) -> (a ~> a) -> (a ~> a)
 r1 >+> r2 = attemptR r1 >>> readerR (\ (b,_) -> snd ^>> if b then tryR r2 else r2)
 
 -- | Sequence a list of 'Arrow's, succeeding if any succeed.
-orR :: (ArrowZero (~>), ArrowPlus (~>), ArrowApply (~>)) => [a ~> a] -> (a ~> a)
+orR :: (CategoryPlus (~>), ArrowPlus (~>), ArrowApply (~>)) => [a ~> a] -> (a ~> a)
 orR = foldl (>+>) zeroArrow
 
 -- | Sequence a list of 'Arrow's, succeeding if they all succeed.

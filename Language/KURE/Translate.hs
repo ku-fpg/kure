@@ -18,7 +18,7 @@
 
 module Language.KURE.Translate
        (  -- * Translations
-          Translate(..)
+          Translate(apply)
         , Rewrite
         , translate
         , rewrite
@@ -30,11 +30,11 @@ module Language.KURE.Translate
         , sideEffectR
           -- * Lenses
         , Lens
+        , applyL
+        , translateL
         , lens
-        , idL
-        , tryL
-        , composeL
-        , sequenceL
+        , testL
+        , transLens
         , pureL
         , focusR
         , focusT
@@ -47,6 +47,8 @@ import Control.Monad
 import Control.Category
 import Control.Arrow
 import Data.Monoid
+import Language.KURE.CategoryPlus
+import Language.KURE.Combinators
 
 ------------------------------------------------------------------------------------------
 
@@ -139,6 +141,8 @@ instance MonadPlus m => MonadPlus (Translate c m a) where
 -- mplus :: Translate c m a b -> Translate c m a b -> Translate c m a b
    mplus t1 t2 = translate $ \ c a -> apply t1 c a `mplus` apply t2 c a
 
+------------------------------------------------------------------------------------------
+
 -- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance Monad m => Category (Translate c m) where
 
@@ -147,6 +151,19 @@ instance Monad m => Category (Translate c m) where
 
 --  (.) :: Translate c m b d -> Translate c m a b -> Translate c m a d
     t2 . t1 = translate $ \ c -> apply t1 c >=> apply t2 c
+
+-- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
+instance MonadPlus m => CategoryZero (Translate c m) where
+
+-- czero :: Translate c m a b
+   czero = mzero
+
+-- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
+instance MonadPlus m => CategoryPlus (Translate c m) where
+
+-- (<+) :: Translate c m a b -> Translate c m a b -> Translate c m a b
+   (<+) = mplus
+
 
 -- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance Monad m => Arrow (Translate c m) where
@@ -181,6 +198,8 @@ instance Monad m => ArrowApply (Translate c m) where
 -- app :: Translate c m (Translate c m a b, a) b
    app = translate $ \ c (t,a) -> apply t c a
 
+------------------------------------------------------------------------------------------
+
 -- | Lifting through the 'Monad' and a Reader transformer, where (c,a) is the read-only environment.
 instance (Monad m, Monoid b) => Monoid (Translate c m a b) where
 
@@ -192,30 +211,60 @@ instance (Monad m, Monoid b) => Monoid (Translate c m a b) where
 
 ------------------------------------------------------------------------------------------
 
--- | A 'Lens' is a way to focus in on a particular point in a structure.
-type Lens c m a b = Translate c m a ((c,b), b -> m a)
+-- | A 'Lens' is a way to focus on a particular point in a structure.
+newtype Lens c m a b = Lens {lensT :: Translate c m a ((c,b), b -> m a)}
 
--- | 'lens' is the primitive way of building a 'Lens'.
+-- | Apply a 'Lens' to a context and value.
+applyL :: Lens c m a b -> c -> a -> m ((c,b), b -> m a)
+applyL = apply . lensT
+
+-- | The primitive way of building a 'Lens'.
+--   If the unfocussing function is applied to the value focussed on then it should succeed,
+--   and produce the same @a@ value as the argument.
+translateL :: Translate c m a ((c,b), b -> m a) -> Lens c m a b
+translateL = Lens
+
+-- | Another way of building a 'Lens', defined as @(translateL . translate)@.
 lens :: (c -> a -> m ((c,b), b -> m a)) -> Lens c m a b
-lens = translate
+lens = translateL . translate
 
--- | Identity 'Lens'.
-idL :: Monad m => Lens c m a a
-idL = lens $ \ c a -> return ((c,a), return)
+-- | Checks if the focusing succeeds, and additionally whether unfocussing from an unchanged value would succeed.
+testL :: MonadPlus m => Lens c m a b -> Translate c m a Bool
+testL (Lens t) = testM $ do ((_,b),k) <- t
+                            constT (k b)
 
--- | Catch a failing endo'Lens', making it into an identity.
-tryL :: MonadPlus m => Lens c m a a -> Lens c m a a
-tryL l = l <+> idL
+-- | Combines a 'Translate' producing a 'Lens' into just a 'Lens'.
+--   Essentially a monadic 'join'.
+transLens :: Monad m => Translate c m a (Lens c m a b) -> Lens c m a b
+transLens tl = translateL (tl >>= lensT)
 
--- | Composition of 'Lens's.
-composeL :: Monad m => Lens c m a b -> Lens c m b d -> Lens c m a d
-composeL l1 l2 = lens $ \ ca a -> do ((cb,b),kb) <- apply l1 ca a
-                                     ((cd,d),kd) <- apply l2 cb b
-                                     return ((cd,d),kd >=> kb)
+instance Monad m => Category (Lens c m) where
 
--- | Sequence a list of endo'Lens's.
-sequenceL :: MonadPlus m => [Lens c m a a] -> Lens c m a a
-sequenceL = foldr composeL idL
+-- id :: Lens c m a a
+   id = lens $ \ c a -> return ((c,a), return)
+
+-- (.) :: Lens c m b d -> Lens c m a b -> Lens c m a d
+   l2 . l1 = lens $ \ ca a -> do ((cb,b),kb) <- applyL l1 ca a
+                                 ((cd,d),kd) <- applyL l2 cb b
+                                 return ((cd,d),kd >=> kb)
+
+-- | The failing 'Lens'.
+instance MonadPlus m => CategoryZero (Lens c m) where
+
+-- czero :: Lens c m a b
+   czero = translateL mzero
+
+
+-- | Catch a failing 'Lens'.  A 'Lens' is deemed to have failed if either it fails on the way down, or,
+--   crucially, if it would fail on the way up for an unchanged value.  However, actual failure on the way up are not caught
+--   (as by then it is too late).  This means that, in theory, a use of (<+) could cause a succeeding 'Lens' application to fail.
+--   But provided |lens| is used correctly, this should never happen.
+
+instance MonadPlus m => CategoryPlus (Lens c m) where
+
+-- (<+) :: Lens c m a b -> Lens c m a b -> Lens c m a b
+   l1 <+ l2 = translateL (condM (testL l1) (lensT l1) (lensT l2))
+
 
 -- | Construct a 'Lens' from two pure functions.
 pureL :: Monad m => (a -> b) -> (b -> a) -> Lens c m a b
@@ -223,12 +272,12 @@ pureL f g = lens (\ c a -> return ((c,f a), return . g))
 
 -- | Apply a 'Rewrite' at a point specified by a 'Lens'.
 focusR :: Monad m => Lens c m a b -> Rewrite c m b -> Rewrite c m a
-focusR l r = rewrite $ \ c a -> do ((c',b),k) <- apply l c a
+focusR l r = rewrite $ \ c a -> do ((c',b),k) <- applyL l c a
                                    apply r c' b >>= k
 
 -- | Apply a 'Translate' at a point specified by a 'Lens'.
 focusT :: Monad m => Lens c m a b -> Translate c m b d -> Translate c m a d
-focusT l t = translate $ \ c a -> do ((c',b),_) <- apply l c a
+focusT l t = translate $ \ c a -> do ((c',b),_) <- applyL l c a
                                      apply t c' b
 
 ------------------------------------------------------------------------------------------

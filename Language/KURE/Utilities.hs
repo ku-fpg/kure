@@ -67,7 +67,7 @@ anyRgeneric :: Walker c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a
 anyRgeneric r c a = inject `liftM` apply (anyR r) c a
 
 childLgeneric :: Walker c m a => Int -> c -> a -> m ((c, Generic a), Generic a -> m (Generic a))
-childLgeneric n c a = (liftM.second.result.liftM) inject $ apply (childL n) c a
+childLgeneric n c a = (liftM.second.result.liftM) inject $ applyL (childL n) c a
 
 -------------------------------------------------------------------------------
 
@@ -109,7 +109,7 @@ attemptAny1N f mba mbas = do (b ,a)  <- mba
 -- | A failing 'Lens' with a standard error message for when the child index is out of bounds.
 
 missingChildL :: Monad m => Int -> Lens c m a b
-missingChildL n = fail ("There is no child number " ++ show n ++ ".")
+missingChildL n = translateL $ fail ("There is no child number " ++ show n ++ ".")
 
 -------------------------------------------------------------------------------
 

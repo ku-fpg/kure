@@ -27,25 +27,47 @@ module Language.KURE.Walker
         , anybuR
         , allduR
         , anyduR
-        , tdpruneR
+        , prunetdR
         , innermostR
 
         -- * Translate Traversals
         , childT
         , foldtdT
         , foldbuT
-        , tdpruneT
+        , prunetdT
         , crushtdT
         , crushbuT
+        , collectT
+        , collectPruneT
 
-        -- * Building Lenses
+        -- * Paths
         , Path
+        , path
+        , AbsolutePath
+        , rootAbsPath
+        , extendAbsPath
+        , ascendAbsPath
+        , PathContext(..)
+        , absPathT
+   --     , abs2pathT
+
+        -- * Building Lenses from Paths
         , pathL
         , exhaustPathL
         , repeatPathL
+        , rootPath
+        , rootL
+        -- * Building Lenses from Predicates
+        , locateT
+        , locatePruneT
+        , locateUniqueT
+        , locatePruneUniqueT
+        , locateOneT
+
 ) where
 
 import Data.Monoid
+import Data.List
 import Control.Monad
 import Control.Arrow
 
@@ -54,6 +76,7 @@ import Language.KURE.Translate
 import Language.KURE.Injection
 
 ------------------------------------------------------------------------------------------
+
 
 -- | A 'Term' is any node in the tree that you wish to be able to traverse.
 
@@ -119,8 +142,8 @@ foldbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) 
 foldbuT t = allT (foldbuT t) `mappend` t
 
 -- | Attempt to apply a 'Translate' in a top-down manner, prunning at successes.
-tdpruneT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-tdpruneT t = t <+> allT (tdpruneT t)
+prunetdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
+prunetdT t = t <+> allT (prunetdT t)
 
 -- | An always successful top-down fold, replacing failures with 'mempty'.
 crushtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
@@ -129,6 +152,14 @@ crushtdT t = foldtdT (mtryM t)
 -- | An always successful bottom-up fold, replacing failures with 'mempty'.
 crushbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
 crushbuT t = foldbuT (mtryM t)
+
+-- | An always successful traversal that collects the results of all successful applications of a 'Translate' in a list.
+collectT :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) [b]
+collectT t = crushtdT (t >>^ (\ b -> [b]))
+
+-- | Like 'collectT', but does not traverse below successes.
+collectPruneT :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) [b]
+collectPruneT t = prunetdT (t >>^ (\ b -> [b]))
 
 -------------------------------------------------------------------------------
 
@@ -159,8 +190,8 @@ anyduR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c 
 anyduR r = r >+> anyR (anyduR r) >+> r
 
 -- | Attempt to apply a 'Rewrite' in a top-down manner, prunning at successful rewrites.
-tdpruneR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-tdpruneR r = r <+> anyR (tdpruneR r)
+prunetdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+prunetdR r = r <+> anyR (prunetdR r)
 
 -- | A fixed-point traveral, starting with the innermost term.
 innermostR :: (Walker c m a, Generic a ~ a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
@@ -168,20 +199,100 @@ innermostR r = anybuR (r >>> tryR (innermostR r))
 
 -------------------------------------------------------------------------------
 
--- | A 'Path' is a list of 'Int's, where each 'Int' specifies which interesting child to descend to at each step.
-type Path = [Int]
+-- | A path is a route to descend the tree from an arbitrary node.
+newtype Path = Path [Int]
+
+instance Show Path where
+  show (Path p) = show p
+
+-- | Build a path from a list of 'Int's, with each 'Int' specifying which interesting child to descend to.
+path :: [Int] -> Path
+path = Path
+
+-- | A path from the root.
+newtype AbsolutePath = AbsolutePath [Int]
+
+instance Show AbsolutePath where
+  show (AbsolutePath p) = show (reverse p)
+
+-- | The (empty) 'AbsolutePath' to the root.
+rootAbsPath :: AbsolutePath
+rootAbsPath = AbsolutePath []
+
+-- | Extend an 'AbsolutePath' by one descent.
+extendAbsPath :: Int -> AbsolutePath -> AbsolutePath
+extendAbsPath n (AbsolutePath p) = AbsolutePath (n : p)
+
+-- | Ascend one step up an 'AbsolutePath', revealing the number of the descent neccassary to restore the path.
+ascendAbsPath :: AbsolutePath -> Maybe (AbsolutePath , Int)
+ascendAbsPath (AbsolutePath [])     = Nothing
+ascendAbsPath (AbsolutePath (n:ns)) = Just (AbsolutePath ns , n)
+
+-- | Contexts that are instances of 'PathContext' contain the current 'AbsolutePath'.
+--   Any user-defined combinators (typically 'childL' and congruence combinators) should update the 'AbsolutePath' using 'extendAbsolutePath'.
+class PathContext c where
+  -- | Find the current path.
+  contextPath :: c -> AbsolutePath
+
+-- | Provided the first 'AbsolutePath' is a prefix of the second 'AbsolutePath',
+--   computes the 'Path' from the end of the first to the end of the second.
+rmPathPrefix :: AbsolutePath -> AbsolutePath -> Maybe Path
+rmPathPrefix (AbsolutePath p1) (AbsolutePath p2) = do guard (p1 `isSuffixOf` p2)
+                                                      return (Path (drop (length p1) (reverse p2)))
+
+-- | Find the 'AbsolutePath' to the current node.
+absPathT :: (PathContext c, Monad m) => Translate c m a AbsolutePath
+absPathT = contextT >>^ contextPath
+
+--  Construct a 'Path' from the current node to the end of the given 'AbsolutePath', provided that 'AbsolutePath' passes through the current node.
+abs2pathT :: (PathContext c, Monad m) => AbsolutePath -> Translate c m a Path
+abs2pathT there = do here <- absPathT
+                     maybe (fail "Absolute path does not pass through current node.") return (rmPathPrefix here there)
+
+-------------------------------------------------------------------------------
 
 -- | Construct a 'Lens' by following a 'Path'.
 pathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
-pathL = sequenceL . map childL
+pathL (Path p) = andR (map childL p)
 
 -- | Construct a 'Lens' that points to the last node at which the 'Path' can be followed.
 exhaustPathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
-exhaustPathL []     = idL
-exhaustPathL (n:ns) = tryL (childL n `composeL` exhaustPathL ns)
+exhaustPathL (Path p) = foldr (\ n l -> tryR (childL n >>> l)) idR p
 
 -- | Repeat as many iterations of the 'Path' as possible.
 repeatPathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
-repeatPathL p = tryL (pathL p `composeL` repeatPathL p)
+repeatPathL p = tryR (pathL p >>> repeatPathL p)
+
+-- | Convert an 'AbsolutePath' into a 'Path' starting at the root.
+rootPath :: AbsolutePath -> Path
+rootPath (AbsolutePath p) = Path (reverse p)
+
+-- | Build a 'Lens' from the root to a point specified by an 'AbsolutePath'.
+rootL :: (Walker c m a, a ~ Generic a) => AbsolutePath -> Lens c m (Generic a) (Generic a)
+rootL = pathL . rootPath
+
+-------------------------------------------------------------------------------
+
+-- | Build a 'Lens' to every descendent node that satisfies the predicate.
+locateT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Lens c m (Generic a) (Generic a)]
+locateT p = collectT (acceptR p >>> absPathT) >>= mapM (liftM pathL . abs2pathT)
+
+-- | Build a 'Lens' to every descendent node that satisfies the predicate, ignoring nodes below successes.
+locatePruneT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Lens c m (Generic a) (Generic a)]
+locatePruneT p = collectPruneT (acceptR p >>> absPathT) >>= mapM (liftM pathL . abs2pathT)
+
+-- | Build a 'Lens' to the descendent node that satisfies the predicate, failing if that does not uniquely identify a node.
+locateUniqueT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Lens c m (Generic a) (Generic a)
+locateUniqueT p = transLens $ do [l] <- locateT p
+                                 return l
+
+-- | Build a 'Lens' to the descendent node that satisfies the predicate, failing if that does not uniquely identify a node (ignoring nodes below successes).
+locatePruneUniqueT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Lens c m (Generic a) (Generic a)
+locatePruneUniqueT p = transLens $ do [l] <- locatePruneT p
+                                      return l
+
+-- | Build a 'Lens' to the first descendent node that satisfies the predicate (in a pre-order traversal).
+locateOneT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Lens c m (Generic a) (Generic a)
+locateOneT p = transLens $ locateT p >>> acceptR (not.null) >>^ head
 
 -------------------------------------------------------------------------------
