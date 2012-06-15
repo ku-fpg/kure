@@ -108,8 +108,8 @@ attemptAny1N f mba mbas = do (b ,a)  <- mba
 
 -- | A failing 'Lens' with a standard error message for when the child index is out of bounds.
 
-missingChildL :: Monad m => Int -> Lens c m a b
-missingChildL n = translateL $ fail ("There is no child number " ++ show n ++ ".")
+missingChildL :: MonadPlus m => Int -> Lens c m a b
+missingChildL n = failR ("There is no child number " ++ show n ++ ".")
 
 -------------------------------------------------------------------------------
 

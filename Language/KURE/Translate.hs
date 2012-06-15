@@ -47,7 +47,6 @@ import Control.Monad
 import Control.Category
 import Control.Arrow
 import Data.Monoid
-import Language.KURE.CategoryPlus
 import Language.KURE.Combinators
 
 ------------------------------------------------------------------------------------------
@@ -153,13 +152,10 @@ instance Monad m => Category (Translate c m) where
     t2 . t1 = translate $ \ c -> apply t1 c >=> apply t2 c
 
 -- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
-instance MonadPlus m => CategoryZero (Translate c m) where
+instance MonadPlus m => CategoryCatch (Translate c m) where
 
--- czero :: Translate c m a b
-   czero = mzero
-
--- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
-instance MonadPlus m => CategoryPlus (Translate c m) where
+-- failR :: String -> Translate c m a b
+   failR = fail
 
 -- (<+) :: Translate c m a b -> Translate c m a b -> Translate c m a b
    (<+) = mplus
@@ -248,19 +244,16 @@ instance Monad m => Category (Lens c m) where
                                  ((cd,d),kd) <- applyL l2 cb b
                                  return ((cd,d),kd >=> kb)
 
--- | The failing 'Lens'.
-instance MonadPlus m => CategoryZero (Lens c m) where
 
--- czero :: Lens c m a b
-   czero = translateL mzero
-
-
--- | Catch a failing 'Lens'.  A 'Lens' is deemed to have failed if either it fails on the way down, or,
+-- | '(<+)' catches a failing 'Lens'.  A 'Lens' is deemed to have failed if either it fails on the way down, or,
 --   crucially, if it would fail on the way up for an unchanged value.  However, actual failure on the way up are not caught
---   (as by then it is too late).  This means that, in theory, a use of (<+) could cause a succeeding 'Lens' application to fail.
+--   (as by then it is too late).  This means that, in theory, a use of '(<+)' could cause a succeeding 'Lens' application to fail.
 --   But provided |lens| is used correctly, this should never happen.
 
-instance MonadPlus m => CategoryPlus (Lens c m) where
+instance MonadPlus m => CategoryCatch (Lens c m) where
+
+-- failR :: String -> Lens c m a b
+   failR = translateL . fail
 
 -- (<+) :: Lens c m a b -> Lens c m a b -> Lens c m a b
    l1 <+ l2 = translateL (condM (testL l1) (lensT l1) (lensT l2))

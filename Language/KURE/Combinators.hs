@@ -24,6 +24,8 @@ module Language.KURE.Combinators
            , testM
            , notM
              -- * Arrow Combinators
+             -- ** Categories with a Catch
+           , CategoryCatch(..)
              -- ** Combinators
            , idR
            , readerR
@@ -55,7 +57,6 @@ import Control.Category
 import Control.Arrow
 import Data.Maybe (isJust)
 import Data.Monoid
-import Language.KURE.CategoryPlus
 
 infixl 3 >+>
 
@@ -96,6 +97,16 @@ notM ma = attemptM ma >>= maybe (return ()) (const mzero)
 
 ------------------------------------------------------------------------------------------
 
+-- | Categories with failure and a catch.
+class Category (~>) => CategoryCatch (~>) where
+
+-- | The failing arrow.
+  failR :: String -> a ~> b
+
+-- | A catch on arrows.
+  (<+) :: (a ~> b) -> (a ~> b) -> (a ~> b)
+
+
 -- | Synonym for 'id'.
 idR :: Category (~>) => (a ~> a)
 idR = id
@@ -105,34 +116,34 @@ readerR :: ArrowApply (~>) => (a -> (a ~> b)) -> (a ~> b)
 readerR f = (f &&& id) ^>> app
 
 -- | Look at the argument to an 'Arrow', and choose to be either the identity arrow or the zero arrow.
-acceptR :: (ArrowZero (~>), ArrowApply (~>)) => (a -> Bool) -> (a ~> a)
-acceptR p = readerR $ \ a -> if p a then id else zeroArrow
+acceptR :: (CategoryCatch (~>), ArrowApply (~>)) => (a -> Bool) -> (a ~> a)
+acceptR p = readerR $ \ a -> if p a then id else failR "acceptR: predicate failed"
 
 -- | Catch a failing 'ArrowPlus', making it into an identity.
-tryR :: CategoryPlus (~>) => (a ~> a) -> (a ~> a)
+tryR :: CategoryCatch (~>) => (a ~> a) -> (a ~> a)
 tryR r = r <+ id
 
 -- | Catch a failing 'ArrowPlus', making it succeed with a Boolean flag.
 --   Useful when defining 'anyR' instances.
-attemptR :: ArrowPlus (~>) => (a ~> a) -> (a ~> (Bool,a))
-attemptR r = (r >>^ (True,)) <+> arr (False,)
+attemptR :: (CategoryCatch (~>), Arrow (~>)) => (a ~> a) -> (a ~> (Bool,a))
+attemptR r = (r >>^ (True,)) <+ arr (False,)
 
 -- | Makes an 'Arrow' fail if the result value equals the argument value.
-changedR :: (ArrowPlus (~>), ArrowApply (~>), Eq a) => (a ~> a) -> (a ~> a)
+changedR :: (CategoryCatch (~>), ArrowApply (~>), Eq a) => (a ~> a) -> (a ~> a)
 changedR r = readerR (\ a -> r >>> acceptR (/=a))
 
 -- | Repeat an 'ArrowPlus' until it fails, then return the result before the failure.
 --   Requires at least the first attempt to succeed.
-repeatR :: CategoryPlus (~>) => (a ~> a) -> (a ~> a)
+repeatR :: CategoryCatch (~>) => (a ~> a) -> (a ~> a)
 repeatR r = r >>> tryR (repeatR r)
 
 -- | Attempts two 'Arrow's in sequence, succeeding if one or both succeed.
-(>+>) :: (CategoryPlus (~>), ArrowPlus (~>), ArrowApply (~>)) => (a ~> a) -> (a ~> a) -> (a ~> a)
+(>+>) :: (CategoryCatch (~>), ArrowApply (~>)) => (a ~> a) -> (a ~> a) -> (a ~> a)
 r1 >+> r2 = attemptR r1 >>> readerR (\ (b,_) -> snd ^>> if b then tryR r2 else r2)
 
 -- | Sequence a list of 'Arrow's, succeeding if any succeed.
-orR :: (CategoryPlus (~>), ArrowPlus (~>), ArrowApply (~>)) => [a ~> a] -> (a ~> a)
-orR = foldl (>+>) zeroArrow
+orR :: (CategoryCatch (~>), ArrowApply (~>)) => [a ~> a] -> (a ~> a)
+orR = foldl (>+>) (failR "orR failed")
 
 -- | Sequence a list of 'Arrow's, succeeding if they all succeed.
 andR :: Category (~>) => [a ~> a] -> (a ~> a)
