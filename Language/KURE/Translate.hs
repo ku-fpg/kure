@@ -17,7 +17,7 @@
 -- "Language.KURE.Combinators" provides some additional combinators that aren't in the standard libraries.
 
 module Language.KURE.Translate
-       (  -- * Translations
+       (-- * Translations
           Translate(apply)
         , Rewrite
         , translate
@@ -28,16 +28,21 @@ module Language.KURE.Translate
         , exposeT
         , mapT
         , sideEffectR
-          -- * Lenses
-        , Lens
-        , applyL
-        , translateL
+        -- * Bi-directional Translations
+        , BiTranslate(forewardT,backwardT)
+        , BiRewrite
+        , bidirectional
+        , whicheverR
+        , invert
+        -- * Lenses
+        , Lens(lensT)
         , lens
-        , testL
-        , transLens
-        , pureL
         , focusR
         , focusT
+        , testL
+        , transLens
+        , bidirectionalL
+        , pureL
 
 ) where
 
@@ -55,12 +60,12 @@ import Language.KURE.Combinators
 data Translate c m a b = Translate { -- | Apply a 'Translate' to a value and its context.
                                      apply :: c -> a -> m b}
 
--- | A 'Rewrite' is a 'Translate' that shares the same source and target type.
-type Rewrite c m a = Translate c m a a
-
 -- | The primitive  way of building a 'Translate'.
 translate :: (c -> a -> m b) -> Translate c m a b
 translate = Translate
+
+-- | A 'Translate' that shares the same source and target type.
+type Rewrite c m a = Translate c m a a
 
 -- | The primitive way of building a 'Rewrite'.
 rewrite :: (c -> a -> m a) -> Rewrite c m a
@@ -207,42 +212,72 @@ instance (Monad m, Monoid b) => Monoid (Translate c m a b) where
 
 ------------------------------------------------------------------------------------------
 
+-- | An undirected 'Translate'.
+data BiTranslate c m a b = BiTranslate {forewardT :: Translate c m a b, backwardT :: Translate c m b a}
+
+-- | A 'BiTranslate' that shares the same source and target type.
+type BiRewrite c m a = BiTranslate c m a a
+
+-- | Construct a 'BiTranslate' from two opposite 'Translate's.
+bidirectional :: Translate c m a b -> Translate c m b a -> BiTranslate c m a b
+bidirectional = BiTranslate
+
+-- | Try the 'BiRewrite' forewards, then backwards if that fails.
+--   Useful when you know which rule you want to apply, but not which direction to apply it in.
+whicheverR :: MonadPlus m => BiRewrite c m a -> Rewrite c m a
+whicheverR r = forewardT r <+ backwardT r
+
+-- | Invert the forewards and backwards directions of a 'BiTranslate'.
+invert :: BiTranslate c m a b -> BiTranslate c m b a
+invert (BiTranslate t1 t2) = BiTranslate t2 t1
+
+instance Monad m => Category (BiTranslate c m) where
+-- id :: BiTranslate c m a a
+   id = bidirectional id id
+
+-- (.) :: BiTranslate c m b d -> BiTranslate c m a b -> BiTranslate c m a d
+   (BiTranslate f1 b1) . (BiTranslate f2 b2) = BiTranslate (f1 . f2) (b2 . b1)
+
+------------------------------------------------------------------------------------------
+
 -- | A 'Lens' is a way to focus on a particular point in a structure.
 newtype Lens c m a b = Lens {lensT :: Translate c m a ((c,b), b -> m a)}
-
--- | Apply a 'Lens' to a context and value.
-applyL :: Lens c m a b -> c -> a -> m ((c,b), b -> m a)
-applyL = apply . lensT
 
 -- | The primitive way of building a 'Lens'.
 --   If the unfocussing function is applied to the value focussed on then it should succeed,
 --   and produce the same @a@ value as the argument.
-translateL :: Translate c m a ((c,b), b -> m a) -> Lens c m a b
-translateL = Lens
+lens :: Translate c m a ((c,b), b -> m a) -> Lens c m a b
+lens = Lens
 
--- | Another way of building a 'Lens', defined as @(translateL . translate)@.
-lens :: (c -> a -> m ((c,b), b -> m a)) -> Lens c m a b
-lens = translateL . translate
+-- | Apply a 'Rewrite' at a point specified by a 'Lens'.
+focusR :: Monad m => Lens c m a b -> Rewrite c m b -> Rewrite c m a
+focusR l r = do ((c,b),k) <- lensT l
+                constT (apply r c b >>= k)
+
+-- | Apply a 'Translate' at a point specified by a 'Lens'.
+focusT :: Monad m => Lens c m a b -> Translate c m b d -> Translate c m a d
+focusT l t = do ((c,b),_) <- lensT l
+                constT (apply t c b)
 
 -- | Checks if the focusing succeeds, and additionally whether unfocussing from an unchanged value would succeed.
 testL :: MonadPlus m => Lens c m a b -> Translate c m a Bool
-testL (Lens t) = testM $ do ((_,b),k) <- t
-                            constT (k b)
+testL l = testM $ do ((_,b),k) <- lensT l
+                     constT (k b)
 
 -- | Combines a 'Translate' producing a 'Lens' into just a 'Lens'.
 --   Essentially a monadic 'join'.
 transLens :: Monad m => Translate c m a (Lens c m a b) -> Lens c m a b
-transLens tl = translateL (tl >>= lensT)
+transLens tl = lens (tl >>= lensT)
 
 instance Monad m => Category (Lens c m) where
 
 -- id :: Lens c m a a
-   id = lens $ \ c a -> return ((c,a), return)
+   id = lens $ translate $ \ c a -> return ((c,a), return)
 
 -- (.) :: Lens c m b d -> Lens c m a b -> Lens c m a d
-   l2 . l1 = lens $ \ ca a -> do ((cb,b),kb) <- applyL l1 ca a
-                                 ((cd,d),kd) <- applyL l2 cb b
-                                 return ((cd,d),kd >=> kb)
+   l2 . l1 = lens $ do translate $ \ ca a -> do ((cb,b),kb) <- apply (lensT l1) ca a
+                                                ((cd,d),kd) <- apply (lensT l2) cb b
+                                                return ((cd,d),kd >=> kb)
 
 
 -- | '(<+)' catches a failing 'Lens'.  A 'Lens' is deemed to have failed if either it fails on the way down, or,
@@ -253,24 +288,19 @@ instance Monad m => Category (Lens c m) where
 instance MonadPlus m => CategoryCatch (Lens c m) where
 
 -- failR :: String -> Lens c m a b
-   failR = translateL . fail
+   failR = lens . fail
 
 -- (<+) :: Lens c m a b -> Lens c m a b -> Lens c m a b
-   l1 <+ l2 = translateL (condM (testL l1) (lensT l1) (lensT l2))
+   l1 <+ l2 = lens (condM (testL l1) (lensT l1) (lensT l2))
 
+-- | Construct a 'Lens' from a 'BiTranslate'.
+bidirectionalL :: Monad m => BiTranslate c m a b -> Lens c m a b
+bidirectionalL (BiTranslate tf tg) = lens $ do c <- contextT
+                                               b <- tf
+                                               return ((c,b), apply tg c)
 
 -- | Construct a 'Lens' from two pure functions.
 pureL :: Monad m => (a -> b) -> (b -> a) -> Lens c m a b
-pureL f g = lens (\ c a -> return ((c,f a), return . g))
-
--- | Apply a 'Rewrite' at a point specified by a 'Lens'.
-focusR :: Monad m => Lens c m a b -> Rewrite c m b -> Rewrite c m a
-focusR l r = rewrite $ \ c a -> do ((c',b),k) <- applyL l c a
-                                   apply r c' b >>= k
-
--- | Apply a 'Translate' at a point specified by a 'Lens'.
-focusT :: Monad m => Lens c m a b -> Translate c m b d -> Translate c m a d
-focusT l t = translate $ \ c a -> do ((c',b),_) <- applyL l c a
-                                     apply t c' b
+pureL f g = bidirectionalL $ bidirectional (arr f) (arr g)
 
 ------------------------------------------------------------------------------------------

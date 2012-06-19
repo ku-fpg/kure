@@ -15,7 +15,7 @@ type TranslateExp b = Translate Context LamM Exp b
 type RewriteExp     = TranslateExp Exp
 
 applyExp :: TranslateExp b -> Exp -> Either String b
-applyExp f = runLamM . apply f []
+applyExp f = runLamM . apply f initialContext
 
 -------------------------------------------------------------------------------
 
@@ -27,13 +27,14 @@ instance Term Exp where
    numChildren (App _ _) = 2
 
 instance Walker Context LamM Exp where
-   childL n = case n of
-                0 ->    appT exposeT idR (childL0of2 App)
-                     <+ lamT exposeT (childL1of2 Lam)
+   childL n = lens $ tagFailR (missingChild n) $
+     case n of
+       0 ->    appT exposeT idR (childL0of2 App)
+            <+ lamT exposeT (childL1of2 Lam)
 
-                1 ->     appT idR exposeT (childL1of2 App)
+       1 -> appT idR exposeT (childL1of2 App)
 
-                _ -> missingChildL n
+       _ -> empty
 
 -------------------------------------------------------------------------------
 
@@ -49,7 +50,7 @@ varT f = contextfreeT $ \ e -> case e of
 
 lamT :: TranslateExp a -> (Name -> a -> b) -> TranslateExp b
 lamT t f = translate $ \ c e -> case e of
-                                  Lam v e1 -> f v <$> apply t (v:c) e1
+                                  Lam v e1 -> f v <$> apply t (addBinding v c @@ 0) e1
                                   _        -> fail "no match for Lam"
 
 lamR :: RewriteExp -> RewriteExp
@@ -59,7 +60,7 @@ lamR r = lamT r Lam
 
 appT' :: TranslateExp a1 -> TranslateExp a2 -> (LamM a1 -> LamM a2 -> LamM b) -> TranslateExp b
 appT' t1 t2 f = translate $ \ c e -> case e of
-         App e1 e2 -> f (apply t1 c e1) (apply t2 c e2)
+         App e1 e2 -> f (apply t1 (c @@ 0) e1) (apply t2 (c @@ 1) e2)
          _         -> fail "no match for App"
 
 appT :: TranslateExp a1 -> TranslateExp a2 -> (a1 -> a2 -> b) -> TranslateExp b

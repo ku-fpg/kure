@@ -3,10 +3,11 @@ module Lam.AST where
 import Control.Applicative
 import Control.Monad
 
+import Language.KURE
+
 -------------------------------------------------------------------------------
 
 import Control.Arrow (second)
-import Language.KURE.Combinators (result)
 
 type Name = String
 
@@ -22,7 +23,10 @@ instance Show Exp where
 
 -------------------------------------------------------------------------------
 
-type Context = [Name] -- bound variable names
+data Context = Context AbsolutePath [Name] -- bound variable names
+
+instance PathContext Context where
+  contextPath (Context p _) = p
 
 newtype LamM a = LamM {expM :: Int -> (Int, Either String a)}
 
@@ -55,13 +59,33 @@ instance Alternative LamM where
 
 -------------------------------------------------------------------------------
 
+addBinding :: Name -> Context -> Context
+addBinding v (Context p vs) = Context p (v:vs)
+
+(@@) :: Context -> Int -> Context
+(Context p vs) @@ n = Context (extendAbsPath n p) vs
+
+initialContext :: Context
+initialContext = Context rootAbsPath []
+
+bindings :: Context -> [Name]
+bindings (Context _ vs) = vs
+
+boundIn :: Name -> Context -> Bool
+boundIn v c = v `elem` bindings c
+
+freeIn :: Name -> Context -> Bool
+freeIn v c = not (v `boundIn` c)
+
+-------------------------------------------------------------------------------
+
 suggestName :: LamM Name
 suggestName = LamM (\n -> ((n+1), Right (show n)))
 
-freshName :: Context -> LamM Name
-freshName c = do n <- suggestName
-                 if n `elem` c
-                  then freshName c
-                  else return n
+freshName :: [Name] -> LamM Name
+freshName vs = do v <- suggestName
+                  if v `elem` vs
+                    then freshName vs
+                    else return v
 
 -------------------------------------------------------------------------------

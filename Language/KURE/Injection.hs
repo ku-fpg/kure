@@ -101,10 +101,10 @@ promoteR r = retractT >>> r >>> injectT
 
 -- | A 'Lens' to the injection of a value.
 injectL  :: (MonadPlus m, Injection a a') => Lens c m a a'
-injectL = lens $ \ c a -> return ((c, inject a), retractM)
+injectL = lens $ translate $ \ c a -> return ((c, inject a), retractM)
 
 -- | A 'Lens' to the retraction of a value.
 retractL :: (MonadPlus m, Injection a a') => Lens c m a' a
-retractL = lens $ \ c -> retractM >=> (\ a -> return ((c,a), injectM))
+retractL = lens $ translate $ \ c -> retractM >=> (\ a -> return ((c,a), injectM))
 
 -------------------------------------------------------------------------------

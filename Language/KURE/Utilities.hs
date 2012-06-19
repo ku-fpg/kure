@@ -24,7 +24,7 @@ module Language.KURE.Utilities
        , attemptAnyN
        , attemptAny1N
          -- * Error Messages
-       , missingChildL
+       , missingChild
          -- * Child Combinators
          -- $childLdoc
        , childLaux
@@ -67,7 +67,7 @@ anyRgeneric :: Walker c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a
 anyRgeneric r c a = inject `liftM` apply (anyR r) c a
 
 childLgeneric :: Walker c m a => Int -> c -> a -> m ((c, Generic a), Generic a -> m (Generic a))
-childLgeneric n c a = (liftM.second.result.liftM) inject $ applyL (childL n) c a
+childLgeneric n c a = (liftM.second.result.liftM) inject $ apply (lensT $ childL n) c a
 
 -------------------------------------------------------------------------------
 
@@ -106,10 +106,10 @@ attemptAny1N f mba mbas = do (b ,a)  <- mba
 
 -------------------------------------------------------------------------------
 
--- | A failing 'Lens' with a standard error message for when the child index is out of bounds.
+-- | A standard error message for when the child index is out of bounds.
 
-missingChildL :: MonadPlus m => Int -> Lens c m a b
-missingChildL n = failR ("There is no child number " ++ show n ++ ".")
+missingChild :: Int -> String
+missingChild n = "There is no child number " ++ show n ++ "."
 
 -------------------------------------------------------------------------------
 

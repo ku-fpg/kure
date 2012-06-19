@@ -13,7 +13,7 @@ import Control.Arrow
 
 freeVarsT :: TranslateExp [Name]
 freeVarsT = fmap nub $ crushbuT $ do (c, Var v) <- exposeT
-                                     guard (v `notElem` c)
+                                     guard (v `freeIn` c)
                                      return [v]
 
 freeVars :: Exp -> [Name]
@@ -48,7 +48,7 @@ beta_reduce = do App (Lam v _) e2 <- idR
                  focusT (pathL [0,0]) (tryR $ substExp v e2)
 
 eta_expand :: RewriteExp
-eta_expand = rewrite $ \ c f -> do v <- freshName c
+eta_expand = rewrite $ \ c f -> do v <- freshName (bindings c)
                                    return $ Lam v (App f (Var v))
 
 eta_reduce :: RewriteExp
@@ -63,7 +63,7 @@ normal_order_eval :: RewriteExp
 normal_order_eval = anytdR (repeatR beta_reduce)
 
 -- This might not actually be applicative order evaluation
--- Contact the  KURE maintainer if you can correct this definition.
+-- Contact the KURE maintainer if you can correct this definition.
 applicative_order_eval :: RewriteExp
 applicative_order_eval = innermostR beta_reduce
 

@@ -28,6 +28,7 @@ module Language.KURE.Combinators
            , CategoryCatch(..)
              -- ** Combinators
            , idR
+           , tagFailR
            , readerR
            , acceptR
            , tryR
@@ -110,6 +111,11 @@ class Category (~>) => CategoryCatch (~>) where
 -- | Synonym for 'id'.
 idR :: Category (~>) => (a ~> a)
 idR = id
+
+-- | Replace the error message of a failing 'CategoryCatch'.
+--   Successful 'CategoryCatch'es are unaffected.
+tagFailR :: CategoryCatch (~>) => String -> (a ~> b) -> (a ~> b)
+tagFailR msg r = r <+ failR msg
 
 -- | Look at the argument to the 'Arrow' before choosing which 'Arrow' to use.
 readerR :: ArrowApply (~>) => (a -> (a ~> b)) -> (a ~> b)

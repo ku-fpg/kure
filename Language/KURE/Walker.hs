@@ -42,14 +42,12 @@ module Language.KURE.Walker
 
         -- * Paths
         , Path
-        , path
         , AbsolutePath
         , rootAbsPath
         , extendAbsPath
         , ascendAbsPath
         , PathContext(..)
         , absPathT
-   --     , abs2pathT
 
         -- * Building Lenses from Paths
         , pathL
@@ -200,14 +198,7 @@ innermostR r = anybuR (r >>> tryR (innermostR r))
 -------------------------------------------------------------------------------
 
 -- | A path is a route to descend the tree from an arbitrary node.
-newtype Path = Path [Int]
-
-instance Show Path where
-  show (Path p) = show p
-
--- | Build a path from a list of 'Int's, with each 'Int' specifying which interesting child to descend to.
-path :: [Int] -> Path
-path = Path
+type Path = [Int]
 
 -- | A path from the root.
 newtype AbsolutePath = AbsolutePath [Int]
@@ -234,11 +225,16 @@ class PathContext c where
   -- | Find the current path.
   contextPath :: c -> AbsolutePath
 
+-- | The simplest instance of 'PathContext' is 'AbsolutePath' itself.
+instance PathContext AbsolutePath where
+-- contextPath :: AbsolutePath -> AbsolutePath
+   contextPath p = p
+
 -- | Provided the first 'AbsolutePath' is a prefix of the second 'AbsolutePath',
 --   computes the 'Path' from the end of the first to the end of the second.
 rmPathPrefix :: AbsolutePath -> AbsolutePath -> Maybe Path
 rmPathPrefix (AbsolutePath p1) (AbsolutePath p2) = do guard (p1 `isSuffixOf` p2)
-                                                      return (Path (drop (length p1) (reverse p2)))
+                                                      return (drop (length p1) (reverse p2))
 
 -- | Find the 'AbsolutePath' to the current node.
 absPathT :: (PathContext c, Monad m) => Translate c m a AbsolutePath
@@ -253,11 +249,11 @@ abs2pathT there = do here <- absPathT
 
 -- | Construct a 'Lens' by following a 'Path'.
 pathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
-pathL (Path p) = andR (map childL p)
+pathL = andR . map childL
 
 -- | Construct a 'Lens' that points to the last node at which the 'Path' can be followed.
 exhaustPathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
-exhaustPathL (Path p) = foldr (\ n l -> tryR (childL n >>> l)) idR p
+exhaustPathL = foldr (\ n l -> tryR (childL n >>> l)) idR
 
 -- | Repeat as many iterations of the 'Path' as possible.
 repeatPathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
@@ -265,7 +261,7 @@ repeatPathL p = tryR (pathL p >>> repeatPathL p)
 
 -- | Convert an 'AbsolutePath' into a 'Path' starting at the root.
 rootPath :: AbsolutePath -> Path
-rootPath (AbsolutePath p) = Path (reverse p)
+rootPath (AbsolutePath p) = reverse p
 
 -- | Build a 'Lens' from the root to a point specified by an 'AbsolutePath'.
 rootL :: (Walker c m a, a ~ Generic a) => AbsolutePath -> Lens c m (Generic a) (Generic a)

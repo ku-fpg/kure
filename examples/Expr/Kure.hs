@@ -22,6 +22,9 @@ import Expr.AST
 type TranslateE a b = Translate Context Maybe a b
 type RewriteE a = TranslateE a a
 
+applyE :: TranslateE a b -> a -> Maybe b
+applyE t = apply t initialContext
+
 ---------------------------------------------------------------------------
 
 data GenericExpr = GExpr Expr
@@ -37,9 +40,9 @@ instance Term GenericExpr where
 
 instance Walker Context Maybe GenericExpr where
 
-  childL n = lens $ \ c g -> case g of
-                               GExpr e -> childLgeneric n c e
-                               GCmd cm -> childLgeneric n c cm
+  childL n = lens $ translate $ \ c g -> case g of
+                                           GExpr e -> childLgeneric n c e
+                                           GCmd cm -> childLgeneric n c cm
 
   allT t = translate $ \ c g -> case g of
                                   GExpr e -> allTgeneric t c e
@@ -71,25 +74,23 @@ instance Term Expr where
 
 
 instance Walker Context Maybe Expr where
-  childL 0 =  addT exposeT idR (childL0of2 Add)
+  childL n = lens $ tagFailR (missingChild n) $
+    case n of
+      0 ->    addT  exposeT idR (childL0of2 Add)
            <+ eseqT exposeT idR (childL0of2 ESeq)
-           <+ missingChildL 0
-  childL 1 =  addT  idR exposeT (childL1of2 Add)
+      1 ->    addT  idR exposeT (childL1of2 Add)
            <+ eseqT idR exposeT (childL1of2 ESeq)
-           <+ missingChildL 1
-  childL n = missingChildL n
+      _ -> empty
 
   allT t =  varT (\ _ -> mempty)
          <+ litT (\ _ -> mempty)
          <+ addT (extractT t) (extractT t) mappend
          <+ eseqT (extractT t) (extractT t) mappend
-         <+ fail "allT failed"
 
   allR r =  varT Var
          <+ litT Lit
          <+ addAllR (extractR r) (extractR r)
          <+ eseqAllR (extractR r) (extractR r)
-         <+ fail "allR failed"
 
   anyR r =  addAnyR (extractR r) (extractR r)
          <+ eseqAnyR (extractR r) (extractR r)
@@ -110,12 +111,12 @@ instance Term Cmd where
   numChildren (Assign _ _) = 2
 
 instance Walker Context Maybe Cmd where
-
-  childL 0 =  seqT exposeT idR (childL0of2 Seq)
+  childL n = lens $ tagFailR (missingChild n) $
+    case n of
+      0 ->    seqT exposeT idR (childL0of2 Seq)
            <+ assignT exposeT (childL1of2 Assign)
-  childL 1 =  seqT idR exposeT (childL1of2 Seq)
-           <+ missingChildL 1
-  childL n = missingChildL n
+      1 ->    seqT idR exposeT (childL1of2 Seq)
+      _ ->    empty
 
   allT t =  seqT (extractT t) (extractT t) mappend
          <+ assignT (extractT t) (\ _ -> id)
@@ -131,7 +132,7 @@ instance Walker Context Maybe Cmd where
 
 seqT' :: TranslateE Cmd a1 -> TranslateE Cmd a2 -> (Maybe a1 -> Maybe a2 -> Maybe b) -> TranslateE Cmd b
 seqT' t1 t2 f = translate $ \ c cm -> case cm of
-                                       Seq cm1 cm2 -> f (apply t1 c cm1) (apply t2 (updateContext cm1 c) cm2)
+                                       Seq cm1 cm2 -> f (apply t1 (c @@ 0) cm1) (apply t2 (updateContextCmd cm1 c @@ 1) cm2)
                                        _           -> fail "not a Seq"
 
 seqT :: TranslateE Cmd a1 -> TranslateE Cmd a2 -> (a1 -> a2 -> b) -> TranslateE Cmd b
@@ -147,7 +148,7 @@ seqAnyR r1 r2 = seqT' (attemptR r1) (attemptR r2) (attemptAny2 Seq)
 
 assignT :: TranslateE Expr a -> (Name -> a -> b) -> TranslateE Cmd b
 assignT t f = translate $ \ c cm -> case cm of
-                                      Assign n e -> f n <$> apply t c e
+                                      Assign n e -> f n <$> apply t (c @@ 0) e
                                       _          -> fail "not an Assign"
 
 assignR :: RewriteE Expr -> RewriteE Cmd
@@ -171,7 +172,7 @@ litT f = contextfreeT $ \ e -> case e of
 
 addT' :: TranslateE Expr a1 -> TranslateE Expr a2 -> (Maybe a1 -> Maybe a2 -> Maybe b) -> TranslateE Expr b
 addT' t1 t2 f = translate $ \ c e -> case e of
-                                       Add e1 e2 -> f (apply t1 c e1) (apply t2 c e2)
+                                       Add e1 e2 -> f (apply t1 (c @@ 0) e1) (apply t2 (c @@ 1) e2)
                                        _         -> fail "not an Add"
 
 addT :: TranslateE Expr a1 -> TranslateE Expr a2 -> (a1 -> a2 -> b) -> TranslateE Expr b
@@ -187,7 +188,7 @@ addAnyR r1 r2 = addT' (attemptR r1) (attemptR r2) (attemptAny2 Add)
 
 eseqT' :: TranslateE Cmd a1 -> TranslateE Expr a2 -> (Maybe a1 -> Maybe a2 -> Maybe b) -> TranslateE Expr b
 eseqT' t1 t2 f = translate $ \ c e -> case e of
-                                        ESeq cm e1 -> f (apply t1 c cm) (apply t2 (updateContext cm c) e1)
+                                        ESeq cm e1 -> f (apply t1 (c @@ 0) cm) (apply t2 (updateContextCmd cm c @@ 1) e1)
                                         _          -> fail "not an ESeq"
 
 eseqT :: TranslateE Cmd a1 -> TranslateE Expr a2 -> (a1 -> a2 -> b) -> TranslateE Expr b

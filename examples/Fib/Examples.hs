@@ -8,7 +8,7 @@ import Fib.Kure
 -----------------------------------------------------------------------
 
 applyFib :: RewriteA -> Arith -> Maybe Arith
-applyFib e = apply e ()
+applyFib e = apply e rootAbsPath
 
 -----------------------------------------------------------------------
 
