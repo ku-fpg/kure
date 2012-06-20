@@ -40,7 +40,7 @@ module Language.KURE.Translate
         , focusR
         , focusT
         , testL
-        , transLens
+        , joinTL
         , bidirectionalL
         , pureL
 
@@ -266,8 +266,8 @@ testL l = testM $ do ((_,b),k) <- lensT l
 
 -- | Combines a 'Translate' producing a 'Lens' into just a 'Lens'.
 --   Essentially a monadic 'join'.
-transLens :: Monad m => Translate c m a (Lens c m a b) -> Lens c m a b
-transLens tl = lens (tl >>= lensT)
+joinTL :: Monad m => Translate c m a (Lens c m a b) -> Lens c m a b
+joinTL tl = lens (tl >>= lensT)
 
 instance Monad m => Category (Lens c m) where
 

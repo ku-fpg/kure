@@ -41,26 +41,27 @@ module Language.KURE.Walker
         , collectPruneT
 
         -- * Paths
-        , Path
+        -- ** Absolute Paths
         , AbsolutePath
         , rootAbsPath
         , extendAbsPath
         , ascendAbsPath
         , PathContext(..)
         , absPathT
+        -- ** Relative Paths
+        , Path
+        , rootPath
+        , pathsToT
+        , prunePathsToT
+        , uniquePathToT
+        , uniquePrunePathToT
+        , firstPathToT
 
         -- * Building Lenses from Paths
         , pathL
         , exhaustPathL
         , repeatPathL
-        , rootPath
         , rootL
-        -- * Building Lenses from Predicates
-        , locateT
-        , locatePruneT
-        , locateUniqueT
-        , locatePruneUniqueT
-        , locateOneT
 
 ) where
 
@@ -197,9 +198,6 @@ innermostR r = anybuR (r >>> tryR (innermostR r))
 
 -------------------------------------------------------------------------------
 
--- | A path is a route to descend the tree from an arbitrary node.
-type Path = [Int]
-
 -- | A path from the root.
 newtype AbsolutePath = AbsolutePath [Int]
 
@@ -230,20 +228,52 @@ instance PathContext AbsolutePath where
 -- contextPath :: AbsolutePath -> AbsolutePath
    contextPath p = p
 
--- | Provided the first 'AbsolutePath' is a prefix of the second 'AbsolutePath',
---   computes the 'Path' from the end of the first to the end of the second.
-rmPathPrefix :: AbsolutePath -> AbsolutePath -> Maybe Path
-rmPathPrefix (AbsolutePath p1) (AbsolutePath p2) = do guard (p1 `isSuffixOf` p2)
-                                                      return (drop (length p1) (reverse p2))
-
 -- | Find the 'AbsolutePath' to the current node.
 absPathT :: (PathContext c, Monad m) => Translate c m a AbsolutePath
 absPathT = contextT >>^ contextPath
+
+-------------------------------------------------------------------------------
+
+-- | A path is a route to descend the tree from an arbitrary node.
+type Path = [Int]
+
+-- | Convert an 'AbsolutePath' into a 'Path' starting at the root.
+rootPath :: AbsolutePath -> Path
+rootPath (AbsolutePath p) = reverse p
+
+--  Provided the first 'AbsolutePath' is a prefix of the second 'AbsolutePath',
+--  computes the 'Path' from the end of the first to the end of the second.
+rmPathPrefix :: AbsolutePath -> AbsolutePath -> Maybe Path
+rmPathPrefix (AbsolutePath p1) (AbsolutePath p2) = do guard (p1 `isSuffixOf` p2)
+                                                      return (drop (length p1) (reverse p2))
 
 --  Construct a 'Path' from the current node to the end of the given 'AbsolutePath', provided that 'AbsolutePath' passes through the current node.
 abs2pathT :: (PathContext c, Monad m) => AbsolutePath -> Translate c m a Path
 abs2pathT there = do here <- absPathT
                      maybe (fail "Absolute path does not pass through current node.") return (rmPathPrefix here there)
+
+-- | Find the 'Path's to every descendent node that satisfies the predicate.
+pathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
+pathsToT p = collectT (acceptR p >>> absPathT) >>= mapM abs2pathT
+
+-- | Find the 'Path's to every descendent node that satisfies the predicate, ignoring nodes below successes.
+prunePathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
+prunePathsToT p = collectPruneT (acceptR p >>> absPathT) >>= mapM abs2pathT
+
+-- | Find the 'Path' to the descendent node that satisfies the predicate, failing if that does not uniquely identify a node.
+uniquePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
+uniquePathToT p = do [pa] <- pathsToT p
+                     return pa
+
+-- | Build a 'Path' to the descendent node that satisfies the predicate, failing if that does not uniquely identify a node (ignoring nodes below successes).
+uniquePrunePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
+uniquePrunePathToT p = do [pa] <- prunePathsToT p
+                          return pa
+
+-- | Build a 'Path' to the first descendent node that satisfies the predicate (in a pre-order traversal).
+firstPathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
+firstPathToT p = do (pa : _) <- pathsToT p
+                    return pa
 
 -------------------------------------------------------------------------------
 
@@ -259,36 +289,8 @@ exhaustPathL = foldr (\ n l -> tryR (childL n >>> l)) idR
 repeatPathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
 repeatPathL p = tryR (pathL p >>> repeatPathL p)
 
--- | Convert an 'AbsolutePath' into a 'Path' starting at the root.
-rootPath :: AbsolutePath -> Path
-rootPath (AbsolutePath p) = reverse p
-
 -- | Build a 'Lens' from the root to a point specified by an 'AbsolutePath'.
 rootL :: (Walker c m a, a ~ Generic a) => AbsolutePath -> Lens c m (Generic a) (Generic a)
 rootL = pathL . rootPath
-
--------------------------------------------------------------------------------
-
--- | Build a 'Lens' to every descendent node that satisfies the predicate.
-locateT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Lens c m (Generic a) (Generic a)]
-locateT p = collectT (acceptR p >>> absPathT) >>= mapM (liftM pathL . abs2pathT)
-
--- | Build a 'Lens' to every descendent node that satisfies the predicate, ignoring nodes below successes.
-locatePruneT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Lens c m (Generic a) (Generic a)]
-locatePruneT p = collectPruneT (acceptR p >>> absPathT) >>= mapM (liftM pathL . abs2pathT)
-
--- | Build a 'Lens' to the descendent node that satisfies the predicate, failing if that does not uniquely identify a node.
-locateUniqueT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Lens c m (Generic a) (Generic a)
-locateUniqueT p = transLens $ do [l] <- locateT p
-                                 return l
-
--- | Build a 'Lens' to the descendent node that satisfies the predicate, failing if that does not uniquely identify a node (ignoring nodes below successes).
-locatePruneUniqueT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Lens c m (Generic a) (Generic a)
-locatePruneUniqueT p = transLens $ do [l] <- locatePruneT p
-                                      return l
-
--- | Build a 'Lens' to the first descendent node that satisfies the predicate (in a pre-order traversal).
-locateOneT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Lens c m (Generic a) (Generic a)
-locateOneT p = transLens $ locateT p >>> acceptR (not.null) >>^ head
 
 -------------------------------------------------------------------------------
