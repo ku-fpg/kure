@@ -68,6 +68,9 @@ module Language.KURE.Walker
         ,  pathR
         ,  pathT
 
+        -- ** Testing Paths
+        ,  testPath
+
 
 ) where
 
@@ -308,5 +311,11 @@ pathR = focusR . pathL
 -- | Apply a 'Translate' at a point specified by a 'Path'.
 pathT :: (Walker c m a, a ~ Generic a) => Path -> Translate c m (Generic a) b -> Translate c m (Generic a) b
 pathT = focusT . pathL
+
+-------------------------------------------------------------------------------
+
+-- | Check if it is possible to construct a 'Lens' along this path from the current node.
+testPath :: Path -> Translate c m a Bool
+testPath = testL . pathL
 
 -------------------------------------------------------------------------------
