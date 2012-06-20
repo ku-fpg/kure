@@ -101,10 +101,10 @@ notM ma = attemptM ma >>= maybe (return ()) (const mzero)
 -- | Categories with failure and a catch.
 class Category (~>) => CategoryCatch (~>) where
 
--- | The failing arrow.
+  -- | The failing arrow.
   failR :: String -> a ~> b
 
--- | A catch on arrows.
+  -- | A catch on arrows.
   (<+) :: (a ~> b) -> (a ~> b) -> (a ~> b)
 
 
