@@ -57,11 +57,17 @@ module Language.KURE.Walker
         , uniquePrunePathToT
         , firstPathToT
 
-        -- * Building Lenses from Paths
+        -- * Using Paths
+        -- ** Building Lenses from Paths
         , pathL
         , exhaustPathL
         , repeatPathL
         , rootL
+
+        -- ** Applying transformations at the end of 'Path's
+        ,  pathR
+        ,  pathT
+
 
 ) where
 
@@ -292,5 +298,15 @@ repeatPathL p = tryR (pathL p >>> repeatPathL p)
 -- | Build a 'Lens' from the root to a point specified by an 'AbsolutePath'.
 rootL :: (Walker c m a, a ~ Generic a) => AbsolutePath -> Lens c m (Generic a) (Generic a)
 rootL = pathL . rootPath
+
+-------------------------------------------------------------------------------
+
+-- | Apply a 'Rewrite' at a point specified by a 'Path'.
+pathR :: (Walker c m a, a ~ Generic a) => Path -> Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+pathR = focusR . pathL
+
+-- | Apply a 'Translate' at a point specified by a 'Path'.
+pathT :: (Walker c m a, a ~ Generic a) => Path -> Translate c m (Generic a) b -> Translate c m (Generic a) b
+pathT = focusT . pathL
 
 -------------------------------------------------------------------------------
