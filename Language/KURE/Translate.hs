@@ -39,7 +39,7 @@ module Language.KURE.Translate
         , lens
         , focusR
         , focusT
-        , testL
+        , testLensT
         , joinTL
         , bidirectionalL
         , pureL
@@ -260,9 +260,9 @@ focusT l t = do ((c,b),_) <- lensT l
                 constT (apply t c b)
 
 -- | Checks if the focusing succeeds, and additionally whether unfocussing from an unchanged value would succeed.
-testL :: MonadPlus m => Lens c m a b -> Translate c m a Bool
-testL l = testM $ do ((_,b),k) <- lensT l
-                     constT (k b)
+testLensT :: MonadPlus m => Lens c m a b -> Translate c m a Bool
+testLensT l = testM $ do ((_,b),k) <- lensT l
+                         constT (k b)
 
 -- | Combines a 'Translate' producing a 'Lens' into just a 'Lens'.
 --   Essentially a monadic 'join'.
@@ -291,7 +291,7 @@ instance MonadPlus m => CategoryCatch (Lens c m) where
    failR = lens . fail
 
 -- (<+) :: Lens c m a b -> Lens c m a b -> Lens c m a b
-   l1 <+ l2 = lens (condM (testL l1) (lensT l1) (lensT l2))
+   l1 <+ l2 = lens (condM (testLensT l1) (lensT l1) (lensT l2))
 
 -- | Construct a 'Lens' from a 'BiTranslate'.
 bidirectionalL :: Monad m => BiTranslate c m a b -> Lens c m a b

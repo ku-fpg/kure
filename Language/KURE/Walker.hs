@@ -69,7 +69,7 @@ module Language.KURE.Walker
         ,  pathT
 
         -- ** Testing Paths
-        ,  testPath
+        ,  testPathT
 
 
 ) where
@@ -315,7 +315,7 @@ pathT = focusT . pathL
 -------------------------------------------------------------------------------
 
 -- | Check if it is possible to construct a 'Lens' along this path from the current node.
-testPath :: Path -> Translate c m a Bool
-testPath = testL . pathL
+testPathT :: (Walker c m a, a ~ Generic a) => Path -> Translate c m a Bool
+testPathT = testLensT . pathL
 
 -------------------------------------------------------------------------------
