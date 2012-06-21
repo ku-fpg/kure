@@ -280,7 +280,7 @@ pathsToT q = collectT (acceptR q >>> absPathT) >>= mapM abs2pathT
 prunePathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
 prunePathsToT q = collectPruneT (acceptR q >>> absPathT) >>= mapM abs2pathT
 
-
+-- local function used by uniquePathToT and uniquePrunePathToT
 requireUniquePath :: Monad m => Translate c m [Path] Path
 requireUniquePath = contextfreeT $ \ ps -> case ps of
                                              []  -> fail "No matching nodes found."
