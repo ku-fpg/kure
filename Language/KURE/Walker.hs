@@ -15,8 +15,13 @@
 -- There is no mechanism for \"ascending\" the tree.
 
 module Language.KURE.Walker
-        ( -- * Traversal Classes
+        ( -- * Terms
           Term(..)
+        , numChildrenT
+        , hasChild
+        , hasChildT
+
+          -- * Tree Walkers
         , Walker(..)
 
         -- * Rewrite Traversals
@@ -45,7 +50,6 @@ module Language.KURE.Walker
         , AbsolutePath
         , rootAbsPath
         , extendAbsPath
-        , ascendAbsPath
         , PathContext(..)
         , absPathT
         -- ** Relative Paths
@@ -98,6 +102,18 @@ class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
 
   -- | Count the number of interesting children.
   numChildren :: a -> Int
+
+-- | Lifted version of 'numChildren'.
+numChildrenT :: (Monad m, Term a) => Translate c m a Int
+numChildrenT = arr numChildren
+
+-- | Check if a 'Term' has a child of the specified index.
+hasChild :: Term a => Int -> a -> Bool
+hasChild n a = (0 <= n) && (n < numChildren a)
+
+-- | Lifted version of 'hasChild'.
+hasChildT :: (Monad m, Term a) => Int -> Translate c m a Bool
+hasChildT = arr . hasChild
 
 -------------------------------------------------------------------------------
 
@@ -219,12 +235,7 @@ rootAbsPath = AbsolutePath []
 
 -- | Extend an 'AbsolutePath' by one descent.
 extendAbsPath :: Int -> AbsolutePath -> AbsolutePath
-extendAbsPath n (AbsolutePath p) = AbsolutePath (n : p)
-
--- | Ascend one step up an 'AbsolutePath', revealing the number of the descent neccassary to restore the path.
-ascendAbsPath :: AbsolutePath -> Maybe (AbsolutePath , Int)
-ascendAbsPath (AbsolutePath [])     = Nothing
-ascendAbsPath (AbsolutePath (n:ns)) = Just (AbsolutePath ns , n)
+extendAbsPath n (AbsolutePath ns) = AbsolutePath (n:ns)
 
 -- | Contexts that are instances of 'PathContext' contain the current 'AbsolutePath'.
 --   Any user-defined combinators (typically 'childL' and congruence combinators) should update the 'AbsolutePath' using 'extendAbsolutePath'.

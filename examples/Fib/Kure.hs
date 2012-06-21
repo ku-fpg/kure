@@ -2,10 +2,10 @@
 
 module Fib.Kure where
 
-import Control.Applicative
-
 import Language.KURE
 import Fib.AST
+
+import Control.Monad(guard)
 
 --------------------------------------------------------------------------------------
 
@@ -25,19 +25,17 @@ instance Term Arith where
 
 instance Walker AbsolutePath Maybe Arith where
 
-  childL n = lens $ translate $ \ c e -> let c' = extendAbsPath n c in
-    case e of
-      Lit _      ->  empty
-      Add e1 e2  ->  case n of
-                       0 -> pure ((c',e1), \ e1' -> pure (Add e1' e2))
-                       1 -> pure ((c',e2), \ e2' -> pure (Add e1 e2'))
-                       _ -> empty
-      Sub e1 e2  ->  case n of
-                       0 -> pure ((c',e1), \ e1' -> pure (Sub e1' e2))
-                       1 -> pure ((c',e2), \ e2' -> pure (Sub e1 e2'))
-                       _ -> empty
-      Fib e1     ->  case n of
-                       0 -> pure ((c',e1), \ e1' -> pure (Fib e1'))
-                       _ -> empty
+  childL n = lens $ translate $ \ c e ->
+    do guard (hasChild n e)
+       let c' = extendAbsPath n c
+       case e of
+         Add e1 e2  ->  case n of
+                          0 -> return ((c',e1), \ e1' -> return (Add e1' e2))
+                          1 -> return ((c',e2), \ e2' -> return (Add e1 e2'))
+         Sub e1 e2  ->  case n of
+                          0 -> return ((c',e1), \ e1' -> return (Sub e1' e2))
+                          1 -> return ((c',e2), \ e2' -> return (Sub e1 e2'))
+         Fib e1     ->  case n of
+                          0 -> return ((c',e1), \ e1' -> return (Fib e1'))
 
 --------------------------------------------------------------------------------------
