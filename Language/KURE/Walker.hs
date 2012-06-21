@@ -274,26 +274,31 @@ abs2pathT there = do here <- absPathT
 
 -- | Find the 'Path's to every descendent node that satisfies the predicate.
 pathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
-pathsToT p = collectT (acceptR p >>> absPathT) >>= mapM abs2pathT
+pathsToT q = collectT (acceptR q >>> absPathT) >>= mapM abs2pathT
 
 -- | Find the 'Path's to every descendent node that satisfies the predicate, ignoring nodes below successes.
 prunePathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
-prunePathsToT p = collectPruneT (acceptR p >>> absPathT) >>= mapM abs2pathT
+prunePathsToT q = collectPruneT (acceptR q >>> absPathT) >>= mapM abs2pathT
+
+
+requireUniquePath :: Monad m => Translate c m [Path] Path
+requireUniquePath = contextfreeT $ \ ps -> case ps of
+                                             []  -> fail "No matching nodes found."
+                                             [p] -> return p
+                                             _   -> fail $ "Ambiguous: " ++ show (length ps) ++ " matching nodes found."
 
 -- | Find the 'Path' to the descendent node that satisfies the predicate, failing if that does not uniquely identify a node.
 uniquePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
-uniquePathToT p = do [pa] <- pathsToT p
-                     return pa
+uniquePathToT q = pathsToT q >>> requireUniquePath
 
 -- | Build a 'Path' to the descendent node that satisfies the predicate, failing if that does not uniquely identify a node (ignoring nodes below successes).
 uniquePrunePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
-uniquePrunePathToT p = do [pa] <- prunePathsToT p
-                          return pa
+uniquePrunePathToT q = pathsToT q >>> requireUniquePath
 
 -- | Build a 'Path' to the first descendent node that satisfies the predicate (in a pre-order traversal).
 firstPathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
-firstPathToT p = do (pa : _) <- pathsToT p
-                    return pa
+firstPathToT q = tagFailR "No matching nodes found." $ do (pa : _) <- pathsToT q
+                                                          return pa
 
 -------------------------------------------------------------------------------
 
