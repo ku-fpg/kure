@@ -3,9 +3,8 @@
 module Fib.Kure where
 
 import Language.KURE
+import Language.KURE.Utilities(missingChild)
 import Fib.AST
-
-import Control.Monad(guard)
 
 --------------------------------------------------------------------------------------
 
@@ -26,7 +25,7 @@ instance Term Arith where
 instance Walker AbsolutePath Maybe Arith where
 
   childL n = lens $ translate $ \ c e ->
-    do guard (hasChild n e)
+    do guardFail (hasChild n e) (missingChild n)
        let c' = extendAbsPath n c
        case e of
          Add e1 e2  ->  case n of

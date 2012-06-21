@@ -27,14 +27,14 @@ instance Term Exp where
    numChildren (App _ _) = 2
 
 instance Walker Context LamM Exp where
-   childL n = lens $ tagFailR (missingChild n) $
+   childL n = lens $
      case n of
        0 ->    appT exposeT idR (childL0of2 App)
             <+ lamT exposeT (childL1of2 Lam)
 
        1 -> appT idR exposeT (childL1of2 App)
 
-       _ -> empty
+       _ -> fail (missingChild n)
 
 -------------------------------------------------------------------------------
 

@@ -74,13 +74,13 @@ instance Term Expr where
 
 
 instance Walker Context Maybe Expr where
-  childL n = lens $ tagFailR (missingChild n) $
+  childL n = lens $
     case n of
       0 ->    addT  exposeT idR (childL0of2 Add)
            <+ eseqT exposeT idR (childL0of2 ESeq)
       1 ->    addT  idR exposeT (childL1of2 Add)
            <+ eseqT idR exposeT (childL1of2 ESeq)
-      _ -> empty
+      _ -> fail (missingChild n)
 
   allT t =  varT (\ _ -> mempty)
          <+ litT (\ _ -> mempty)
@@ -111,12 +111,12 @@ instance Term Cmd where
   numChildren (Assign _ _) = 2
 
 instance Walker Context Maybe Cmd where
-  childL n = lens $ tagFailR (missingChild n) $
+  childL n = lens $
     case n of
       0 ->    seqT exposeT idR (childL0of2 Seq)
            <+ assignT exposeT (childL1of2 Assign)
-      1 ->    seqT idR exposeT (childL1of2 Seq)
-      _ ->    empty
+      1 -> seqT idR exposeT (childL1of2 Seq)
+      _ -> fail (missingChild n)
 
   allT t =  seqT (extractT t) (extractT t) mappend
          <+ assignT (extractT t) (\ _ -> id)
