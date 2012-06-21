@@ -293,7 +293,7 @@ uniquePathToT q = pathsToT q >>> requireUniquePath
 
 -- | Build a 'Path' to the descendent node that satisfies the predicate, failing if that does not uniquely identify a node (ignoring nodes below successes).
 uniquePrunePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
-uniquePrunePathToT q = pathsToT q >>> requireUniquePath
+uniquePrunePathToT q = prunePathsToT q >>> requireUniquePath
 
 -- | Build a 'Path' to the first descendent node that satisfies the predicate (in a pre-order traversal).
 firstPathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
