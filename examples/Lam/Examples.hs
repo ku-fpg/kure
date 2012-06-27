@@ -1,19 +1,21 @@
 module Lam.Examples where
 
+import Prelude hiding (id, (.))
+
 import Language.KURE
 
 import Lam.AST
 import Lam.Kure
 
 import Data.List (nub)
-import Control.Monad (guard)
 import Control.Arrow
+import Control.Category
 
 ------------------------------------------------------------------------
 
 freeVarsT :: TranslateExp [Name]
 freeVarsT = fmap nub $ crushbuT $ do (c, Var v) <- exposeT
-                                     guard (v `freeIn` c)
+                                     guardM (v `freeIn` c)
                                      return [v]
 
 freeVars :: Exp -> [Name]
@@ -21,7 +23,7 @@ freeVars = either error id . applyExp freeVarsT
 
 -- Only works for lambdas, fails for all others
 alphaLam :: [Name] -> RewriteExp
-alphaLam frees = do Lam v e <- idR
+alphaLam frees = do Lam v e <- id
                     v' <- constT $ freshName $ frees ++ v : freeVars e
                     lamT (tryR $ substExp v (Var v')) (\ _ -> Lam v')
 
@@ -31,31 +33,32 @@ substExp v s = rules_var <+ rules_lam <+ rule_app
         -- From Lambda Calc Textbook, the 6 rules.
         rules_var = whenM (varT (==v)) (return s)                   -- Rule 1
 
-        rules_lam = do Lam n e <- idR
-                       guard (n /= v)                               -- Rule 3
-                       guard (v `elem` freeVars e)                  -- Rule 4a
+        rules_lam = do Lam n e <- id
+                       guardM (n /= v)                              -- Rule 3
+                       guardM (v `elem` freeVars e)                 -- Rule 4a
                        if n `elem` freeVars s
                         then alphaLam (freeVars s) >>> rules_lam    -- Rule 5
                         else lamR (substExp v s)                    -- Rule 4b
 
-        rule_app = do App _ _ <- idR
+        rule_app = do App _ _ <- id
                       anyR (substExp v s)                           -- Rule 6
 
 ------------------------------------------------------------------------
 
 beta_reduce :: RewriteExp
-beta_reduce = do App (Lam v _) e2 <- idR
-                 focusT (pathL [0,0]) (tryR $ substExp v e2)
+beta_reduce = withPatFailMsg "Cannot beta-reduce, not app-lambda." $
+                do App (Lam v _) e2 <- id
+                   pathT [0,0] (tryR $ substExp v e2)
 
 eta_expand :: RewriteExp
 eta_expand = rewrite $ \ c f -> do v <- freshName (bindings c)
                                    return $ Lam v (App f (Var v))
 
 eta_reduce :: RewriteExp
-eta_reduce = contextfreeT $ \ e -> case e of
-                               Lam v1 (App f (Var v2)) -> do guardFail (v1 == v2) $ "Cannot eta-reduce, " ++ v1 ++ " /= " ++ v2
-                                                             return f
-                               _                       -> fail "Cannot eta-reduce, not lambda-app-var."
+eta_reduce = withPatFailMsg "Cannot eta-reduce, not lambda-app-var." $
+               do Lam v1 (App f (Var v2)) <- id
+                  guardMsg (v1 == v2) $ "Cannot eta-reduce, " ++ v1 ++ " /= " ++ v2
+                  return f
 
 -- This might not actually be normal order evaluation
 -- Contact the  KURE maintainer if you can correct this definition.

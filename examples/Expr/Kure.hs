@@ -2,6 +2,9 @@
 
 module Expr.Kure where
 
+import Prelude hiding (id , (.))
+
+import Control.Category
 import Control.Applicative
 
 import Data.Monoid
@@ -12,25 +15,47 @@ import Language.KURE.Utilities
 
 import Expr.AST
 
----------------------------------------------------------------------------
-
 -- NOTE: allT, allR and anyR have been defined to serve as examples,
 --       but using the default instances would be fine (just slightly less efficient).
 
 ---------------------------------------------------------------------------
 
-type TranslateE a b = Translate Context Maybe a b
+data Context = Context AbsolutePath [(Name,Expr)] -- A list of bindings.
+                                                  -- We assume no shadowing in the language.
+
+instance PathContext Context where
+  contextPath (Context p _) = p
+
+addDef :: Name -> Expr -> Context -> Context
+addDef v e (Context p defs) = Context p ((v,e):defs)
+
+updateContextCmd :: Cmd -> Context -> Context
+updateContextCmd (Seq c1 c2)  = updateContextCmd c2 . updateContextCmd c1
+updateContextCmd (Assign v e) = (addDef v e)
+
+(@@) :: Context -> Int -> Context
+(Context p defs) @@ n = Context (extendAbsPath n p) defs
+
+initialContext :: Context
+initialContext = Context rootAbsPath []
+
+lookupDef :: Name -> Context -> KureMonad Expr
+lookupDef v (Context _ defs) = maybe (fail $ v ++ " not found in context") return $ lookup v defs
+
+---------------------------------------------------------------------------
+
+type TranslateE a b = Translate Context KureMonad a b
 type RewriteE a = TranslateE a a
 
-applyE :: TranslateE a b -> a -> Maybe b
-applyE t = apply t initialContext
+applyE :: TranslateE a b -> a -> Either String b
+applyE t = runKureMonad Right Left . apply t initialContext
 
 ---------------------------------------------------------------------------
 
 data GenericExpr = GExpr Expr
                  | GCmd Cmd
 
-instance Term GenericExpr where
+instance Node GenericExpr where
   type Generic GenericExpr = GenericExpr
 
   numChildren (GExpr e) = numChildren e
@@ -38,7 +63,7 @@ instance Term GenericExpr where
 
 ---------------------------------------------------------------------------
 
-instance Walker Context Maybe GenericExpr where
+instance Walker Context KureMonad GenericExpr where
 
   childL n = lens $ translate $ \ c g -> case g of
                                            GExpr e -> childLgeneric n c e
@@ -64,7 +89,7 @@ instance Injection Expr GenericExpr where
   retract (GExpr e) = Just e
   retract _         = Nothing
 
-instance Term Expr where
+instance Node Expr where
   type Generic Expr = GenericExpr
 
   numChildren (Add _ _)  = 2
@@ -72,14 +97,13 @@ instance Term Expr where
   numChildren (Var _)    = 0
   numChildren (Lit _)    = 0
 
-
-instance Walker Context Maybe Expr where
+instance Walker Context KureMonad Expr where
   childL n = lens $
     case n of
-      0 ->    addT  exposeT idR (childL0of2 Add)
-           <+ eseqT exposeT idR (childL0of2 ESeq)
-      1 ->    addT  idR exposeT (childL1of2 Add)
-           <+ eseqT idR exposeT (childL1of2 ESeq)
+      0 ->    addT  exposeT id (childL0of2 Add)
+           <+ eseqT exposeT id (childL0of2 ESeq)
+      1 ->    addT  id exposeT (childL1of2 Add)
+           <+ eseqT id exposeT (childL1of2 ESeq)
       _ -> fail (missingChild n)
 
   allT t =  varT (\ _ -> mempty)
@@ -104,18 +128,19 @@ instance Injection Cmd GenericExpr where
   retract (GCmd c) = Just c
   retract _        = Nothing
 
-instance Term Cmd where
+instance Node Cmd where
   type Generic Cmd = GenericExpr
 
   numChildren (Seq _ _)    = 2
-  numChildren (Assign _ _) = 2
+  numChildren (Assign _ _) = 1
 
-instance Walker Context Maybe Cmd where
+instance Walker Context KureMonad Cmd where
   childL n = lens $
     case n of
-      0 ->    seqT exposeT idR (childL0of2 Seq)
+      0 ->    seqT exposeT id (childL0of2 Seq)
            <+ assignT exposeT (childL1of2 Assign)
-      1 -> seqT idR exposeT (childL1of2 Seq)
+      1 ->    seqT id exposeT (childL1of2 Seq)
+           <+ fail (missingChild n)
       _ -> fail (missingChild n)
 
   allT t =  seqT (extractT t) (extractT t) mappend
@@ -130,7 +155,7 @@ instance Walker Context Maybe Cmd where
 
 ---------------------------------------------------------------------------
 
-seqT' :: TranslateE Cmd a1 -> TranslateE Cmd a2 -> (Maybe a1 -> Maybe a2 -> Maybe b) -> TranslateE Cmd b
+seqT' :: TranslateE Cmd a1 -> TranslateE Cmd a2 -> (KureMonad a1 -> KureMonad a2 -> KureMonad b) -> TranslateE Cmd b
 seqT' t1 t2 f = translate $ \ c cm -> case cm of
                                        Seq cm1 cm2 -> f (apply t1 (c @@ 0) cm1) (apply t2 (updateContextCmd cm1 c @@ 1) cm2)
                                        _           -> fail "not a Seq"
@@ -170,7 +195,7 @@ litT f = contextfreeT $ \ e -> case e of
 
 ---------------------------------------------------------------------------
 
-addT' :: TranslateE Expr a1 -> TranslateE Expr a2 -> (Maybe a1 -> Maybe a2 -> Maybe b) -> TranslateE Expr b
+addT' :: TranslateE Expr a1 -> TranslateE Expr a2 -> (KureMonad a1 -> KureMonad a2 -> KureMonad b) -> TranslateE Expr b
 addT' t1 t2 f = translate $ \ c e -> case e of
                                        Add e1 e2 -> f (apply t1 (c @@ 0) e1) (apply t2 (c @@ 1) e2)
                                        _         -> fail "not an Add"
@@ -186,7 +211,7 @@ addAnyR r1 r2 = addT' (attemptR r1) (attemptR r2) (attemptAny2 Add)
 
 ---------------------------------------------------------------------------
 
-eseqT' :: TranslateE Cmd a1 -> TranslateE Expr a2 -> (Maybe a1 -> Maybe a2 -> Maybe b) -> TranslateE Expr b
+eseqT' :: TranslateE Cmd a1 -> TranslateE Expr a2 -> (KureMonad a1 -> KureMonad a2 -> KureMonad b) -> TranslateE Expr b
 eseqT' t1 t2 f = translate $ \ c e -> case e of
                                         ESeq cm e1 -> f (apply t1 (c @@ 0) cm) (apply t2 (updateContextCmd cm c @@ 1) e1)
                                         _          -> fail "not an ESeq"

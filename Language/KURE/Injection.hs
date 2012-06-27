@@ -37,6 +37,7 @@ import Control.Monad
 import Control.Arrow
 
 import Language.KURE.Translate
+import Language.KURE.Combinators
 
 -------------------------------------------------------------------------------
 
@@ -64,9 +65,9 @@ instance Injection a (Maybe a) where
 injectM :: (Monad m, Injection a a') => a -> m a'
 injectM = return . inject
 
--- | Retracts a value and lifts it into a 'MonadPlus', producing 'mzero' if the retraction fails.
-retractM :: (MonadPlus m, Injection a a') => a' -> m a
-retractM = maybe mzero return . retract
+-- | Retracts a value and lifts it into a 'MonadCatch', with the possibility of failure.
+retractM :: (MonadCatch m, Injection a a') => a' -> m a
+retractM = maybe (fail "retractM failed") return . retract
 
 -------------------------------------------------------------------------------
 
@@ -75,7 +76,7 @@ injectT :: (Monad m, Injection a a') => Translate c m a a'
 injectT = arr inject
 
 -- | Lifted 'retract', the 'Translate' fails if the retraction fails.
-retractT :: (MonadPlus m, Injection a a') => Translate c m a' a
+retractT :: (MonadCatch m, Injection a a') => Translate c m a' a
 retractT = contextfreeT retractM
 
 -- | Convert a 'Translate' over an injected value into a 'Translate' over a non-injected value.
@@ -84,27 +85,27 @@ extractT t = injectT >>> t
 
 -- | Promote a 'Translate' over a value into a 'Translate' over an injection of that value,
 --   (failing if that injected value cannot be retracted).
-promoteT  :: (MonadPlus m, Injection a a') => Translate c m a b -> Translate c m a' b
+promoteT  :: (MonadCatch m, Injection a a') => Translate c m a b -> Translate c m a' b
 promoteT t = retractT >>> t
 
 -- | Convert a 'Rewrite' over an injected value into a 'Rewrite' over a retraction of that value,
 --   (failing if that injected value cannot be retracted).
-extractR :: (MonadPlus m, Injection a a') => Rewrite c m a' -> Rewrite c m a
+extractR :: (MonadCatch m, Injection a a') => Rewrite c m a' -> Rewrite c m a
 extractR r = injectT >>> r >>> retractT
 
 -- | Promote a 'Rewrite' into over a value into a 'Rewrite' over an injection of that value,
 --   (failing if that injected value cannot be retracted).
-promoteR  :: (MonadPlus m, Injection a a') => Rewrite c m a -> Rewrite c m a'
+promoteR  :: (MonadCatch m, Injection a a') => Rewrite c m a -> Rewrite c m a'
 promoteR r = retractT >>> r >>> injectT
 
 -------------------------------------------------------------------------------
 
 -- | A 'Lens' to the injection of a value.
-injectL  :: (MonadPlus m, Injection a a') => Lens c m a a'
+injectL  :: (MonadCatch m, Injection a a') => Lens c m a a'
 injectL = lens $ translate $ \ c a -> return ((c, inject a), retractM)
 
 -- | A 'Lens' to the retraction of a value.
-retractL :: (MonadPlus m, Injection a a') => Lens c m a' a
+retractL :: (MonadCatch m, Injection a a') => Lens c m a' a
 retractL = lens $ translate $ \ c -> retractM >=> (\ a -> return ((c,a), injectM))
 
 -------------------------------------------------------------------------------

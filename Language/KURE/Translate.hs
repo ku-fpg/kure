@@ -137,6 +137,13 @@ instance Monad m => Monad (Translate c m a) where
    fail = constT . fail
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
+instance MonadCatch m => MonadCatch (Translate c m a) where
+
+-- catchM :: Translate c m a b -> (String -> Translate c m a b) -> Translate c m a b
+   catchM t1 t2 = translate $ \ c a -> apply t1 c a `catchM` \ msg -> apply (t2 msg) c a
+
+
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadPlus m => MonadPlus (Translate c m a) where
 
 -- mzero :: Translate c m a b
@@ -157,13 +164,13 @@ instance Monad m => Category (Translate c m) where
     t2 . t1 = translate $ \ c -> apply t1 c >=> apply t2 c
 
 -- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
-instance MonadPlus m => CategoryCatch (Translate c m) where
+instance MonadCatch m => CategoryCatch (Translate c m) where
 
--- failR :: String -> Translate c m a b
-   failR = fail
+-- failure :: String -> Translate c m a b
+   failure = fail
 
--- (<+) :: Translate c m a b -> Translate c m a b -> Translate c m a b
-   (<+) = mplus
+-- catch :: Translate c m a b -> (String -> Translate c m a b) -> Translate c m a b
+   catch = catchM
 
 
 -- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
@@ -224,7 +231,7 @@ bidirectional = BiTranslate
 
 -- | Try the 'BiRewrite' forewards, then backwards if that fails.
 --   Useful when you know which rule you want to apply, but not which direction to apply it in.
-whicheverR :: MonadPlus m => BiRewrite c m a -> Rewrite c m a
+whicheverR :: MonadCatch m => BiRewrite c m a -> Rewrite c m a
 whicheverR r = forewardT r <+ backwardT r
 
 -- | Invert the forewards and backwards directions of a 'BiTranslate'.
@@ -260,9 +267,8 @@ focusT l t = do ((c,b),_) <- lensT l
                 constT (apply t c b)
 
 -- | Checks if the focusing succeeds, and additionally whether unfocussing from an unchanged value would succeed.
-testLensT :: MonadPlus m => Lens c m a b -> Translate c m a Bool
-testLensT l = testM $ do ((_,b),k) <- lensT l
-                         constT (k b)
+testLensT :: MonadCatch m => Lens c m a b -> Translate c m a Bool
+testLensT l = testM (focusR l id)
 
 -- | Combines a 'Translate' producing a 'Lens' into just a 'Lens'.
 --   Essentially a monadic 'join'.
@@ -280,18 +286,18 @@ instance Monad m => Category (Lens c m) where
                                                 return ((cd,d),kd >=> kb)
 
 
--- | '(<+)' catches a failing 'Lens'.  A 'Lens' is deemed to have failed if either it fails on the way down, or,
---   crucially, if it would fail on the way up for an unchanged value.  However, actual failure on the way up are not caught
---   (as by then it is too late).  This means that, in theory, a use of '(<+)' could cause a succeeding 'Lens' application to fail.
---   But provided |lens| is used correctly, this should never happen.
+-- | A 'Lens' is deemed to have failed (and thus can be caught) if either it fails on the way down, or,
+--   crucially, if it would fail on the way up for an unmodified value.  However, actual failure on the way up is not caught
+--   (as by then it is too late to use an alternative 'Lens').  This means that, in theory, a use of 'catch' could cause a succeeding 'Lens' application to fail.
+--   But provided 'lens' is used correctly, this should never happen.
 
-instance MonadPlus m => CategoryCatch (Lens c m) where
+instance MonadCatch m => CategoryCatch (Lens c m) where
 
--- failR :: String -> Lens c m a b
-   failR = lens . fail
+-- failure :: String -> Lens c m a b
+   failure = lens . fail
 
--- (<+) :: Lens c m a b -> Lens c m a b -> Lens c m a b
-   l1 <+ l2 = lens (condM (testLensT l1) (lensT l1) (lensT l2))
+-- catch :: Lens c m a b -> (String -> Lens c m a b) -> Lens c m a b
+   l1 `catch` l2 = lens (attemptM (focusR l1 id) >>= either (lensT . l2) (const (lensT l1)))
 
 -- | Construct a 'Lens' from a 'BiTranslate'.
 bidirectionalL :: Monad m => BiTranslate c m a b -> Lens c m a b

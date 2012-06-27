@@ -1,5 +1,8 @@
 module Fib.Examples where
 
+import Prelude hiding (id , (.), snd)
+import Control.Category
+
 import Language.KURE
 
 import Fib.AST
@@ -7,15 +10,16 @@ import Fib.Kure
 
 -----------------------------------------------------------------------
 
-applyFib :: RewriteA -> Arith -> Maybe Arith
-applyFib e = apply e rootAbsPath
+applyFib :: RewriteA -> Arith -> Either String Arith
+applyFib r = runKureMonad Right Left . apply r rootAbsPath
 
 -----------------------------------------------------------------------
 
 -- | Apply the definition of the fibonacci function once.
 --   Requires the argument to Fib to be a Literal.
 fibLitR :: RewriteA
-fibLitR = do Fib (Lit n) <- idR
+fibLitR = withPatFailMsg "fibLitR failed: not of form Fib (Lit n)" $
+          do Fib (Lit n) <- id
              case n of
                0  ->  return (Lit 0)
                1  ->  return (Lit 1)
@@ -25,12 +29,14 @@ fibLitR = do Fib (Lit n) <- idR
 
 -- | Compute the addition of two literals.
 addLitR :: RewriteA
-addLitR = do Add (Lit m) (Lit n) <- idR
+addLitR = withPatFailMsg "addLitR failed" $
+          do Add (Lit m) (Lit n) <- id
              return (Lit (m + n))
 
 -- | Compute the subtraction of two literals.
 subLitR :: RewriteA
-subLitR = do Sub (Lit m) (Lit n) <- idR
+subLitR = withPatFailMsg "subLitR failed" $
+          do Sub (Lit m) (Lit n) <- id
              return (Lit (m - n))
 
 -----------------------------------------------------------------------
@@ -64,52 +70,52 @@ expr3 = 100 - Fib (3 + 7)
 test1a :: Bool
 test1a = applyFib anyAddR expr1
          ==
-         Just (10 - 5)
+         Right (10 - 5)
 
 test1b :: Bool
 test1b = applyFib anySubR expr1
          ==
-         Nothing
+         Left "subLitR failed"
 
 test1c :: Bool
 test1c = applyFib anyArithR expr1
          ==
-         Just 5
+         Right 5
 
 test1d :: Bool
 test1d = applyFib evalR expr1
          ==
-         Just 5
+         Right 5
 
 test2a :: Bool
 test2a = applyFib fibLitR expr2
          ==
-         Just ((Fib (8 - 1)) + (Fib (8 - 2)))
+         Right ((Fib (8 - 1)) + (Fib (8 - 2)))
 
 test2b :: Bool
 test2b = applyFib (anytdR fibLitR) expr2
          ==
-         Just ((Fib (8 - 1)) + (Fib (8 - 2)))
+         Right ((Fib (8 - 1)) + (Fib (8 - 2)))
 
 test2c :: Bool
 test2c = applyFib evalR expr2
          ==
-         Just 21
+         Right 21
 
 test3a :: Bool
 test3a = applyFib anyArithR expr3
          ==
-         Just (100 - (Fib 10))
+         Right (100 - (Fib 10))
 
 test3b :: Bool
 test3b = applyFib (anyArithR >+> anyR fibLitR) expr3
          ==
-         Just (100 - ((Fib (10 - 1)) + (Fib (10 - 2))))
+         Right (100 - ((Fib (10 - 1)) + (Fib (10 - 2))))
 
 test3c :: Bool
 test3c = applyFib evalR expr3
          ==
-         Just 45
+         Right 45
 
 -----------------------------------------------------------------------
 

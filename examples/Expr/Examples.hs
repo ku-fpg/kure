@@ -34,7 +34,7 @@ result1 = ESeq (Seq (Assign "m" (Lit 7))
                )
 
 test1 :: Bool
-test1 = applyE (extractR (anytdR inlineGR)) expr1 == Just result1
+test1 = applyE (extractR (anytdR inlineGR)) expr1 == Right result1
 
 expr2 :: Expr
 expr2 = ESeq (Seq (Assign "m" (Lit 7))
@@ -52,7 +52,7 @@ result2 = ESeq (Seq (Assign "m" (Lit 7))
                     (Var "x")
                )
 test2 :: Bool
-test2 = applyE (extractR (anytdR inlineGR)) expr2 == Just result2
+test2 = applyE (extractR (anytdR inlineGR)) expr2 == Right result2
 
 expr3 :: Expr
 expr3 = ESeq (Assign "m" (Lit 7)
@@ -62,7 +62,7 @@ expr3 = ESeq (Assign "m" (Lit 7)
              )
 
 test3 :: Bool
-test3 = applyE (extractR (anytdR inlineGR)) expr3 == Nothing
+test3 = applyE (extractR (anytdR inlineGR)) expr3 == Left "anyR failed"
 
 -----------------------------------------------------------------
 

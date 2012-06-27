@@ -8,13 +8,13 @@ import Fib.AST
 
 --------------------------------------------------------------------------------------
 
--- | For this simple example, the context only contains the 'AbsolutePath', and 'Translate' always operates on 'Arith'.
-type TranslateA b = Translate AbsolutePath Maybe Arith b
+-- | For this simple example, the context is just an 'AbsolutePath', and 'Translate' always operates on 'Arith'.
+type TranslateA b = Translate AbsolutePath KureMonad Arith b
 type RewriteA = TranslateA Arith
 
 --------------------------------------------------------------------------------------
 
-instance Term Arith where
+instance Node Arith where
   type Generic Arith = Arith
 
   numChildren (Lit _)   = 0
@@ -22,10 +22,10 @@ instance Term Arith where
   numChildren (Sub _ _) = 2
   numChildren (Fib _)   = 1
 
-instance Walker AbsolutePath Maybe Arith where
+instance Walker AbsolutePath KureMonad Arith where
 
   childL n = lens $ translate $ \ c e ->
-    do guardFail (hasChild n e) (missingChild n)
+    do guardMsg (hasChild n e) (missingChild n)
        let c' = extendAbsPath n c
        case e of
          Add e1 e2  ->  case n of

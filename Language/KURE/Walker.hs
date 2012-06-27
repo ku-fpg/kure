@@ -15,8 +15,8 @@
 -- There is no mechanism for \"ascending\" the tree.
 
 module Language.KURE.Walker
-        ( -- * Terms
-          Term(..)
+        ( -- * Nodes
+          Node(..)
         , numChildrenT
         , hasChild
         , hasChildT
@@ -68,7 +68,7 @@ module Language.KURE.Walker
         , repeatPathL
         , rootL
 
-        -- ** Applying transformations at the end of 'Path's
+        -- ** Applying transformations at the end of Paths
         ,  pathR
         ,  pathT
 
@@ -78,10 +78,13 @@ module Language.KURE.Walker
 
 ) where
 
+import Prelude hiding (id)
+
 import Data.Monoid
 import Data.List
 import Control.Monad
 import Control.Arrow
+import Control.Category hiding ((.))
 
 import Language.KURE.Combinators
 import Language.KURE.Translate
@@ -90,35 +93,35 @@ import Language.KURE.Injection
 ------------------------------------------------------------------------------------------
 
 
--- | A 'Term' is any node in the tree that you wish to be able to traverse.
+-- | A 'Node' is any node in the tree that you wish to be able to traverse.
 
-class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Term a where
+class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Node a where
 
-  -- | 'Generic' is a sum of all the interesting sub-types, transitively, of @a@.
+  -- | 'Generic' is a sum of all the types of the sub-nodes, transitively, of @a@.
   -- We use @Generic a ~ a@ to signify that something is its own Generic.
   -- Simple expression types might be their own sole 'Generic', more complex examples
-  -- will have a new datatype for the 'Generic', which will also be an instance of class 'Term'.
+  -- will have a new datatype for the 'Generic', which will also be an instance of class 'Node'.
   type Generic a :: *
 
-  -- | Count the number of interesting children.
+  -- | Count the number of immediate child 'Node's.
   numChildren :: a -> Int
 
 -- | Lifted version of 'numChildren'.
-numChildrenT :: (Monad m, Term a) => Translate c m a Int
+numChildrenT :: (Monad m, Node a) => Translate c m a Int
 numChildrenT = arr numChildren
 
--- | Check if a 'Term' has a child of the specified index.
-hasChild :: Term a => Int -> a -> Bool
+-- | Check if a 'Node' has a child of the specified index.
+hasChild :: Node a => Int -> a -> Bool
 hasChild n a = (0 <= n) && (n < numChildren a)
 
 -- | Lifted version of 'hasChild'.
-hasChildT :: (Monad m, Term a) => Int -> Translate c m a Bool
+hasChildT :: (Monad m, Node a) => Int -> Translate c m a Bool
 hasChildT = arr . hasChild
 
 -------------------------------------------------------------------------------
 
--- | 'Walker' captures the ability to walk over a 'Term' applying 'Rewrite's,
---   using a specific context @c@ and a 'MonadPlus' @m@.
+-- | 'Walker' captures the ability to walk over a tree of 'Node's,
+--   using a specific context @c@ and a 'MonadCatch' @m@.
 --
 --   Minimal complete definition: 'childL'.
 --
@@ -126,48 +129,48 @@ hasChildT = arr . hasChild
 --   For small numbers of interesting children this will not be an issue, but for a large number, say
 --   for a list of children, it may be.
 
-class (MonadPlus m, Term a) => Walker c m a where
+class (MonadCatch m, Node a) => Walker c m a where
 
-  -- | Construct a 'Lens' pointing at the n-th interesting child of this node.
+  -- | Construct a 'Lens' to the n-th child 'Node'.
   childL :: Int -> Lens c m a (Generic a)
 
-  -- | Apply a 'Generic' 'Translate' to all interesting children of this node, succeeding if they all succeed.
+  -- | Apply a 'Generic' 'Translate' to all immediate child 'Node's, succeeding if they all succeed.
   --   The results are combined in a 'Monoid'.
   allT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
   allT t = do n <- arr numChildren
               mconcat [ childT i t | i <- [0..(n-1)] ]
 
-  -- | Apply a 'Generic' 'Rewrite' to all interesting children of this node, succeeding if they all succeed.
+  -- | Apply a 'Generic' 'Rewrite' to all interesting children of this 'Node', succeeding if they all succeed.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
   allR r = do n <- arr numChildren
               andR [ childR i r | i <- [0..(n-1)] ]
 
-  -- | Apply 'Generic' 'Rewrite' to all interesting children of this node, suceeding if any succeed.
+  -- | Apply 'Generic' 'Rewrite' to all interesting children of this 'Node', suceeding if any succeed.
   anyR :: Rewrite c m (Generic a) -> Rewrite c m a
   anyR r = do n <- arr numChildren
               orR [ childR i r | i <- [0..(n-1)] ]
 
--- | Apply a 'Translate' to a specific child.
+-- | Apply a 'Translate' to a specific child 'Node'.
 childT :: Walker c m a => Int -> Translate c m (Generic a) b -> Translate c m a b
 childT n = focusT (childL n)
 
--- | Apply a 'Rewrite' to a specific child.
+-- | Apply a 'Rewrite' to a specific child 'Node'.
 childR :: Walker c m a => Int -> Rewrite c m (Generic a) -> Rewrite c m a
 childR n = focusR (childL n)
 
 -------------------------------------------------------------------------------
 
--- | Fold a tree in a top-down manner, using a single 'Translate' for each node.
+-- | Fold a tree in a top-down manner, using a single 'Translate' for each 'Node'.
 foldtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
 foldtdT t = t `mappend` allT (foldtdT t)
 
--- | Fold a tree in a bottom-up manner, using a single 'Translate' for each node.
+-- | Fold a tree in a bottom-up manner, using a single 'Translate' for each 'Node'.
 foldbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
 foldbuT t = allT (foldbuT t) `mappend` t
 
 -- | Attempt to apply a 'Translate' in a top-down manner, prunning at successes.
 prunetdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-prunetdT t = t <+> allT (prunetdT t)
+prunetdT t = t <+ allT (prunetdT t)
 
 -- | An always successful top-down fold, replacing failures with 'mempty'.
 crushtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
@@ -215,7 +218,7 @@ anyduR r = r >+> anyR (anyduR r) >+> r
 
 -- | Attempt to apply a 'Rewrite' in a top-down manner, prunning at successful rewrites.
 prunetdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-prunetdR r = r <+> anyR (prunetdR r)
+prunetdR r = r <+ anyR (prunetdR r)
 
 -- | A fixed-point traveral, starting with the innermost term.
 innermostR :: (Walker c m a, Generic a ~ a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
@@ -238,7 +241,7 @@ extendAbsPath :: Int -> AbsolutePath -> AbsolutePath
 extendAbsPath n (AbsolutePath ns) = AbsolutePath (n:ns)
 
 -- | Contexts that are instances of 'PathContext' contain the current 'AbsolutePath'.
---   Any user-defined combinators (typically 'childL' and congruence combinators) should update the 'AbsolutePath' using 'extendAbsolutePath'.
+--   Any user-defined combinators (typically 'childL' and congruence combinators) should update the 'AbsolutePath' using 'extendAbsPath'.
 class PathContext c where
   -- | Find the current path.
   contextPath :: c -> AbsolutePath
@@ -248,13 +251,13 @@ instance PathContext AbsolutePath where
 -- contextPath :: AbsolutePath -> AbsolutePath
    contextPath p = p
 
--- | Find the 'AbsolutePath' to the current node.
+-- | Find the 'AbsolutePath' to the current 'Node'.
 absPathT :: (PathContext c, Monad m) => Translate c m a AbsolutePath
 absPathT = contextT >>^ contextPath
 
 -------------------------------------------------------------------------------
 
--- | A path is a route to descend the tree from an arbitrary node.
+-- | A path is a route to descend the tree from an arbitrary 'Node'.
 type Path = [Int]
 
 -- | Convert an 'AbsolutePath' into a 'Path' starting at the root.
@@ -267,16 +270,16 @@ rmPathPrefix :: AbsolutePath -> AbsolutePath -> Maybe Path
 rmPathPrefix (AbsolutePath p1) (AbsolutePath p2) = do guard (p1 `isSuffixOf` p2)
                                                       return (drop (length p1) (reverse p2))
 
---  Construct a 'Path' from the current node to the end of the given 'AbsolutePath', provided that 'AbsolutePath' passes through the current node.
+--  Construct a 'Path' from the current 'Node' to the end of the given 'AbsolutePath', provided that 'AbsolutePath' passes through the current 'Node'.
 abs2pathT :: (PathContext c, Monad m) => AbsolutePath -> Translate c m a Path
 abs2pathT there = do here <- absPathT
                      maybe (fail "Absolute path does not pass through current node.") return (rmPathPrefix here there)
 
--- | Find the 'Path's to every descendent node that satisfies the predicate.
+-- | Find the 'Path's to every descendent 'Node' that satisfies the predicate.
 pathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
 pathsToT q = collectT (acceptR q >>> absPathT) >>= mapM abs2pathT
 
--- | Find the 'Path's to every descendent node that satisfies the predicate, ignoring nodes below successes.
+-- | Find the 'Path's to every descendent 'Node' that satisfies the predicate, ignoring 'Node's below successes.
 prunePathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
 prunePathsToT q = collectPruneT (acceptR q >>> absPathT) >>= mapM abs2pathT
 
@@ -287,18 +290,18 @@ requireUniquePath = contextfreeT $ \ ps -> case ps of
                                              [p] -> return p
                                              _   -> fail $ "Ambiguous: " ++ show (length ps) ++ " matching nodes found."
 
--- | Find the 'Path' to the descendent node that satisfies the predicate, failing if that does not uniquely identify a node.
+-- | Find the 'Path' to the descendent 'Node' that satisfies the predicate, failing if that does not uniquely identify a 'Node'.
 uniquePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
 uniquePathToT q = pathsToT q >>> requireUniquePath
 
--- | Build a 'Path' to the descendent node that satisfies the predicate, failing if that does not uniquely identify a node (ignoring nodes below successes).
+-- | Build a 'Path' to the descendent 'Node' that satisfies the predicate, failing if that does not uniquely identify a 'Node' (ignoring 'Node's below successes).
 uniquePrunePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
 uniquePrunePathToT q = prunePathsToT q >>> requireUniquePath
 
--- | Build a 'Path' to the first descendent node that satisfies the predicate (in a pre-order traversal).
+-- | Build a 'Path' to the first descendent 'Node' that satisfies the predicate (in a pre-order traversal).
 firstPathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
-firstPathToT q = tagFailR "No matching nodes found." $ do (pa : _) <- pathsToT q
-                                                          return pa
+firstPathToT q = withPatFailMsg "No matching nodes found." $ do (pa : _) <- pathsToT q
+                                                                return pa
 
 -------------------------------------------------------------------------------
 
@@ -306,9 +309,9 @@ firstPathToT q = tagFailR "No matching nodes found." $ do (pa : _) <- pathsToT q
 pathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
 pathL = andR . map childL
 
--- | Construct a 'Lens' that points to the last node at which the 'Path' can be followed.
+-- | Construct a 'Lens' that points to the last 'Node' at which the 'Path' can be followed.
 exhaustPathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
-exhaustPathL = foldr (\ n l -> tryR (childL n >>> l)) idR
+exhaustPathL = foldr (\ n l -> tryR (childL n >>> l)) id
 
 -- | Repeat as many iterations of the 'Path' as possible.
 repeatPathL :: (Walker c m a, a ~ Generic a) => Path -> Lens c m (Generic a) (Generic a)
@@ -330,7 +333,7 @@ pathT = focusT . pathL
 
 -------------------------------------------------------------------------------
 
--- | Check if it is possible to construct a 'Lens' along this path from the current node.
+-- | Check if it is possible to construct a 'Lens' along this path from the current 'Node'.
 testPathT :: (Walker c m a, a ~ Generic a) => Path -> Translate c m a Bool
 testPathT = testLensT . pathL
 
