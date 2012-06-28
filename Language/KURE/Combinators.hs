@@ -140,15 +140,15 @@ whenM mb ma = condM mb ma (fail "condition False")
 
 class Category (~>) => CategoryCatch (~>) where
   -- | The failing arrow.
-  failure :: String -> a ~> b
+  failT :: String -> a ~> b
 
   -- | A catch on arrows.
-  catch :: (a ~> b) -> (String -> (a ~> b)) -> (a ~> b)
+  catchT :: (a ~> b) -> (String -> (a ~> b)) -> (a ~> b)
 
 
 -- | Left-biased choice.
 (<+) :: CategoryCatch (~>) => (a ~> b) -> (a ~> b) -> (a ~> b)
-f <+ g = f `catch` \ _ -> g
+f <+ g = f `catchT` \ _ -> g
 
 -- | Look at the argument to the 'Arrow' before choosing which 'Arrow' to use.
 readerT :: ArrowApply (~>) => (a -> (a ~> b)) -> (a ~> b)
@@ -156,7 +156,7 @@ readerT f = (f &&& id) ^>> app
 
 -- | Look at the argument to an 'Arrow', and choose to be either the identity arrow or a failure.
 acceptR :: (CategoryCatch (~>), ArrowApply (~>)) => (a -> Bool) -> (a ~> a)
-acceptR p = readerT $ \ a -> if p a then id else failure "acceptR: predicate failed"
+acceptR p = readerT $ \ a -> if p a then id else failT "acceptR: predicate failed"
 
 -- | Catch a failing 'CategoryCatch', making it into an identity.
 tryR :: CategoryCatch (~>) => (a ~> a) -> (a ~> a)
@@ -182,7 +182,7 @@ r1 >+> r2 = attemptR r1 >>> readerT (\ (b,_) -> snd ^>> if b then tryR r2 else r
 
 -- | Sequence a list of 'Arrow's, succeeding if any succeed.
 orR :: (CategoryCatch (~>), ArrowApply (~>)) => [a ~> a] -> (a ~> a)
-orR = foldl (>+>) (failure "orR failed")
+orR = foldl (>+>) (failT "orR failed")
 
 -- | Sequence a list of 'Category's, succeeding if all succeed.
 andR :: Category (~>) => [a ~> a] -> (a ~> a)

@@ -40,7 +40,7 @@ module Language.KURE.Translate
         , focusR
         , focusT
         , testLensT
-        , joinTL
+   --     , joinTL
         , bidirectionalL
         , pureL
 
@@ -166,11 +166,11 @@ instance Monad m => Category (Translate c m) where
 -- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance MonadCatch m => CategoryCatch (Translate c m) where
 
--- failure :: String -> Translate c m a b
-   failure = fail
+-- failT :: String -> Translate c m a b
+   failT = fail
 
--- catch :: Translate c m a b -> (String -> Translate c m a b) -> Translate c m a b
-   catch = catchM
+-- catchT :: Translate c m a b -> (String -> Translate c m a b) -> Translate c m a b
+   catchT = catchM
 
 
 -- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
@@ -270,10 +270,10 @@ focusT l t = do ((c,b),_) <- lensT l
 testLensT :: MonadCatch m => Lens c m a b -> Translate c m a Bool
 testLensT l = testM (focusR l id)
 
--- | Combines a 'Translate' producing a 'Lens' into just a 'Lens'.
---   Essentially a monadic 'join'.
-joinTL :: Monad m => Translate c m a (Lens c m a b) -> Lens c m a b
-joinTL tl = lens (tl >>= lensT)
+--  Combines a 'Translate' producing a 'Lens' into just a 'Lens'.
+--  Essentially a monadic 'join'.
+-- joinTL :: Monad m => Translate c m a (Lens c m a b) -> Lens c m a b
+-- joinTL tl = lens (tl >>= lensT)
 
 instance Monad m => Category (Lens c m) where
 
@@ -293,11 +293,11 @@ instance Monad m => Category (Lens c m) where
 
 instance MonadCatch m => CategoryCatch (Lens c m) where
 
--- failure :: String -> Lens c m a b
-   failure = lens . fail
+-- failT :: String -> Lens c m a b
+   failT = lens . fail
 
 -- catch :: Lens c m a b -> (String -> Lens c m a b) -> Lens c m a b
-   l1 `catch` l2 = lens (attemptM (focusR l1 id) >>= either (lensT . l2) (const (lensT l1)))
+   l1 `catchT` l2 = lens (attemptM (focusR l1 id) >>= either (lensT . l2) (const (lensT l1)))
 
 -- | Construct a 'Lens' from a 'BiTranslate'.
 bidirectionalL :: Monad m => BiTranslate c m a b -> Lens c m a b

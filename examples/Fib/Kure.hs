@@ -3,7 +3,7 @@
 module Fib.Kure where
 
 import Language.KURE
-import Language.KURE.Utilities(missingChild)
+import Language.KURE.Utilities(KureMonad,missingChild)
 import Fib.AST
 
 --------------------------------------------------------------------------------------
