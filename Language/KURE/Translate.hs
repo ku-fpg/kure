@@ -18,8 +18,9 @@
 
 module Language.KURE.Translate
        (-- * Translations
-          Translate(apply)
+          Translate
         , Rewrite
+        , apply
         , translate
         , rewrite
         , contextfreeT
@@ -29,14 +30,17 @@ module Language.KURE.Translate
         , mapT
         , sideEffectR
         -- * Bi-directional Translations
-        , BiTranslate(forewardT,backwardT)
+        , BiTranslate
         , BiRewrite
         , bidirectional
+        , forewardT
+        , backwardT
         , whicheverR
         , invert
         -- * Lenses
-        , Lens(lensT)
+        , Lens
         , lens
+        , lensT
         , focusR
         , focusT
         , testLensT
@@ -220,7 +224,9 @@ instance (Monad m, Monoid b) => Monoid (Translate c m a b) where
 ------------------------------------------------------------------------------------------
 
 -- | An undirected 'Translate'.
-data BiTranslate c m a b = BiTranslate {forewardT :: Translate c m a b, backwardT :: Translate c m b a}
+data BiTranslate c m a b = BiTranslate {forewardT :: Translate c m a b, -- ^ Extract a forewards 'Translate' from a 'BiTranslate'.
+                                        backwardT :: Translate c m b a  -- ^ Extract a backwards 'Translate' from a 'BiTranslate'.
+                                       }
 
 -- | A 'BiTranslate' that shares the same source and target type.
 type BiRewrite c m a = BiTranslate c m a a
@@ -248,7 +254,8 @@ instance Monad m => Category (BiTranslate c m) where
 ------------------------------------------------------------------------------------------
 
 -- | A 'Lens' is a way to focus on a particular point in a structure.
-newtype Lens c m a b = Lens {lensT :: Translate c m a ((c,b), b -> m a)}
+newtype Lens c m a b = Lens { -- | Convert a 'Lens' into a 'Translate' that produces a sub-structure (and its context) and an unfocussing function.
+                              lensT :: Translate c m a ((c,b), b -> m a)}
 
 -- | The primitive way of building a 'Lens'.
 --   If the unfocussing function is applied to the value focussed on then it should succeed,

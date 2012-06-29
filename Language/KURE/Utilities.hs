@@ -11,7 +11,7 @@
 
 module Language.KURE.Utilities
        ( -- * The KURE Monad
-         KureMonad(..)
+         KureMonad
        , runKureMonad
          -- * Error Messages
        , missingChild
