@@ -288,9 +288,9 @@ instance Monad m => Category (Lens c m) where
    id = lens $ translate $ \ c a -> return ((c,a), return)
 
 -- (.) :: Lens c m b d -> Lens c m a b -> Lens c m a d
-   l2 . l1 = lens $ do translate $ \ ca a -> do ((cb,b),kb) <- apply (lensT l1) ca a
-                                                ((cd,d),kd) <- apply (lensT l2) cb b
-                                                return ((cd,d),kd >=> kb)
+   l2 . l1 = lens $ translate $ \ ca a -> do ((cb,b),kb) <- apply (lensT l1) ca a
+                                             ((cd,d),kd) <- apply (lensT l2) cb b
+                                             return ((cd,d),kd >=> kb)
 
 
 -- | A 'Lens' is deemed to have failed (and thus can be caught) if either it fails on the way down, or,
