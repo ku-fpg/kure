@@ -137,17 +137,20 @@ class (MonadCatch m, Node a) => Walker c m a where
   -- | Apply a 'Generic' 'Translate' to all immediate child 'Node's, succeeding if they all succeed.
   --   The results are combined in a 'Monoid'.
   allT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
-  allT t = do n <- arr numChildren
+  allT t = modFailMsg ("allT failed: " ++) $
+           do n <- arr numChildren
               mconcat [ childT i t | i <- [0..(n-1)] ]
 
   -- | Apply a 'Generic' 'Rewrite' to all interesting children of this 'Node', succeeding if they all succeed.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
-  allR r = do n <- arr numChildren
+  allR r = modFailMsg ("allR failed: " ++) $
+           do n <- arr numChildren
               andR [ childR i r | i <- [0..(n-1)] ]
 
   -- | Apply 'Generic' 'Rewrite' to all interesting children of this 'Node', suceeding if any succeed.
   anyR :: Rewrite c m (Generic a) -> Rewrite c m a
-  anyR r = do n <- arr numChildren
+  anyR r = setFailMsg "anyR failed" $
+           do n <- arr numChildren
               orR [ childR i r | i <- [0..(n-1)] ]
 
 -- | Apply a 'Translate' to a specific child 'Node'.
@@ -162,67 +165,82 @@ childR n = focusR (childL n)
 
 -- | Fold a tree in a top-down manner, using a single 'Translate' for each 'Node'.
 foldtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-foldtdT t = t `mappend` allT (foldtdT t)
+foldtdT t = modFailMsg ("foldtdT failed: " ++) $
+            t `mappend` allT (foldtdT t)
 
 -- | Fold a tree in a bottom-up manner, using a single 'Translate' for each 'Node'.
 foldbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-foldbuT t = allT (foldbuT t) `mappend` t
+foldbuT t = modFailMsg ("foldbuT failed: " ++) $
+            allT (foldbuT t) `mappend` t
 
 -- | Attempt to apply a 'Translate' in a top-down manner, prunning at successes.
 prunetdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-prunetdT t = t <+ allT (prunetdT t)
+prunetdT t = modFailMsg ("prunetdT failed: " ++) $
+             t <+ allT (prunetdT t)
 
 -- | An always successful top-down fold, replacing failures with 'mempty'.
 crushtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-crushtdT t = foldtdT (mtryM t)
+crushtdT t = modFailMsg ("crushtdT failed: " ++) $
+             foldtdT (mtryM t)
 
 -- | An always successful bottom-up fold, replacing failures with 'mempty'.
 crushbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-crushbuT t = foldbuT (mtryM t)
+crushbuT t = modFailMsg ("crushbuT failed: " ++) $
+             foldbuT (mtryM t)
 
 -- | An always successful traversal that collects the results of all successful applications of a 'Translate' in a list.
 collectT :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) [b]
-collectT t = crushtdT (t >>^ (\ b -> [b]))
+collectT t = modFailMsg ("collectT failed: " ++) $
+             crushtdT (t >>^ (\ b -> [b]))
 
 -- | Like 'collectT', but does not traverse below successes.
 collectPruneT :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) [b]
-collectPruneT t = prunetdT (t >>^ (\ b -> [b]))
+collectPruneT t = modFailMsg ("collectPruneT failed: " ++) $
+                  prunetdT (t >>^ (\ b -> [b]))
 
 -------------------------------------------------------------------------------
 
 -- | Apply a 'Rewrite' in a top-down manner, succeeding if they all succeed.
 alltdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-alltdR r = r >>> allR (alltdR r)
+alltdR r = modFailMsg ("alltdR failed: " ++) $
+           r >>> allR (alltdR r)
 
 -- | Apply a 'Rewrite' in a top-down manner, succeeding if any succeed.
 anytdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-anytdR r = r >+> anyR (anytdR r)
+anytdR r = modFailMsg ("anytdR failed: " ++) $
+           r >+> anyR (anytdR r)
 
 -- | Apply a 'Rewrite' in a bottom-up manner, succeeding if they all succeed.
 allbuR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-allbuR r = allR (allbuR r) >>> r
+allbuR r = modFailMsg ("allbuR failed: " ++) $
+           allR (allbuR r) >>> r
 
 -- | Apply a 'Rewrite' in a bottom-up manner, succeeding if any succeed.
 anybuR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-anybuR r = anyR (anybuR r) >+> r
+anybuR r = setFailMsg "anybuR failed" $
+           anyR (anybuR r) >+> r
 
 -- | Apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal,
 --   succeeding if they all succeed.
 allduR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-allduR r = r >>> allR (allduR r) >>> r
+allduR r = modFailMsg ("allduR failed: " ++) $
+           r >>> allR (allduR r) >>> r
 
 -- | Apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal,
 --   succeeding if any succeed.
 anyduR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-anyduR r = r >+> anyR (anyduR r) >+> r
+anyduR r = setFailMsg "anyduR failed" $
+           r >+> anyR (anyduR r) >+> r
 
 -- | Attempt to apply a 'Rewrite' in a top-down manner, prunning at successful rewrites.
 prunetdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-prunetdR r = r <+ anyR (prunetdR r)
+prunetdR r = setFailMsg "prunetdR failed" $
+             r <+ anyR (prunetdR r)
 
 -- | A fixed-point traveral, starting with the innermost term.
 innermostR :: (Walker c m a, Generic a ~ a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-innermostR r = anybuR (r >>> tryR (innermostR r))
+innermostR r = setFailMsg "innermostR failed" $
+               anybuR (r >>> tryR (innermostR r))
 
 -------------------------------------------------------------------------------
 
