@@ -207,7 +207,7 @@ alltdR r = modFailMsg ("alltdR failed: " ++) $
 
 -- | Apply a 'Rewrite' in a top-down manner, succeeding if any succeed.
 anytdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-anytdR r = modFailMsg ("anytdR failed: " ++) $
+anytdR r = setFailMsg "anytdR failed" $
            r >+> anyR (anytdR r)
 
 -- | Apply a 'Rewrite' in a bottom-up manner, succeeding if they all succeed.

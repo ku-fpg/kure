@@ -42,6 +42,7 @@ module Language.KURE.Combinators
            , (>+>)
            , orR
            , andR
+           , catchesT
              -- ** Basic Routing
              -- | The names 'result' and 'argument' are taken from Conal Elliott's semantic editor combinators.
            , result
@@ -182,11 +183,15 @@ r1 >+> r2 = attemptR r1 >>> readerT (\ (b,_) -> snd ^>> if b then tryR r2 else r
 
 -- | Sequence a list of 'Arrow's, succeeding if any succeed.
 orR :: (CategoryCatch (~>), ArrowApply (~>)) => [a ~> a] -> (a ~> a)
-orR = foldl (>+>) (failT "orR failed")
+orR = foldr (>+>) (failT "orR failed")
 
 -- | Sequence a list of 'Category's, succeeding if all succeed.
 andR :: Category (~>) => [a ~> a] -> (a ~> a)
-andR = foldl (>>>) id
+andR = foldr (>>>) id
+
+-- | Select the first 'CategoryCatch' that succeeds.
+catchesT :: CategoryCatch (~>) => [a ~> b] -> (a ~> b)
+catchesT = foldr (<+) (failT "catchesT failed")
 
 ------------------------------------------------------------------------------------------
 
