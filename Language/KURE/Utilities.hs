@@ -18,16 +18,27 @@ module Language.KURE.Utilities
          -- * Generic Combinators
          -- $genericdoc
        , allTgeneric
+       , oneTgeneric
        , allRgeneric
        , anyRgeneric
+       , oneRgeneric
        , childLgeneric
          -- * Attempt Combinators
-         -- $attemptdoc
+         -- ** anyR Support
+         -- $attemptAnydoc
        , attemptAny2
        , attemptAny3
        , attemptAny4
        , attemptAnyN
        , attemptAny1N
+         -- * oneR Support
+         -- $attemptOnedoc
+       , withArgumentT
+       , attemptOne2
+       , attemptOne3
+       , attemptOne4
+       , attemptOneN
+       , attemptOne1N
          -- * Child Combinators
          -- $childLdoc
        , childLaux
@@ -102,58 +113,133 @@ instance Applicative KureMonad where
 allTgeneric :: (Walker c m a, Monoid b) => Translate c m (Generic a) b -> c -> a -> m b
 allTgeneric t c a = inject `liftM` apply (allT t) c a
 
+oneTgeneric :: Walker c m a => Translate c m (Generic a) b -> c -> a -> m b
+oneTgeneric t c a = inject `liftM` apply (oneT t) c a
+
 allRgeneric :: Walker c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
 allRgeneric r c a = inject `liftM` apply (allR r) c a
 
 anyRgeneric :: Walker c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
 anyRgeneric r c a = inject `liftM` apply (anyR r) c a
 
+oneRgeneric :: Walker c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
+oneRgeneric r c a = inject `liftM` apply (oneR r) c a
+
 childLgeneric :: Walker c m a => Int -> c -> a -> m ((c, Generic a), Generic a -> m (Generic a))
 childLgeneric n c a = (liftM.second.result.liftM) inject $ apply (lensT $ childL n) c a
 
 -------------------------------------------------------------------------------
 
--- $attemptdoc
+-- $attemptAnydoc
 -- These are useful when defining congruence combinators that succeed if any child rewrite succeeds.
 -- As well as being generally useful, such combinators are helpful when defining 'anyR' instances.
--- See the \"Lam\" or \"Expr\" examples, or the HERMIT package.
+-- See the \"Expr\" example, or the HERMIT package.
+
+attemptAny2' :: Monad m => (a1 -> a2 -> r) -> (Bool,a1) -> (Bool,a2) -> m r
+attemptAny2' f (b1,a1) (b2,a2) = if b1 || b2
+                                  then return (f a1 a2)
+                                  else fail "failed for both children"
+
+attemptAny3' :: Monad m => (a1 -> a2 -> a3 -> r) -> (Bool,a1) -> (Bool,a2) -> (Bool,a3) -> m r
+attemptAny3' f (b1,a1) (b2,a2) (b3,a3) = if b1 || b2 || b3
+                                          then return (f a1 a2 a3)
+                                          else fail "failed for all three children"
+
+attemptAny4' :: Monad m => (a1 -> a2 -> a3 -> a4 -> r) -> (Bool,a1) -> (Bool,a2) -> (Bool,a3) -> (Bool,a4) -> m r
+attemptAny4' f (b1,a1) (b2,a2) (b3,a3) (b4,a4) = if b1 || b2 || b3 || b4
+                                                  then return (f a1 a2 a3 a4)
+                                                  else fail "failed for all four children"
+
+attemptAnyN' :: Monad m => ([a] -> b) -> [(Bool,a)] -> m b
+attemptAnyN' f bas = let (bs,as) = unzip bas
+                      in if or bs
+                          then return (f as)
+                          else fail ("failed for all " ++ show (length bs) ++ " children")
+
+attemptAny1N' :: Monad m => (a1 -> [a2] -> r) -> (Bool,a1) -> [(Bool,a2)] -> m r
+attemptAny1N' f (b,a) bas = let (bs,as) = unzip bas
+                             in if or (b:bs)
+                                 then return (f a as)
+                                 else fail ("failed for all " ++ show (1 + length bs) ++ " children")
 
 attemptAny2 :: Monad m => (a1 -> a2 -> r) -> m (Bool,a1) -> m (Bool,a2) -> m r
-attemptAny2 f mba1 mba2 = do (b1,a1) <- mba1
-                             (b2,a2) <- mba2
-                             if b1 || b2
-                              then return (f a1 a2)
-                              else fail "failed for both children"
+attemptAny2 f = liftArgument2 (attemptAny2' f)
 
 attemptAny3 :: Monad m => (a1 -> a2 -> a3 -> r) -> m (Bool,a1) -> m (Bool,a2) -> m (Bool,a3) -> m r
-attemptAny3 f mba1 mba2 mba3 = do (b1,a1) <- mba1
-                                  (b2,a2) <- mba2
-                                  (b3,a3) <- mba3
-                                  if b1 || b2 || b3
-                                   then return (f a1 a2 a3)
-                                   else fail "failed for all three children"
+attemptAny3 f = liftArgument3 (attemptAny3' f)
 
 attemptAny4 :: Monad m => (a1 -> a2 -> a3 -> a4 -> r) -> m (Bool,a1) -> m (Bool,a2) -> m (Bool,a3) -> m (Bool,a4) -> m r
-attemptAny4 f mba1 mba2 mba3 mba4 = do (b1,a1) <- mba1
-                                       (b2,a2) <- mba2
-                                       (b3,a3) <- mba3
-                                       (b4,a4) <- mba4
-                                       if b1 || b2 || b3 || b4
-                                        then return (f a1 a2 a3 a4)
-                                        else fail "failed for all four children"
+attemptAny4 f = liftArgument4 (attemptAny4' f)
 
 attemptAnyN :: Monad m => ([a] -> b) -> [m (Bool,a)] -> m b
-attemptAnyN f mbas = do (bs,as) <- unzip `liftM` sequence mbas
-                        if or bs
-                         then return (f as)
-                         else fail ("failed for all " ++ show (length bs) ++ " children")
+attemptAnyN f = liftArgumentN (attemptAnyN' f)
 
 attemptAny1N :: Monad m => (a1 -> [a2] -> r) -> m (Bool,a1) -> [m (Bool,a2)] -> m r
-attemptAny1N f mba mbas = do (b ,a)  <- mba
-                             (bs,as) <- unzip `liftM` sequence mbas
-                             if or (b:bs)
-                               then return (f a as)
-                               else fail ("failed for all " ++ show (1 + length bs) ++ " children")
+attemptAny1N f = liftArgument1N (attemptAny1N' f)
+
+-------------------------------------------------------------------------------
+
+-- -- | Catch a failing 'Arrow', making it succeed with an error message, and passing through the argument value.
+-- --   Useful when defining 'Language.KURE.Walker.oneR' instances.
+-- attemptT :: MonadCatch m => Translate c m a b -> Translate c m a (Either String b, a)
+-- attemptT t = forkFirst (attemptM t)
+
+-- $attemptOnedoc
+-- These are useful when defining congruence combinators that succeed if one child rewrite succeeds
+-- (and the remainder are then discarded).
+-- As well as being generally useful, such combinators are helpful when defining 'oneR' instances.
+-- See the \"Expr\" example, or the HERMIT package.
+
+-- | Return the monadic result of a 'Translate' and pair it with the argument.
+withArgumentT :: Monad m => Translate c m a b -> Translate c m a (m b, a)
+withArgumentT t = do (c,a) <- exposeT
+                     return (apply t c a, a)
+
+attemptOne1' :: Monad m => (a -> r) -> (m a, a) -> m r
+attemptOne1' f (ma , _) = f `liftM` ma
+
+attemptOne2' :: MonadCatch m => (a -> b -> r) -> (m a, a) -> (m b, b) -> m r
+attemptOne2' f (ma , a) mbb@(_ , b) = (do a' <- ma
+                                          return (f a' b)
+                                      ) <<+ attemptOne1' (f a) mbb
+
+attemptOne3' :: MonadCatch m => (a -> b -> c -> r) -> (m a, a) -> (m b, b) -> (m c, c) -> m r
+attemptOne3' f (ma , a) mbb@(_ , b) mcc@(_ , c) = (do a' <- ma
+                                                      return (f a' b c)
+                                                  ) <<+ attemptOne2' (f a) mbb mcc
+
+attemptOne4' :: MonadCatch m => (a -> b -> c -> d -> r) -> (m a, a) -> (m b, b) -> (m c, c) -> (m d, d) -> m r
+attemptOne4' f (ma , a) mbb@(_ , b) mcc@(_ , c) mdd@(_ , d) = (do a' <- ma
+                                                                  return (f a' b c d)
+                                                              ) <<+ attemptOne3' (f a) mbb mcc mdd
+
+attemptOneN' :: MonadCatch m => ([a] -> r) -> [(m a, a)] -> m r
+attemptOneN' _ []                = fail "failed for all children"
+attemptOneN' f [maa]             = attemptOne1' (f . (:[])) maa
+attemptOneN' f ((ma , a) : maas) = (do a' <- ma
+                                       return $ f (a' : map snd maas)
+                                   ) <<+ attemptOneN' (f . (a:)) maas
+
+attemptOne1N' :: MonadCatch m => (a -> [b] -> r) -> (m a, a) -> [(m b, b)] -> m r
+attemptOne1N' f (ma , a) mbbs = (do a' <- ma
+                                    return $ f a' (map snd mbbs)
+                                ) <<+ attemptOneN' (f a) mbbs
+
+
+attemptOne2 :: MonadCatch m => (a -> b -> r) -> m (m a, a) -> m (m b, b) -> m r
+attemptOne2 f = liftArgument2 (attemptOne2' f)
+
+attemptOne3 :: MonadCatch m => (a -> b -> c -> r) -> m (m a, a) -> m (m b, b) -> m (m c, c) -> m r
+attemptOne3 f = liftArgument3 (attemptOne3' f)
+
+attemptOne4 :: MonadCatch m => (a -> b -> c -> d -> r) -> m (m a, a) -> m (m b, b) -> m (m c, c) -> m (m d, d) -> m r
+attemptOne4 f = liftArgument4 (attemptOne4' f)
+
+attemptOneN :: MonadCatch m => ([a] -> r) -> [m (m a, a)] -> m r
+attemptOneN f = liftArgumentN (attemptOneN' f)
+
+attemptOne1N :: MonadCatch m => (a -> [b] -> r) -> m (m a, a) -> [m (m b, b)] -> m r
+attemptOne1N f = liftArgument1N (attemptOne1N' f)
 
 -------------------------------------------------------------------------------
 
@@ -223,5 +309,36 @@ atIndex :: Int -> (a -> a) -> [a] -> [a]
 atIndex i f as = [ if n == i then f a else a
                  | (a,n) <- zip as [0..]
                  ]
+
+-------------------------------------------------------------------------------
+
+-- liftResult :: Monad m => (a -> b) -> (a -> m b)
+-- liftResult = result return
+
+-- liftResult2 :: Monad m => (a -> b -> c) -> (a -> b -> m c)
+-- liftResult2 = (result.result) return
+
+-- liftResult3 :: Monad m => (a -> b -> c -> d) -> (a -> b -> c -> m d)
+-- liftResult3 = (result.result.result) return
+
+-- liftResult4 :: Monad m => (a -> b -> c -> d -> e) -> (a -> b -> c -> d -> m e)
+-- liftResult4 = (result.result.result.result) return
+
+liftArgument2 :: Monad m => (a -> b -> m c) -> m a -> m b -> m c
+liftArgument2 f ma mb = join (liftM2 f ma mb)
+
+liftArgument3 :: Monad m => (a -> b -> c -> m d) -> m a -> m b -> m c -> m d
+liftArgument3 f ma mb mc = join (liftM3 f ma mb mc)
+
+liftArgument4 :: Monad m => (a -> b -> c -> d -> m e) -> m a -> m b -> m c -> m d -> m e
+liftArgument4 f ma mb mc md = join (liftM4 f ma mb mc md)
+
+liftArgumentN :: Monad m => ([a] -> m b) -> [m a] -> m b
+liftArgumentN f mas = sequence mas >>= f
+
+liftArgument1N :: Monad m => (a -> [b] -> m c) -> m a -> [m b] -> m c
+liftArgument1N f ma mbs = do a  <- ma
+                             bs <- sequence mbs
+                             f a bs
 
 -------------------------------------------------------------------------------

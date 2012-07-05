@@ -16,6 +16,8 @@ module Language.KURE.Combinators
            ( -- * Monad Combinators
              -- ** Monads with a Catch
              MonadCatch(..)
+           , (<<+)
+           , catchesM
            , tryM
            , mtryM
            , attemptM
@@ -64,7 +66,7 @@ import Control.Arrow
 import Data.Monoid
 import Data.List (isPrefixOf)
 
-infixl 3 >+>
+infixl 3 >+>, <+, <<+
 
 ------------------------------------------------------------------------------------------
 
@@ -79,9 +81,17 @@ class Monad m => MonadCatch m where
 
 ------------------------------------------------------------------------------------------
 
+-- | A monadic catch that ignores the error message.
+(<<+) :: MonadCatch m => m a -> m a -> m a
+ma <<+ mb = ma `catchM` const mb
+
+-- | Select the first monadic computation that succeeds, discarding any thereafter.
+catchesM :: MonadCatch m => [m a] -> m a
+catchesM = foldr (<<+) (fail "catchesM failed")
+
 -- | Catch a failing monadic computation, making it succeed with a constant value.
 tryM :: MonadCatch m => a -> m a -> m a
-tryM a ma = ma `catchM` \ _ -> return a
+tryM a ma = ma <<+ return a
 
 -- | Catch a failing monadic computation, making it succeed with 'mempty'.
 mtryM :: (MonadCatch m, Monoid a) => m a -> m a
@@ -93,7 +103,7 @@ attemptM ma = liftM Right ma `catchM` (return . Left)
 
 -- | Determine if a monadic computation succeeds.
 testM :: MonadCatch m => m a -> m Bool
-testM ma = liftM (const True) ma `catchM` \ _ -> return False
+testM ma = liftM (const True) ma <<+ return False
 
 -- | Fail if the 'Monad' succeeds; succeed with @()@ if it fails.
 notM :: MonadCatch m => m a -> m ()
@@ -189,7 +199,7 @@ orR = foldr (>+>) (failT "orR failed")
 andR :: Category (~>) => [a ~> a] -> (a ~> a)
 andR = foldr (>>>) id
 
--- | Select the first 'CategoryCatch' that succeeds.
+-- | Select the first 'CategoryCatch' that succeeds, discarding any thereafter.
 catchesT :: CategoryCatch (~>) => [a ~> b] -> (a ~> b)
 catchesT = foldr (<+) (failT "catchesT failed")
 

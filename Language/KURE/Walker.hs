@@ -12,7 +12,7 @@
 -- This module provides combinators that traverse a tree.
 --
 -- Note that all traversals take place on the node, its children, or its descendents.
--- There is no mechanism for \"ascending\" the tree.
+-- Deliberately, there is no mechanism for \"ascending\" the tree.
 
 module Language.KURE.Walker
         ( -- * Nodes
@@ -27,11 +27,13 @@ module Language.KURE.Walker
         -- * Rewrite Traversals
         , childR
         , alltdR
-        , anytdR
         , allbuR
-        , anybuR
         , allduR
+        , anytdR
+        , anybuR
         , anyduR
+        , onetdR
+        , onebuR
         , prunetdR
         , innermostR
 
@@ -39,6 +41,8 @@ module Language.KURE.Walker
         , childT
         , foldtdT
         , foldbuT
+        , onetdT
+        , onebuT
         , prunetdT
         , crushtdT
         , crushbuT
@@ -56,10 +60,10 @@ module Language.KURE.Walker
         , Path
         , rootPath
         , pathsToT
+        , onePathToT
         , prunePathsToT
         , uniquePathToT
         , uniquePrunePathToT
-        , firstPathToT
 
         -- * Using Paths
         -- ** Building Lenses from Paths
@@ -125,122 +129,171 @@ hasChildT = arr . hasChild
 --
 --   Minimal complete definition: 'childL'.
 --
---   Default instances are provided for 'allT', 'allR' and 'anyR', but they may be overridden for efficiency.
---   For small numbers of interesting children this will not be an issue, but for a large number, say
---   for a list of children, it may be.
+--   Default instances are provided for 'allT', 'oneT', 'allR', 'anyR' and 'oneR', but they may be overridden for efficiency.
+--   For small numbers of interesting children this will not be an issue, but for a large number,
+--   say for a list of children, it may be.
 
 class (MonadCatch m, Node a) => Walker c m a where
 
   -- | Construct a 'Lens' to the n-th child 'Node'.
   childL :: Int -> Lens c m a (Generic a)
 
-  -- | Apply a 'Generic' 'Translate' to all immediate child 'Node's, succeeding if they all succeed.
+  -- | Apply a 'Generic' 'Translate' to all immediate children, succeeding if they all succeed.
   --   The results are combined in a 'Monoid'.
   allT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
   allT t = modFailMsg ("allT failed: " ++) $
-           do n <- arr numChildren
-              mconcat [ childT i t | i <- [0..(n-1)] ]
+           do n <- numChildrenT
+              mconcat (childrenT n t)
 
-  -- | Apply a 'Generic' 'Rewrite' to all interesting children of this 'Node', succeeding if they all succeed.
+  -- | Apply a 'Generic' 'Translate' to the first immediate child for which it can succeed.
+  oneT :: Translate c m (Generic a) b -> Translate c m a b
+  oneT t = setFailMsg "oneT failed" $
+           do n <- numChildrenT
+              catchesT (childrenT n t)
+
+  -- | Apply a 'Generic' 'Rewrite' to all immediate children, succeeding if they all succeed.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
   allR r = modFailMsg ("allR failed: " ++) $
-           do n <- arr numChildren
-              andR [ childR i r | i <- [0..(n-1)] ]
+           do n <- numChildrenT
+              andR (childrenR n r)
 
-  -- | Apply 'Generic' 'Rewrite' to all interesting children of this 'Node', suceeding if any succeed.
+  -- | Apply a 'Generic' 'Rewrite' to all immediate children, suceeding if any succeed.
   anyR :: Rewrite c m (Generic a) -> Rewrite c m a
   anyR r = setFailMsg "anyR failed" $
-           do n <- arr numChildren
-              orR [ childR i r | i <- [0..(n-1)] ]
+           do n <- numChildrenT
+              orR (childrenR n r)
 
--- | Apply a 'Translate' to a specific child 'Node'.
+  -- | Apply a 'Generic' 'Rewrite' to the first immediate child for which it can succeed.
+  oneR :: Rewrite c m (Generic a) -> Rewrite c m a
+  oneR r = setFailMsg "oneR failed" $
+           do n <- numChildrenT
+              catchesT (childrenR n r)
+
+-- | Apply a 'Translate' to a specified child.
 childT :: Walker c m a => Int -> Translate c m (Generic a) b -> Translate c m a b
 childT n = focusT (childL n)
 
--- | Apply a 'Rewrite' to a specific child 'Node'.
+-- | Apply a 'Rewrite' to a specified child.
 childR :: Walker c m a => Int -> Rewrite c m (Generic a) -> Rewrite c m a
 childR n = focusR (childL n)
+
+childrenT :: Walker c m a => Int -> Translate c m (Generic a) b -> [Translate c m a b]
+childrenT n t = [ childT i t | i <- [0..(n-1)] ]
+
+childrenR :: Walker c m a => Int -> Rewrite c m (Generic a) -> [Rewrite c m a]
+childrenR n r = [ childR i r | i <- [0..(n-1)] ]
 
 -------------------------------------------------------------------------------
 
 -- | Fold a tree in a top-down manner, using a single 'Translate' for each 'Node'.
 foldtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
 foldtdT t = modFailMsg ("foldtdT failed: " ++) $
-            t `mappend` allT (foldtdT t)
+            let go = t `mappend` allT go
+             in go
 
 -- | Fold a tree in a bottom-up manner, using a single 'Translate' for each 'Node'.
 foldbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
 foldbuT t = modFailMsg ("foldbuT failed: " ++) $
-            allT (foldbuT t) `mappend` t
+            let go = allT go `mappend` t
+             in go
 
--- | Attempt to apply a 'Translate' in a top-down manner, prunning at successes.
+-- | Apply a 'Translate' to the first 'Node' for which it can succeed, in a top-down traversal.
+onetdT :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
+onetdT t = setFailMsg "onetdT failed" $
+           let go = t <+ oneT go
+            in go
+
+-- | Apply a 'Translate' to the first 'Node' for which it can succeed, in a bottom-up traversal.
+onebuT :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
+onebuT t = setFailMsg "onetdT failed" $
+           let go = oneT go <+ t
+            in go
+
+-- | Attempt to apply a 'Translate' in a top-down manner, pruning at successes.
 prunetdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-prunetdT t = modFailMsg ("prunetdT failed: " ++) $
-             t <+ allT (prunetdT t)
+prunetdT t = setFailMsg "prunetdT failed" $
+             let go = t <+ allT go
+              in go
 
 -- | An always successful top-down fold, replacing failures with 'mempty'.
 crushtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-crushtdT t = modFailMsg ("crushtdT failed: " ++) $
-             foldtdT (mtryM t)
+crushtdT t = foldtdT (mtryM t)
 
 -- | An always successful bottom-up fold, replacing failures with 'mempty'.
 crushbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-crushbuT t = modFailMsg ("crushbuT failed: " ++) $
-             foldbuT (mtryM t)
+crushbuT t = foldbuT (mtryM t)
 
 -- | An always successful traversal that collects the results of all successful applications of a 'Translate' in a list.
 collectT :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) [b]
-collectT t = modFailMsg ("collectT failed: " ++) $
-             crushtdT (t >>^ (\ b -> [b]))
+collectT t = crushtdT (t >>^ (\ b -> [b]))
 
 -- | Like 'collectT', but does not traverse below successes.
 collectPruneT :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) [b]
-collectPruneT t = modFailMsg ("collectPruneT failed: " ++) $
-                  prunetdT (t >>^ (\ b -> [b]))
+collectPruneT t = prunetdT (t >>^ (\ b -> [b]))
 
 -------------------------------------------------------------------------------
 
 -- | Apply a 'Rewrite' in a top-down manner, succeeding if they all succeed.
 alltdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 alltdR r = modFailMsg ("alltdR failed: " ++) $
-           r >>> allR (alltdR r)
-
--- | Apply a 'Rewrite' in a top-down manner, succeeding if any succeed.
-anytdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-anytdR r = setFailMsg "anytdR failed" $
-           r >+> anyR (anytdR r)
+           let go = r >>> allR go
+            in go
 
 -- | Apply a 'Rewrite' in a bottom-up manner, succeeding if they all succeed.
 allbuR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 allbuR r = modFailMsg ("allbuR failed: " ++) $
-           allR (allbuR r) >>> r
-
--- | Apply a 'Rewrite' in a bottom-up manner, succeeding if any succeed.
-anybuR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-anybuR r = setFailMsg "anybuR failed" $
-           anyR (anybuR r) >+> r
+           let go = allR go >>> r
+            in go
 
 -- | Apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal,
 --   succeeding if they all succeed.
 allduR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 allduR r = modFailMsg ("allduR failed: " ++) $
-           r >>> allR (allduR r) >>> r
+           let go = r >>> allR go >>> r
+            in go
+
+-- | Apply a 'Rewrite' in a top-down manner, succeeding if any succeed.
+anytdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+anytdR r = setFailMsg "anytdR failed" $
+           let go = r >+> anyR go
+            in go
+
+-- | Apply a 'Rewrite' in a bottom-up manner, succeeding if any succeed.
+anybuR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+anybuR r = setFailMsg "anybuR failed" $
+           let go = anyR go >+> r
+            in go
 
 -- | Apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal,
 --   succeeding if any succeed.
 anyduR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 anyduR r = setFailMsg "anyduR failed" $
-           r >+> anyR (anyduR r) >+> r
+           let go = r >+> anyR go >+> r
+            in go
 
--- | Attempt to apply a 'Rewrite' in a top-down manner, prunning at successful rewrites.
+-- | Apply a 'Rewrite' to the first 'Node' for which it can succeed, in a top-down traversal.
+onetdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+onetdR r = setFailMsg "onetdR failed" $
+           let go = r <+ oneR go
+            in go
+
+-- | Apply a 'Rewrite' to the first 'Node' for which it can succeed, in a bottom-up traversal.
+onebuR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+onebuR r = setFailMsg "onetdR failed" $
+           let go = oneR go <+ r
+            in go
+
+-- | Attempt to apply a 'Rewrite' in a top-down manner, pruning at successful rewrites.
 prunetdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 prunetdR r = setFailMsg "prunetdR failed" $
-             r <+ anyR (prunetdR r)
+             let go = r <+ anyR go
+              in go
 
 -- | A fixed-point traveral, starting with the innermost term.
 innermostR :: (Walker c m a, Generic a ~ a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
 innermostR r = setFailMsg "innermostR failed" $
-               anybuR (r >>> tryR (innermostR r))
+               let go = anybuR (r >>> tryR go)
+                in go
 
 -------------------------------------------------------------------------------
 
@@ -297,9 +350,15 @@ abs2pathT there = do here <- absPathT
 pathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
 pathsToT q = collectT (acceptR q >>> absPathT) >>= mapM abs2pathT
 
+-- | Find the 'Path' to the first descendent 'Node' that satisfies the predicate (in a pre-order traversal).
+onePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
+onePathToT q = setFailMsg "No matching nodes found." $
+               onetdT (acceptR q >>> absPathT) >>= abs2pathT
+
 -- | Find the 'Path's to every descendent 'Node' that satisfies the predicate, ignoring 'Node's below successes.
 prunePathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
 prunePathsToT q = collectPruneT (acceptR q >>> absPathT) >>= mapM abs2pathT
+
 
 -- local function used by uniquePathToT and uniquePrunePathToT
 requireUniquePath :: Monad m => Translate c m [Path] Path
@@ -315,11 +374,6 @@ uniquePathToT q = pathsToT q >>> requireUniquePath
 -- | Build a 'Path' to the descendent 'Node' that satisfies the predicate, failing if that does not uniquely identify a 'Node' (ignoring 'Node's below successes).
 uniquePrunePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
 uniquePrunePathToT q = prunePathsToT q >>> requireUniquePath
-
--- | Build a 'Path' to the first descendent 'Node' that satisfies the predicate (in a pre-order traversal).
-firstPathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
-firstPathToT q = withPatFailMsg "No matching nodes found." $ do (pa : _) <- pathsToT q
-                                                                return pa
 
 -------------------------------------------------------------------------------
 

@@ -43,7 +43,8 @@ subLitR = withPatFailMsg "subLitR failed" $
 -----------------------------------------------------------------------
 
 arithR :: RewriteA
-arithR = addLitR >+> subLitR
+arithR = setFailMsg "arithR failed" $
+         addLitR >+> subLitR
 
 anyAddR :: RewriteA
 anyAddR = anybuR addLitR
@@ -53,6 +54,9 @@ anySubR = anybuR subLitR
 
 anyArithR :: RewriteA
 anyArithR = anybuR arithR
+
+allArithR :: RewriteA
+allArithR = allbuR arithR
 
 evalR :: RewriteA
 evalR = innermostR (arithR >+> fibLitR)
@@ -69,22 +73,32 @@ expr3 :: Arith
 expr3 = 100 - Fib (3 + 7)
 
 test1a :: Bool
-test1a = applyFib anyAddR expr1
+test1a = applyFib (allR addLitR) expr1
          ==
          Right (10 - 5)
 
 test1b :: Bool
-test1b = applyFib anySubR expr1
+test1b = applyFib (alltdR addLitR) expr1
          ==
-         Left "subLitR failed"
+         Left "alltdR failed: addLitR failed"
 
 test1c :: Bool
-test1c = applyFib anyArithR expr1
+test1c = applyFib anyAddR expr1
+         ==
+         Right (10 - 5)
+
+test1d :: Bool
+test1d = applyFib anySubR expr1
+         ==
+         Left "anybuR failed"
+
+test1e :: Bool
+test1e = applyFib anyArithR expr1
          ==
          Right 5
 
-test1d :: Bool
-test1d = applyFib evalR expr1
+test1f :: Bool
+test1f = applyFib evalR expr1
          ==
          Right 5
 
@@ -118,12 +132,17 @@ test3c = applyFib evalR expr3
          ==
          Right 45
 
+test3d :: Bool
+test3d = applyFib allArithR expr3
+         ==
+         Left "allbuR failed: allR failed: arithR failed"
+
 -----------------------------------------------------------------------
 
 checkTests :: Bool
-checkTests = and [ test1a, test1b, test1c, test1d
-                 , test2a, test2b, test2c, test3a
-                 , test3b, test3c
+checkTests = and [ test1a, test1b, test1c, test1d, test1e, test1f
+                 , test2a, test2b, test2c
+                 , test3a, test3b, test3c, test3d
                  ]
 
 -----------------------------------------------------------------------

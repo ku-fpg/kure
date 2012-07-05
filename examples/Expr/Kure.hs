@@ -73,6 +73,10 @@ instance Walker Context KureMonad GenericExpr where
                                   GExpr e -> allTgeneric t c e
                                   GCmd cm -> allTgeneric t c cm
 
+  oneT t = translate $ \ c g -> case g of
+                                  GExpr e -> oneTgeneric t c e
+                                  GCmd cm -> oneTgeneric t c cm
+
   allR r = rewrite $ \ c g -> case g of
                                 GExpr e -> allRgeneric r c e
                                 GCmd cm -> allRgeneric r c cm
@@ -80,6 +84,10 @@ instance Walker Context KureMonad GenericExpr where
   anyR r = rewrite $ \ c g -> case g of
                                 GExpr e -> anyRgeneric r c e
                                 GCmd cm -> anyRgeneric r c cm
+
+  oneR r = rewrite $ \ c g -> case g of
+                                GExpr e -> oneRgeneric r c e
+                                GCmd cm -> oneRgeneric r c cm
 
 ---------------------------------------------------------------------------
 
@@ -111,6 +119,10 @@ instance Walker Context KureMonad Expr where
          <+ addT (extractT t) (extractT t) mappend
          <+ eseqT (extractT t) (extractT t) mappend
 
+  oneT t =  addT' (extractT t) (extractT t) (<<+)
+         <+ eseqT' (extractT t) (extractT t) (<<+)
+         <+ fail "oneT failed"
+
   allR r =  varT Var
          <+ litT Lit
          <+ addAllR (extractR r) (extractR r)
@@ -119,6 +131,10 @@ instance Walker Context KureMonad Expr where
   anyR r =  addAnyR (extractR r) (extractR r)
          <+ eseqAnyR (extractR r) (extractR r)
          <+ fail "anyR failed"
+
+  oneR r =  addOneR (extractR r) (extractR r)
+         <+ eseqOneR (extractR r) (extractR r)
+         <+ fail "oneR failed"
 
 ---------------------------------------------------------------------------
 
@@ -146,12 +162,20 @@ instance Walker Context KureMonad Cmd where
   allT t =  seqT (extractT t) (extractT t) mappend
          <+ assignT (extractT t) (\ _ -> id)
 
+  oneT t =  seqT' (extractT t) (extractT t) (<<+)
+         <+ assignT (extractT t) (\ _ -> id)
+         <+ fail "oneT failed"
+
   allR r =  seqAllR (extractR r) (extractR r)
          <+ assignR (extractR r)
 
   anyR r =  seqAnyR (extractR r) (extractR r)
          <+ assignR (extractR r)
          <+ fail "anyR failed"
+
+  oneR r =  seqOneR (extractR r) (extractR r)
+         <+ assignR (extractR r)
+         <+ fail "oneR failed"
 
 ---------------------------------------------------------------------------
 
@@ -168,6 +192,9 @@ seqAllR r1 r2 = seqT r1 r2 Seq
 
 seqAnyR :: RewriteE Cmd -> RewriteE Cmd -> RewriteE Cmd
 seqAnyR r1 r2 = seqT' (attemptR r1) (attemptR r2) (attemptAny2 Seq)
+
+seqOneR :: RewriteE Cmd -> RewriteE Cmd -> RewriteE Cmd
+seqOneR r1 r2 = seqT' (withArgumentT r1) (withArgumentT r2) (attemptOne2 Seq)
 
 ---------------------------------------------------------------------------
 
@@ -209,6 +236,9 @@ addAllR r1 r2 = addT r1 r2 Add
 addAnyR :: RewriteE Expr -> RewriteE Expr -> RewriteE Expr
 addAnyR r1 r2 = addT' (attemptR r1) (attemptR r2) (attemptAny2 Add)
 
+addOneR :: RewriteE Expr -> RewriteE Expr -> RewriteE Expr
+addOneR r1 r2 = addT' (withArgumentT r1) (withArgumentT r2) (attemptOne2 Add)
+
 ---------------------------------------------------------------------------
 
 eseqT' :: TranslateE Cmd a1 -> TranslateE Expr a2 -> (KureMonad a1 -> KureMonad a2 -> KureMonad b) -> TranslateE Expr b
@@ -224,5 +254,8 @@ eseqAllR r1 r2 = eseqT r1 r2 ESeq
 
 eseqAnyR :: RewriteE Cmd -> RewriteE Expr -> RewriteE Expr
 eseqAnyR r1 r2 = eseqT' (attemptR r1) (attemptR r2) (attemptAny2 ESeq)
+
+eseqOneR :: RewriteE Cmd -> RewriteE Expr -> RewriteE Expr
+eseqOneR r1 r2 = eseqT' (withArgumentT r1) (withArgumentT r2) (attemptOne2 ESeq)
 
 ---------------------------------------------------------------------------
