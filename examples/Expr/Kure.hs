@@ -15,8 +15,8 @@ import Language.KURE.Utilities
 
 import Expr.AST
 
--- NOTE: allT, allR and anyR have been defined to serve as examples,
---       but using the default instances would be fine (just slightly less efficient).
+-- NOTE: allT, oneT, allR, anyR and oneR have been defined just to serve as examples:
+--       the difference in efficiency with the default instances is negligible.
 
 ---------------------------------------------------------------------------
 
