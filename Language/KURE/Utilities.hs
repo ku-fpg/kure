@@ -13,6 +13,7 @@ module Language.KURE.Utilities
        ( -- * The KURE Monad
          KureMonad
        , runKureMonad
+       , fromKureMonad
          -- * Error Messages
        , missingChild
          -- * Generic Combinators
@@ -75,6 +76,10 @@ data KureMonad a = Failure String | Success a deriving (Eq, Show)
 runKureMonad :: (a -> b) -> (String -> b) -> KureMonad a -> b
 runKureMonad _ f (Failure msg) = f msg
 runKureMonad s _ (Success a)   = s a
+
+-- | Get the value from a 'KureMonad', providing a function to handle the error case.
+fromKureMonad :: (String -> a) -> KureMonad a -> a
+fromKureMonad = runKureMonad id
 
 instance Monad KureMonad where
 -- return :: a -> KureMonad a
