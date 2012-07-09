@@ -26,8 +26,12 @@ module Language.KURE.Injection
        , retractT
        , extractT
        , promoteT
+       , promoteWithFailMsgT
+       -- * Rewrite Injections
        , extractR
        , promoteR
+       , promoteWithFailMsgR
+       , extractWithFailMsgR
        -- * Lens Injections
        , injectL
        , retractL
@@ -83,20 +87,33 @@ retractT = contextfreeT retractM
 extractT :: (Monad m, Injection a a') => Translate c m a' b -> Translate c m a b
 extractT t = injectT >>> t
 
+-- | As 'promoteT', but takes a custom error message to use if promotion fails.
+promoteWithFailMsgT  :: (MonadCatch m, Injection a a') => String -> Translate c m a b -> Translate c m a' b
+promoteWithFailMsgT msg t = setFailMsg msg retractT >>> t
+
 -- | Promote a 'Translate' over a value into a 'Translate' over an injection of that value,
 --   (failing if that injected value cannot be retracted).
 promoteT  :: (MonadCatch m, Injection a a') => Translate c m a b -> Translate c m a' b
-promoteT t = retractT >>> t
+promoteT = promoteWithFailMsgT "promoteT failed"
+
+-- | Convert a 'Rewrite' over an injected value into a 'Rewrite' over a retraction of that value,
+--   (failing if that injected value cannot be retracted).
+extractWithFailMsgR :: (MonadCatch m, Injection a a') => String -> Rewrite c m a' -> Rewrite c m a
+extractWithFailMsgR msg r = setFailMsg msg injectT >>> r >>> retractT
 
 -- | Convert a 'Rewrite' over an injected value into a 'Rewrite' over a retraction of that value,
 --   (failing if that injected value cannot be retracted).
 extractR :: (MonadCatch m, Injection a a') => Rewrite c m a' -> Rewrite c m a
-extractR r = injectT >>> r >>> retractT
+extractR = extractWithFailMsgR "extractR failed"
+
+-- | As 'promoteR', but takes a custom error message to use if promotion fails.
+promoteWithFailMsgR :: (MonadCatch m, Injection a a') => String -> Rewrite c m a -> Rewrite c m a'
+promoteWithFailMsgR msg r = setFailMsg msg retractT >>> r >>> injectT
 
 -- | Promote a 'Rewrite' into over a value into a 'Rewrite' over an injection of that value,
 --   (failing if that injected value cannot be retracted).
 promoteR  :: (MonadCatch m, Injection a a') => Rewrite c m a -> Rewrite c m a'
-promoteR r = retractT >>> r >>> injectT
+promoteR = promoteWithFailMsgR "promoteR failed"
 
 -------------------------------------------------------------------------------
 
