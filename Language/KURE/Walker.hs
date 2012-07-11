@@ -61,6 +61,7 @@ module Language.KURE.Walker
         , rootPath
         , pathsToT
         , onePathToT
+        , oneNonEmptyPathToT
         , prunePathsToT
         , uniquePathToT
         , uniquePrunePathToT
@@ -143,31 +144,31 @@ class (MonadCatch m, Node a) => Walker c m a where
   allT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
   allT t = modFailMsg ("allT failed: " ++) $
            do n <- numChildrenT
-              mconcat (childrenT n t)
+              mconcat (childrenT n (const t))
 
   -- | Apply a 'Generic' 'Translate' to the first immediate child for which it can succeed.
   oneT :: Translate c m (Generic a) b -> Translate c m a b
   oneT t = setFailMsg "oneT failed" $
            do n <- numChildrenT
-              catchesT (childrenT n t)
+              catchesT (childrenT n (const t))
 
   -- | Apply a 'Generic' 'Rewrite' to all immediate children, succeeding if they all succeed.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
   allR r = modFailMsg ("allR failed: " ++) $
            do n <- numChildrenT
-              andR (childrenR n r)
+              andR (childrenR n (const r))
 
   -- | Apply a 'Generic' 'Rewrite' to all immediate children, suceeding if any succeed.
   anyR :: Rewrite c m (Generic a) -> Rewrite c m a
   anyR r = setFailMsg "anyR failed" $
            do n <- numChildrenT
-              orR (childrenR n r)
+              orR (childrenR n (const r))
 
   -- | Apply a 'Generic' 'Rewrite' to the first immediate child for which it can succeed.
   oneR :: Rewrite c m (Generic a) -> Rewrite c m a
   oneR r = setFailMsg "oneR failed" $
            do n <- numChildrenT
-              catchesT (childrenR n r)
+              catchesT (childrenR n (const r))
 
 -- | Apply a 'Translate' to a specified child.
 childT :: Walker c m a => Int -> Translate c m (Generic a) b -> Translate c m a b
@@ -177,11 +178,11 @@ childT n = focusT (childL n)
 childR :: Walker c m a => Int -> Rewrite c m (Generic a) -> Rewrite c m a
 childR n = focusR (childL n)
 
-childrenT :: Walker c m a => Int -> Translate c m (Generic a) b -> [Translate c m a b]
-childrenT n t = [ childT i t | i <- [0..(n-1)] ]
+childrenT :: Walker c m a => Int -> (Int -> Translate c m (Generic a) b) -> [Translate c m a b]
+childrenT n ts = [ childT i (ts i) | i <- [0..(n-1)] ]
 
-childrenR :: Walker c m a => Int -> Rewrite c m (Generic a) -> [Rewrite c m a]
-childrenR n r = [ childR i r | i <- [0..(n-1)] ]
+childrenR :: Walker c m a => Int -> (Int -> Rewrite c m (Generic a)) -> [Rewrite c m a]
+childrenR n rs = [ childR i (rs i) | i <- [0..(n-1)] ]
 
 -------------------------------------------------------------------------------
 
@@ -346,16 +347,22 @@ abs2pathT :: (PathContext c, Monad m) => AbsolutePath -> Translate c m a Path
 abs2pathT there = do here <- absPathT
                      maybe (fail "Absolute path does not pass through current node.") return (rmPathPrefix here there)
 
--- | Find the 'Path's to every descendent 'Node' that satisfies the predicate.
+-- | Find the 'Path's to every 'Node' that satisfies the predicate.
 pathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
 pathsToT q = collectT (acceptR q >>> absPathT) >>= mapM abs2pathT
 
--- | Find the 'Path' to the first descendent 'Node' that satisfies the predicate (in a pre-order traversal).
+-- | Find the 'Path' to the first 'Node' that satisfies the predicate (in a pre-order traversal).
 onePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
 onePathToT q = setFailMsg "No matching nodes found." $
                onetdT (acceptR q >>> absPathT) >>= abs2pathT
 
--- | Find the 'Path's to every descendent 'Node' that satisfies the predicate, ignoring 'Node's below successes.
+-- | Find the 'Path' to the first descendent 'Node' that satisfies the predicate (in a pre-order traversal).
+oneNonEmptyPathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
+oneNonEmptyPathToT q = setFailMsg "No matching nodes found." $
+                       do n <- numChildrenT
+                          catchesT $ childrenT n (\ i -> onePathToT q >>^ (i:))
+
+-- | Find the 'Path's to every 'Node' that satisfies the predicate, ignoring 'Node's below successes.
 prunePathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
 prunePathsToT q = collectPruneT (acceptR q >>> absPathT) >>= mapM abs2pathT
 
@@ -367,11 +374,11 @@ requireUniquePath = contextfreeT $ \ ps -> case ps of
                                              [p] -> return p
                                              _   -> fail $ "Ambiguous: " ++ show (length ps) ++ " matching nodes found."
 
--- | Find the 'Path' to the descendent 'Node' that satisfies the predicate, failing if that does not uniquely identify a 'Node'.
+-- | Find the 'Path' to the 'Node' that satisfies the predicate, failing if that does not uniquely identify a 'Node'.
 uniquePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
 uniquePathToT q = pathsToT q >>> requireUniquePath
 
--- | Build a 'Path' to the descendent 'Node' that satisfies the predicate, failing if that does not uniquely identify a 'Node' (ignoring 'Node's below successes).
+-- | Build a 'Path' to the 'Node' that satisfies the predicate, failing if that does not uniquely identify a 'Node' (ignoring 'Node's below successes).
 uniquePrunePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
 uniquePrunePathToT q = prunePathsToT q >>> requireUniquePath
 
