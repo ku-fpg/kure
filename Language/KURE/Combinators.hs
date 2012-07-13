@@ -144,16 +144,16 @@ whenM mb ma = condM mb ma (fail "condition False")
 
 ------------------------------------------------------------------------------------------
 
--- | 'Category's with failure and a catch.
+-- | 'Category's with failure and catching.
 --   The following law is expected to hold:
 --
--- > faiure msg `catch` f == f msg
+-- > failT msg `catchT` f == f msg
 
 class Category (~>) => CategoryCatch (~>) where
-  -- | The failing arrow.
+  -- | The failing 'Category'.
   failT :: String -> a ~> b
 
-  -- | A catch on arrows.
+  -- | A catch on 'Category's.
   catchT :: (a ~> b) -> (String -> (a ~> b)) -> (a ~> b)
 
 

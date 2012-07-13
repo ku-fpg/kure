@@ -30,8 +30,8 @@ module Language.KURE.Injection
        -- * Rewrite Injections
        , extractR
        , promoteR
-       , promoteWithFailMsgR
        , extractWithFailMsgR
+       , promoteWithFailMsgR
        -- * Lens Injections
        , injectL
        , retractL
@@ -96,10 +96,9 @@ promoteWithFailMsgT msg t = setFailMsg msg retractT >>> t
 promoteT  :: (MonadCatch m, Injection a a') => Translate c m a b -> Translate c m a' b
 promoteT = promoteWithFailMsgT "promoteT failed"
 
--- | Convert a 'Rewrite' over an injected value into a 'Rewrite' over a retraction of that value,
---   (failing if that injected value cannot be retracted).
+-- | As 'extractR', but takes a custom error message to use if extraction fails.
 extractWithFailMsgR :: (MonadCatch m, Injection a a') => String -> Rewrite c m a' -> Rewrite c m a
-extractWithFailMsgR msg r = setFailMsg msg injectT >>> r >>> retractT
+extractWithFailMsgR msg r = injectT >>> r >>> setFailMsg msg retractT
 
 -- | Convert a 'Rewrite' over an injected value into a 'Rewrite' over a retraction of that value,
 --   (failing if that injected value cannot be retracted).

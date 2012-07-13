@@ -8,8 +8,8 @@
 -- Portability: ghc
 --
 -- This module defines the main KURE types: 'Translate', 'Rewrite' and 'Lens'.
--- 'Rewrite' and 'Lens' are just special cases of 'Translate', and so any function that operates on 'Translate' is also
--- applicable to 'Rewrite' and 'Lens' (although care should be taken in the 'Lens' case).
+-- 'Rewrite' is just a special case of 'Translate', and so any function that operates on 'Translate' is also
+-- applicable to 'Rewrite'.
 --
 -- This module also contains 'Translate' instance declarations for the 'Monad' and 'Arrow' type-class families.
 -- Given these instances, many of the desirable combinators over 'Translate' and 'Rewrite' are special cases
@@ -44,7 +44,6 @@ module Language.KURE.Translate
         , focusR
         , focusT
         , testLensT
-   --     , joinTL
         , bidirectionalL
         , pureL
 
@@ -60,7 +59,8 @@ import Language.KURE.Combinators
 
 ------------------------------------------------------------------------------------------
 
--- | 'Translate' is a translation or strategy that translates from a value in a context to a monadic value.
+-- | An abstract representation of a transformation from a value of type @a@ in a context @c@ to a monadic value of type @m b@.
+--   The 'Translate' type is the basis of the entire KURE library.
 data Translate c m a b = Translate { -- | Apply a 'Translate' to a value and its context.
                                      apply :: c -> a -> m b}
 
@@ -224,8 +224,8 @@ instance (Monad m, Monoid b) => Monoid (Translate c m a b) where
 ------------------------------------------------------------------------------------------
 
 -- | An undirected 'Translate'.
-data BiTranslate c m a b = BiTranslate {forewardT :: Translate c m a b, -- ^ Extract a forewards 'Translate' from a 'BiTranslate'.
-                                        backwardT :: Translate c m b a  -- ^ Extract a backwards 'Translate' from a 'BiTranslate'.
+data BiTranslate c m a b = BiTranslate {forewardT :: Translate c m a b, -- ^ Extract the foreward 'Translate' from a 'BiTranslate'.
+                                        backwardT :: Translate c m b a  -- ^ Extract the backward 'Translate' from a 'BiTranslate'.
                                        }
 
 -- | A 'BiTranslate' that shares the same source and target type.
@@ -253,13 +253,13 @@ instance Monad m => Category (BiTranslate c m) where
 
 ------------------------------------------------------------------------------------------
 
--- | A 'Lens' is a way to focus on a particular point in a structure.
+-- | A 'Lens' is a way to focus on a sub-structure of type @b@ from a structure of type @a@.
 newtype Lens c m a b = Lens { -- | Convert a 'Lens' into a 'Translate' that produces a sub-structure (and its context) and an unfocussing function.
                               lensT :: Translate c m a ((c,b), b -> m a)}
 
 -- | The primitive way of building a 'Lens'.
 --   If the unfocussing function is applied to the value focussed on then it should succeed,
---   and produce the same @a@ value as the argument.
+--   and produce the same value as the original argument (of type @a@).
 lens :: Translate c m a ((c,b), b -> m a) -> Lens c m a b
 lens = Lens
 
@@ -273,14 +273,9 @@ focusT :: Monad m => Lens c m a b -> Translate c m b d -> Translate c m a d
 focusT l t = do ((c,b),_) <- lensT l
                 constT (apply t c b)
 
--- | Checks if the focusing succeeds, and additionally whether unfocussing from an unchanged value would succeed.
+-- | Check if the focusing succeeds, and additionally whether unfocussing from an unchanged value would succeed.
 testLensT :: MonadCatch m => Lens c m a b -> Translate c m a Bool
 testLensT l = testM (focusR l id)
-
---  Combines a 'Translate' producing a 'Lens' into just a 'Lens'.
---  Essentially a monadic 'join'.
--- joinTL :: Monad m => Translate c m a (Lens c m a b) -> Lens c m a b
--- joinTL tl = lens (tl >>= lensT)
 
 instance Monad m => Category (Lens c m) where
 
