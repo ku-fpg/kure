@@ -25,6 +25,7 @@ module Language.KURE.Combinators
            , notM
            , modFailMsg
            , setFailMsg
+           , prefixFailMsg
            , withPatFailMsg
              -- ** Conditionals
            , guardMsg
@@ -118,6 +119,11 @@ modFailMsg f ma = ma `catchM` (fail . f)
 --   Successful computations are unaffected.
 setFailMsg :: MonadCatch m => String -> m a -> m a
 setFailMsg msg = modFailMsg (const msg)
+
+-- | Add a prefix to the error message of a failing monadic computation.
+--   Successful computations are unaffected.
+prefixFailMsg :: MonadCatch m => String -> m a -> m a
+prefixFailMsg msg = modFailMsg (msg ++)
 
 -- | Use the given error message whenever a monadic pattern match failure occurs.
 withPatFailMsg :: MonadCatch m => String -> m a -> m a
