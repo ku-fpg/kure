@@ -349,12 +349,12 @@ abs2pathT there = do here <- absPathT
 
 -- | Find the 'Path's to every 'Node' that satisfies the predicate.
 pathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
-pathsToT q = collectT (acceptR q >>> absPathT) >>= mapM abs2pathT
+pathsToT q = collectT (acceptR q "pathsToT" >>> absPathT) >>= mapM abs2pathT
 
 -- | Find the 'Path' to the first 'Node' that satisfies the predicate (in a pre-order traversal).
 onePathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
 onePathToT q = setFailMsg "No matching nodes found." $
-               onetdT (acceptR q >>> absPathT) >>= abs2pathT
+               onetdT (acceptR q "pathsToT" >>> absPathT) >>= abs2pathT
 
 -- | Find the 'Path' to the first descendent 'Node' that satisfies the predicate (in a pre-order traversal).
 oneNonEmptyPathToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) Path
@@ -364,7 +364,7 @@ oneNonEmptyPathToT q = setFailMsg "No matching nodes found." $
 
 -- | Find the 'Path's to every 'Node' that satisfies the predicate, ignoring 'Node's below successes.
 prunePathsToT :: (PathContext c, Walker c m a, a ~ Generic a) => (Generic a -> Bool) -> Translate c m (Generic a) [Path]
-prunePathsToT q = collectPruneT (acceptR q >>> absPathT) >>= mapM abs2pathT
+prunePathsToT q = collectPruneT (acceptR q "pathsToT" >>> absPathT) >>= mapM abs2pathT
 
 
 -- local function used by uniquePathToT and uniquePrunePathToT

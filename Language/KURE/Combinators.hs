@@ -38,6 +38,7 @@ module Language.KURE.Combinators
            , (<+)
            , readerT
            , acceptR
+           , accepterR
            , tryR
            , attemptR
            , changedR
@@ -56,6 +57,7 @@ module Language.KURE.Combinators
            , fork
            , forkFirst
            , forkSecond
+           , constant
 ) where
 
 import Prelude hiding (id , (.), catch)
@@ -172,8 +174,13 @@ readerT :: ArrowApply (~>) => (a -> (a ~> b)) -> (a ~> b)
 readerT f = (f &&& id) ^>> app
 
 -- | Look at the argument to an 'Arrow', and choose to be either the identity arrow or a failure.
-acceptR :: (CategoryCatch (~>), ArrowApply (~>)) => (a -> Bool) -> (a ~> a)
-acceptR p = readerT $ \ a -> if p a then id else failT "acceptR: predicate failed"
+acceptR :: (CategoryCatch (~>), ArrowApply (~>)) => (a -> Bool) -> String -> (a ~> a)
+acceptR p msg = readerT $ \ a -> if p a then id else failT msg
+
+-- | Look at the argument to an 'Arrow', and choose to be either the identity arrow or a failure.
+--   This is a generalisation of 'acceptR' to any 'Arrow'.
+accepterR :: (CategoryCatch (~>), ArrowApply (~>)) => (a ~> Bool) -> String -> (a ~> a)
+accepterR t msg = forkFirst t >>> readerT (\ (b,a) -> if b then constant a else failT msg)
 
 -- | Catch a failing 'CategoryCatch', making it into an identity.
 tryR :: CategoryCatch (~>) => (a ~> a) -> (a ~> a)
@@ -186,7 +193,7 @@ attemptR r = (r >>^ (True,)) <+ arr (False,)
 
 -- | Makes an 'Arrow' fail if the result value equals the argument value.
 changedR :: (CategoryCatch (~>), ArrowApply (~>), Eq a) => (a ~> a) -> (a ~> a)
-changedR r = readerT (\ a -> r >>> acceptR (/=a))
+changedR r = readerT (\ a -> r >>> acceptR (/=a) "changedR: value is unchanged")
 
 -- | Repeat a 'CategoryCatch' until it fails, then return the result before the failure.
 --   Requires at least the first attempt to succeed.
@@ -242,5 +249,9 @@ forkFirst sf = fork >>> first sf
 -- | Tag the result of an 'Arrow' with its argument.
 forkSecond :: Arrow (~>) => (a ~> b) -> (a ~> (a , b))
 forkSecond sf = fork >>> second sf
+
+-- | An arrow with a constant result.
+constant :: Arrow (~>) => b -> (a ~> b)
+constant b = arr (const b)
 
 -------------------------------------------------------------------------------
