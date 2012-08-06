@@ -30,8 +30,9 @@ module Language.KURE.Combinators
              -- ** Conditionals
            , guardMsg
            , guardM
-           , condM
+           , ifM
            , whenM
+           , unlessM
              -- * Arrow Combinators
              -- ** Categories with a Catch
            , CategoryCatch(..)
@@ -110,7 +111,7 @@ testM ma = liftM (const True) ma <<+ return False
 
 -- | Fail if the 'Monad' succeeds; succeed with @()@ if it fails.
 notM :: MonadCatch m => m a -> m ()
-notM ma = condM (testM ma) (fail "notM  of success") (return ())
+notM ma = ifM (testM ma) (fail "notM of success") (return ())
 
 -- | Modify the error message of a failing monadic computation.
 --   Successful computations are unaffected.
@@ -139,16 +140,20 @@ guardMsg b msg = unless b (fail msg)
 
 -- | As 'guardMsg', but with a default error message.
 guardM ::  Monad m => Bool -> m ()
-guardM b = guardMsg b "guard failed"
+guardM b = guardMsg b "guardM failed"
 
--- | if-then-else lifted over a 'Monad'.
-condM ::  Monad m => m Bool -> m a -> m a -> m a
-condM mb m1 m2 = do b <- mb
-                    if b then m1 else m2
+-- | if-then-else lifted over a monadic predicate.
+ifM ::  Monad m => m Bool -> m a -> m a -> m a
+ifM mb m1 m2 = do b <- mb
+                  if b then m1 else m2
 
--- | if-then lifted over a 'Monad'.
+-- | if the monadic predicate holds then perform the monadic action, else fail.
 whenM ::  Monad m => m Bool -> m a -> m a
-whenM mb ma = condM mb ma (fail "condition False")
+whenM mb ma = ifM mb ma (fail "whenM: condition False")
+
+-- | if the monadic predicate holds then fail, else perform the monadic action.
+unlessM ::  Monad m => m Bool -> m a -> m a
+unlessM mb ma = ifM mb (fail "unlessM: condition True") ma
 
 ------------------------------------------------------------------------------------------
 
