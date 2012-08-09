@@ -147,11 +147,11 @@ ifM ::  Monad m => m Bool -> m a -> m a -> m a
 ifM mb m1 m2 = do b <- mb
                   if b then m1 else m2
 
--- | if the monadic predicate holds then perform the monadic action, else fail.
+-- | If the monadic predicate holds then perform the monadic action, else fail.
 whenM ::  Monad m => m Bool -> m a -> m a
 whenM mb ma = ifM mb ma (fail "whenM: condition False")
 
--- | if the monadic predicate holds then fail, else perform the monadic action.
+-- | If the monadic predicate holds then fail, else perform the monadic action.
 unlessM ::  Monad m => m Bool -> m a -> m a
 unlessM mb ma = ifM mb (fail "unlessM: condition True") ma
 
