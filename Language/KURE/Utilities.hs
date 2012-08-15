@@ -94,7 +94,8 @@ instance Monad KureMonad where
 
 -- | 'KureMonad' is the minimal monad that can be an instance of 'MonadCatch'.
 instance MonadCatch KureMonad where
--- catchM :: KureMonad a -> (a -> KureMonad b) -> KureMonad b
+-- catchM :: KureMonad a -> (String -> KureMonad a) -> KureMonad a
+
    (Success a)   `catchM` _ = Success a
    (Failure msg) `catchM` f = f msg
 
