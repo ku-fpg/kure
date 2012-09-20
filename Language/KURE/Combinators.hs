@@ -248,11 +248,11 @@ fork :: Arrow arr => arr a (a,a)
 fork = arr (\a -> (a,a))
 
 -- | Tag the result of an 'Arrow' with its argument.
-forkFirst :: Arrow arr => arr a b -> arr a (b , a)
+forkFirst :: Arrow arr => arr a b -> arr a (b,a)
 forkFirst sf = fork >>> first sf
 
 -- | Tag the result of an 'Arrow' with its argument.
-forkSecond :: Arrow arr => arr a b -> arr a (a , b)
+forkSecond :: Arrow arr => arr a b -> arr a (a,b)
 forkSecond sf = fork >>> second sf
 
 -- | An arrow with a constant result.
