@@ -97,7 +97,6 @@ import Language.KURE.Injection
 
 ------------------------------------------------------------------------------------------
 
-
 -- | A 'Node' is any node in the tree that you wish to be able to traverse.
 
 class (Injection a (Generic a), Generic a ~ Generic (Generic a)) => Node a where
