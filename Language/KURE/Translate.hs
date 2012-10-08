@@ -298,7 +298,7 @@ instance MonadCatch m => CategoryCatch (Lens c m) where
 -- failT :: String -> Lens c m a b
    failT = lens . fail
 
--- catch :: Lens c m a b -> (String -> Lens c m a b) -> Lens c m a b
+-- catchT :: Lens c m a b -> (String -> Lens c m a b) -> Lens c m a b
    l1 `catchT` l2 = lens (attemptM (focusR l1 id) >>= either (lensT . l2) (const (lensT l1)))
 
 -- | Construct a 'Lens' from a 'BiTranslate'.
