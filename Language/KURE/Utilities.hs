@@ -11,9 +11,9 @@
 
 module Language.KURE.Utilities
        ( -- * The KURE Monad
-         KureMonad
-       , runKureMonad
-       , fromKureMonad
+         KureM
+       , runKureM
+       , fromKureM
          -- * Error Messages
        , missingChild
          -- * Generic Combinators
@@ -69,48 +69,48 @@ import Language.KURE.Injection
 
 -------------------------------------------------------------------------------
 
--- | A basic error 'Monad'.
---   The KURE user is free to either use 'KureMonad' or provide their own monad.
---   'KureMonad' is essentially the same as ('Either' 'String' @a@), except that the 'fail' method produces an error in the monad,
+-- | 'KureM' is a basic error 'Monad'.
+--   The KURE user is free to either use 'KureM' or provide their own monad.
+--   'KureM' is essentially the same as ('Either' 'String' @a@), except that the 'fail' method produces an error in the monad,
 --   rather than invoking 'error'.
 --   A major advantage of this is that monadic pattern match failures are caught safely.
-data KureMonad a = Failure String | Success a deriving (Eq, Show)
+data KureM a = Failure String | Success a deriving (Eq, Show)
 
--- | Eliminator for 'KureMonad'.
-runKureMonad :: (a -> b) -> (String -> b) -> KureMonad a -> b
-runKureMonad _ f (Failure msg) = f msg
-runKureMonad s _ (Success a)   = s a
+-- | Eliminator for 'KureM'.
+runKureM :: (a -> b) -> (String -> b) -> KureM a -> b
+runKureM _ f (Failure msg) = f msg
+runKureM s _ (Success a)   = s a
 
--- | Get the value from a 'KureMonad', providing a function to handle the error case.
-fromKureMonad :: (String -> a) -> KureMonad a -> a
-fromKureMonad = runKureMonad id
+-- | Get the value from a 'KureM', providing a function to handle the error case.
+fromKureM :: (String -> a) -> KureM a -> a
+fromKureM = runKureM id
 
-instance Monad KureMonad where
--- return :: a -> KureMonad a
+instance Monad KureM where
+-- return :: a -> KureM a
    return = Success
 
--- (>>=) :: KureMonad a -> (a -> KureMonad b) -> KureMonad b
+-- (>>=) :: KureM a -> (a -> KureM b) -> KureM b
    (Success a)   >>= f = f a
    (Failure msg) >>= _ = Failure msg
 
--- fail :: String -> KureMonad a
+-- fail :: String -> KureM a
    fail = Failure
 
--- | 'KureMonad' is the minimal monad that can be an instance of 'MonadCatch'.
-instance MonadCatch KureMonad where
--- catchM :: KureMonad a -> (String -> KureMonad a) -> KureMonad a
+-- | 'KureM' is the minimal monad that can be an instance of 'MonadCatch'.
+instance MonadCatch KureM where
+-- catchM :: KureM a -> (String -> KureM a) -> KureM a
    (Success a)   `catchM` _ = Success a
    (Failure msg) `catchM` f = f msg
 
-instance Functor KureMonad where
--- fmap :: (a -> b) -> KureMonad a -> KureMonad b
+instance Functor KureM where
+-- fmap :: (a -> b) -> KureM a -> KureM b
    fmap = liftM
 
-instance Applicative KureMonad where
--- pure :: a -> KureMonad a
+instance Applicative KureM where
+-- pure :: a -> KureM a
    pure = return
 
--- (<*>) :: KureMonad (a -> b) -> KureMonad a -> KureMonad b
+-- (<*>) :: KureM (a -> b) -> KureM a -> KureM b
    (<*>) = ap
 
 ------------------------------------------------------------------------------------------
@@ -320,18 +320,6 @@ atIndex i f as = [ if n == i then f a else a
                  ]
 
 -------------------------------------------------------------------------------
-
--- liftResult :: Monad m => (a -> b) -> (a -> m b)
--- liftResult = result return
-
--- liftResult2 :: Monad m => (a -> b -> c) -> (a -> b -> m c)
--- liftResult2 = (result.result) return
-
--- liftResult3 :: Monad m => (a -> b -> c -> d) -> (a -> b -> c -> m d)
--- liftResult3 = (result.result.result) return
-
--- liftResult4 :: Monad m => (a -> b -> c -> d -> e) -> (a -> b -> c -> d -> m e)
--- liftResult4 = (result.result.result.result) return
 
 liftArgument2 :: Monad m => (a -> b -> m c) -> m a -> m b -> m c
 liftArgument2 f ma mb = join (liftM2 f ma mb)
