@@ -69,7 +69,11 @@ import Language.KURE.Injection
 
 -------------------------------------------------------------------------------
 
--- | A basic error 'Monad'.  KURE users may use either 'KureMonad' or their own 'Monad'(s).
+-- | A basic error 'Monad'.
+--   The KURE user is free to either use 'KureMonad' or provide their own monad.
+--   'KureMonad' is essentially the same as ('Either' 'String' @a@), except that the 'fail' method produces an error in the monad,
+--   rather than invoking 'error'.
+--   A major advantage of this is that monadic pattern match failures are caught safely.
 data KureMonad a = Failure String | Success a deriving (Eq, Show)
 
 -- | Eliminator for 'KureMonad'.
@@ -95,7 +99,6 @@ instance Monad KureMonad where
 -- | 'KureMonad' is the minimal monad that can be an instance of 'MonadCatch'.
 instance MonadCatch KureMonad where
 -- catchM :: KureMonad a -> (String -> KureMonad a) -> KureMonad a
-
    (Success a)   `catchM` _ = Success a
    (Failure msg) `catchM` f = f msg
 

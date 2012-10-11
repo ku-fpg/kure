@@ -125,7 +125,7 @@ instance Alternative m => Alternative (Translate c m a) where
    empty = constT empty
 
 -- (<|>) :: Translate c m a b -> Translate c m a b -> Translate c m a b
-   t1 <|> t2 = translate $ \ c a -> apply t1 c a <|> apply t2 c a
+   t1 <|> t2 = translate (\ c a -> apply t1 c a <|> apply t2 c a)
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Monad m => Monad (Translate c m a) where
@@ -161,11 +161,11 @@ instance MonadPlus m => MonadPlus (Translate c m a) where
 -- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance Monad m => Category (Translate c m) where
 
---  id :: Translate c m a a
-    id = contextfreeT return
+-- id :: Translate c m a a
+   id = contextfreeT return
 
---  (.) :: Translate c m b d -> Translate c m a b -> Translate c m a d
-    t2 . t1 = translate $ \ c -> apply t1 c >=> apply t2 c
+-- (.) :: Translate c m b d -> Translate c m a b -> Translate c m a d
+   t2 . t1 = translate (\ c -> apply t1 c >=> apply t2 c)
 
 -- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance MonadCatch m => CategoryCatch (Translate c m) where
@@ -184,7 +184,7 @@ instance Monad m => Arrow (Translate c m) where
    arr f = contextfreeT (return . f)
 
 -- first :: Translate c m a b -> Translate c m (a,z) (b,z)
-   first t = translate $ \ c (a,z) -> liftM (\b -> (b,z)) (apply t c a)
+   first t = translate $ \ c (a,z) -> liftM (\ b -> (b,z)) (apply t c a)
 
 -- (***) :: Translate c m a1 b1 -> Translate c m a2 b2 -> Translate c m (a1,a2) (b1,b2)
    t1 *** t2 = translate $ \ c (a,b) -> liftM2 (,) (apply t1 c a) (apply t2 c b)
@@ -208,7 +208,7 @@ instance MonadPlus m => ArrowPlus (Translate c m) where
 instance Monad m => ArrowApply (Translate c m) where
 
 -- app :: Translate c m (Translate c m a b, a) b
-   app = translate $ \ c (t,a) -> apply t c a
+   app = translate (\ c (t,a) -> apply t c a)
 
 ------------------------------------------------------------------------------------------
 
