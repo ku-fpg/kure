@@ -225,11 +225,11 @@ crushbuT t = foldbuT (mtryM t)
 
 -- | An always successful traversal that collects the results of all successful applications of a 'Translate' in a list.
 collectT :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) [b]
-collectT t = crushtdT (t >>^ (: []))
+collectT t = crushtdT (t >>^ return)
 
 -- | Like 'collectT', but does not traverse below successes.
 collectPruneT :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) [b]
-collectPruneT t = prunetdT (t >>^ (: []))
+collectPruneT t = prunetdT (t >>^ return)
 
 -------------------------------------------------------------------------------
 
