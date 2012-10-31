@@ -39,16 +39,16 @@ updateContextCmd (Assign v e) = (addDef v e)
 initialContext :: Context
 initialContext = Context rootAbsPath []
 
-lookupDef :: Name -> Context -> KureMonad Expr
+lookupDef :: Name -> Context -> KureM Expr
 lookupDef v (Context _ defs) = maybe (fail $ v ++ " not found in context") return $ lookup v defs
 
 ---------------------------------------------------------------------------
 
-type TranslateE a b = Translate Context KureMonad a b
+type TranslateE a b = Translate Context KureM a b
 type RewriteE a = TranslateE a a
 
 applyE :: TranslateE a b -> a -> Either String b
-applyE t = runKureMonad Right Left . apply t initialContext
+applyE t = runKureM Right Left . apply t initialContext
 
 ---------------------------------------------------------------------------
 
@@ -63,7 +63,7 @@ instance Node GenericExpr where
 
 ---------------------------------------------------------------------------
 
-instance Walker Context KureMonad GenericExpr where
+instance Walker Context KureM GenericExpr where
 
   childL n = lens $ translate $ \ c g -> case g of
                                            GExpr e -> childLgeneric n c e
@@ -105,7 +105,7 @@ instance Node Expr where
   numChildren (Var _)    = 0
   numChildren (Lit _)    = 0
 
-instance Walker Context KureMonad Expr where
+instance Walker Context KureM Expr where
   childL n = lens $
     case n of
       0 ->    addT  exposeT id (childL0of2 Add)
@@ -150,7 +150,7 @@ instance Node Cmd where
   numChildren (Seq _ _)    = 2
   numChildren (Assign _ _) = 1
 
-instance Walker Context KureMonad Cmd where
+instance Walker Context KureM Cmd where
   childL n = lens $
     case n of
       0 ->    seqT exposeT id (childL0of2 Seq)
@@ -179,7 +179,7 @@ instance Walker Context KureMonad Cmd where
 
 ---------------------------------------------------------------------------
 
-seqT' :: TranslateE Cmd a1 -> TranslateE Cmd a2 -> (KureMonad a1 -> KureMonad a2 -> KureMonad b) -> TranslateE Cmd b
+seqT' :: TranslateE Cmd a1 -> TranslateE Cmd a2 -> (KureM a1 -> KureM a2 -> KureM b) -> TranslateE Cmd b
 seqT' t1 t2 f = translate $ \ c cm -> case cm of
                                        Seq cm1 cm2 -> f (apply t1 (c @@ 0) cm1) (apply t2 (updateContextCmd cm1 c @@ 1) cm2)
                                        _           -> fail "not a Seq"
@@ -222,7 +222,7 @@ litT f = contextfreeT $ \ e -> case e of
 
 ---------------------------------------------------------------------------
 
-addT' :: TranslateE Expr a1 -> TranslateE Expr a2 -> (KureMonad a1 -> KureMonad a2 -> KureMonad b) -> TranslateE Expr b
+addT' :: TranslateE Expr a1 -> TranslateE Expr a2 -> (KureM a1 -> KureM a2 -> KureM b) -> TranslateE Expr b
 addT' t1 t2 f = translate $ \ c e -> case e of
                                        Add e1 e2 -> f (apply t1 (c @@ 0) e1) (apply t2 (c @@ 1) e2)
                                        _         -> fail "not an Add"
@@ -241,7 +241,7 @@ addOneR r1 r2 = addT' (withArgumentT r1) (withArgumentT r2) (attemptOne2 Add)
 
 ---------------------------------------------------------------------------
 
-eseqT' :: TranslateE Cmd a1 -> TranslateE Expr a2 -> (KureMonad a1 -> KureMonad a2 -> KureMonad b) -> TranslateE Expr b
+eseqT' :: TranslateE Cmd a1 -> TranslateE Expr a2 -> (KureM a1 -> KureM a2 -> KureM b) -> TranslateE Expr b
 eseqT' t1 t2 f = translate $ \ c e -> case e of
                                         ESeq cm e1 -> f (apply t1 (c @@ 0) cm) (apply t2 (updateContextCmd cm c @@ 1) e1)
                                         _          -> fail "not an ESeq"

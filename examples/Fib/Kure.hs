@@ -3,13 +3,13 @@
 module Fib.Kure where
 
 import Language.KURE
-import Language.KURE.Utilities(KureMonad,missingChild)
+import Language.KURE.Utilities(KureM,missingChild)
 import Fib.AST
 
 --------------------------------------------------------------------------------------
 
 -- | For this simple example, the context is just an 'AbsolutePath', and 'Translate' always operates on 'Arith'.
-type TranslateA b = Translate AbsolutePath KureMonad Arith b
+type TranslateA b = Translate AbsolutePath KureM Arith b
 type RewriteA = TranslateA Arith
 
 --------------------------------------------------------------------------------------
@@ -22,7 +22,7 @@ instance Node Arith where
   numChildren (Sub _ _) = 2
   numChildren (Fib _)   = 1
 
-instance Walker AbsolutePath KureMonad Arith where
+instance Walker AbsolutePath KureM Arith where
 
   childL n = lens $ translate $ \ c e ->
     do guardMsg (hasChild n e) (missingChild n)

@@ -4,7 +4,7 @@ import Prelude hiding (id , (.), snd)
 import Control.Category
 
 import Language.KURE
-import Language.KURE.Utilities(runKureMonad)
+import Language.KURE.Utilities(runKureM)
 
 import Fib.AST
 import Fib.Kure
@@ -12,7 +12,7 @@ import Fib.Kure
 -----------------------------------------------------------------------
 
 applyFib :: RewriteA -> Arith -> Either String Arith
-applyFib r = runKureMonad Right Left . apply r rootAbsPath
+applyFib r = runKureM Right Left . apply r rootAbsPath
 
 -----------------------------------------------------------------------
 
