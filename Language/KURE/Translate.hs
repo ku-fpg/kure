@@ -24,6 +24,7 @@ module Language.KURE.Translate
         , translate
         , rewrite
         , contextfreeT
+        , contextonlyT
         , constT
         , contextT
         , exposeT
@@ -79,7 +80,11 @@ rewrite = translate
 
 -- | Build a 'Translate' that doesn't depend on the context.
 contextfreeT :: (a -> m b) -> Translate c m a b
-contextfreeT = translate . const
+contextfreeT f = translate (\ _ -> f)
+
+-- | Build a 'Translate' that doesn't depend on the value.
+contextonlyT :: (c -> m b) -> Translate c m a b
+contextonlyT f = translate (\ c _ -> f c)
 
 -- | Build a constant 'Translate' from a monadic computation.
 constT :: m b -> Translate c m a b
