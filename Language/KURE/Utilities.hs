@@ -248,7 +248,7 @@ instance Monad m => Monad (S m) where
   {-# INLINE return #-}
   return a = S $ \b -> return (a, b)
   {-# INLINE (>>=) #-}
-  m >>= k = S $ \b -> runS m b >>= \(a, b) -> runS (k a) b
+  m >>= k = S $ \_b -> runS m _b >>= \(a, _b) -> runS (k a) _b
 
 attemptOneN :: (Traversable t, MonadCatch m) => (t a -> r) -> t (m (m a, a)) -> m r
 attemptOneN f = liftM (f . fst) . flip runS False . Traversable.mapM each where
