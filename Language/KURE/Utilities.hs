@@ -237,14 +237,14 @@ attemptOne4 f = liftArgument4 (attemptOne4' f)
 
 
 
-newtype S m a = S {runS :: Bool -> m (a, Bool)}
-instance Monad m => Functor (S m) where fmap = liftM
-instance Monad m => Applicative (S m) where
+newtype S s m a = S {runS :: s -> m (a, s)}
+instance Monad m => Functor (S s m) where fmap = liftM
+instance Monad m => Applicative (S s m) where
   {-# INLINE pure #-}
   pure = return
   {-# INLINE (<*>) #-}
   (<*>) = liftM2 ($)
-instance Monad m => Monad (S m) where
+instance Monad m => Monad (S s m) where
   {-# INLINE return #-}
   return a = S $ \b -> return (a, b)
   {-# INLINE (>>=) #-}
@@ -256,10 +256,11 @@ attemptOneN f = liftM (f . fst) . flip runS False . Traversable.mapM each where
     if b then return (a, b) else liftM (flip (,) True) ma <<+ return (a, b)
 
 attemptOne1N :: (Traversable t, MonadCatch m) => (a -> t b -> r) -> m (m a, a) -> t (m (m b, b)) -> m r
-attemptOne1N f mma mmbs = mma >>= \(ma, a) ->
-  f `liftM` ma `ap` Traversable.mapM (>>= fst) mmbs
-
-   <<+   attemptOneN (f a) mmbs
+attemptOne1N f mmaa mmbbs = do
+  (ma, a) <- mmaa
+  mbbs <- Traversable.sequence mmbbs
+  (<<+) (flip liftM ma $ \a' -> f a' $ fmap snd mbbs) $
+        attemptOneN (f a) (fmap return mbbs)
 
 -------------------------------------------------------------------------------
 
@@ -321,9 +322,16 @@ childL3of4 f b0 b1 b2 cb3 = childLaux cb3 (\ b3 -> f b0 b1 b2 b3)
 
 childLMofN :: (MonadCatch m, Node b, Traversable t) =>
   Int -> (t b -> a) -> t (c,b) -> ((c, Generic b) , Generic b -> m a)
-childLMofN m f cbs =
-  childLaux (Foldable.toList cbs !! m) $ \ b' -> f $ snd $
-    Traversable.mapAccumL (\n (_, v) -> (n + 1, if n == m then b' else v)) 0 cbs
+childLMofN = \m f cbs ->
+  childLaux (cbs `atIndex` m) $ \ b' -> f $ snd $
+    Traversable.mapAccumL (\n (_, b) -> n `seq` (n + 1, if n == m then b' else b)) 0 cbs
+
+  where
+    -- helper function for looking up the nth element in a container
+    atIndex :: Traversable t => t a -> Int -> a
+    atIndex as n = snd $ Foldable.foldl' snoc (0, initial) as where
+      initial = error "childLMofN: index too large!"
+      snoc (m, found) a = m `seq` (,) (m + 1) $ if n == m then a else found
 
 -------------------------------------------------------------------------------
 
