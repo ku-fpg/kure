@@ -62,6 +62,10 @@ import Control.Arrow
 
 import Data.Monoid
 
+import Data.Traversable (Traversable)
+import qualified Data.Foldable as Foldable
+import qualified Data.Traversable as Traversable
+
 import Language.KURE.Combinators
 import Language.KURE.Translate
 import Language.KURE.Walker
@@ -159,17 +163,17 @@ attemptAny4' f (b1,a1) (b2,a2) (b3,a3) (b4,a4) = if b1 || b2 || b3 || b4
                                                   then return (f a1 a2 a3 a4)
                                                   else fail "failed for all four children"
 
-attemptAnyN' :: Monad m => ([a] -> b) -> [(Bool,a)] -> m b
-attemptAnyN' f bas = let (bs,as) = unzip bas
-                      in if or bs
+attemptAnyN' :: (Traversable t, Monad m) => (t a -> b) -> t (Bool,a) -> m b
+attemptAnyN' f bas = let (bs,as) = fmap fst &&& fmap snd $ bas
+                      in if Foldable.or bs
                           then return (f as)
-                          else fail ("failed for all " ++ show (length bs) ++ " children")
+                          else fail ("failed for all " ++ show (length $ Foldable.toList bs) ++ " children")
 
-attemptAny1N' :: Monad m => (a1 -> [a2] -> r) -> (Bool,a1) -> [(Bool,a2)] -> m r
-attemptAny1N' f (b,a) bas = let (bs,as) = unzip bas
-                             in if or (b:bs)
+attemptAny1N' :: (Traversable t, Monad m) => (a1 -> t a2 -> r) -> (Bool,a1) -> t (Bool,a2) -> m r
+attemptAny1N' f (b,a) bas = let (bs,as) = fmap fst &&& fmap snd $ bas
+                             in if b || Foldable.or bs
                                  then return (f a as)
-                                 else fail ("failed for all " ++ show (1 + length bs) ++ " children")
+                                 else fail ("failed for all " ++ show (1 + length (Foldable.toList bs)) ++ " children")
 
 attemptAny2 :: Monad m => (a1 -> a2 -> r) -> m (Bool,a1) -> m (Bool,a2) -> m r
 attemptAny2 f = liftArgument2 (attemptAny2' f)
@@ -180,10 +184,10 @@ attemptAny3 f = liftArgument3 (attemptAny3' f)
 attemptAny4 :: Monad m => (a1 -> a2 -> a3 -> a4 -> r) -> m (Bool,a1) -> m (Bool,a2) -> m (Bool,a3) -> m (Bool,a4) -> m r
 attemptAny4 f = liftArgument4 (attemptAny4' f)
 
-attemptAnyN :: Monad m => ([a] -> b) -> [m (Bool,a)] -> m b
+attemptAnyN :: (Traversable t, Monad m) => (t a -> b) -> t (m (Bool,a)) -> m b
 attemptAnyN f = liftArgumentN (attemptAnyN' f)
 
-attemptAny1N :: Monad m => (a1 -> [a2] -> r) -> m (Bool,a1) -> [m (Bool,a2)] -> m r
+attemptAny1N :: (Traversable t, Monad m) => (a1 -> t a2 -> r) -> m (Bool,a1) -> t (m (Bool,a2)) -> m r
 attemptAny1N f = liftArgument1N (attemptAny1N' f)
 
 -------------------------------------------------------------------------------
@@ -222,19 +226,6 @@ attemptOne4' f (ma , a) mbb@(_ , b) mcc@(_ , c) mdd@(_ , d) = (do a' <- ma
                                                                   return (f a' b c d)
                                                               ) <<+ attemptOne3' (f a) mbb mcc mdd
 
-attemptOneN' :: MonadCatch m => ([a] -> r) -> [(m a, a)] -> m r
-attemptOneN' _ []                = fail "failed for all children"
-attemptOneN' f [maa]             = attemptOne1' (f . (:[])) maa
-attemptOneN' f ((ma , a) : maas) = (do a' <- ma
-                                       return $ f (a' : map snd maas)
-                                   ) <<+ attemptOneN' (f . (a:)) maas
-
-attemptOne1N' :: MonadCatch m => (a -> [b] -> r) -> (m a, a) -> [(m b, b)] -> m r
-attemptOne1N' f (ma , a) mbbs = (do a' <- ma
-                                    return $ f a' (map snd mbbs)
-                                ) <<+ attemptOneN' (f a) mbbs
-
-
 attemptOne2 :: MonadCatch m => (a -> b -> r) -> m (m a, a) -> m (m b, b) -> m r
 attemptOne2 f = liftArgument2 (attemptOne2' f)
 
@@ -244,11 +235,31 @@ attemptOne3 f = liftArgument3 (attemptOne3' f)
 attemptOne4 :: MonadCatch m => (a -> b -> c -> d -> r) -> m (m a, a) -> m (m b, b) -> m (m c, c) -> m (m d, d) -> m r
 attemptOne4 f = liftArgument4 (attemptOne4' f)
 
-attemptOneN :: MonadCatch m => ([a] -> r) -> [m (m a, a)] -> m r
-attemptOneN f = liftArgumentN (attemptOneN' f)
 
-attemptOne1N :: MonadCatch m => (a -> [b] -> r) -> m (m a, a) -> [m (m b, b)] -> m r
-attemptOne1N f = liftArgument1N (attemptOne1N' f)
+
+newtype S m a = S {runS :: Bool -> m (a, Bool)}
+instance Monad m => Functor (S m) where fmap = liftM
+instance Monad m => Applicative (S m) where
+  {-# INLINE pure #-}
+  pure = return
+  {-# INLINE (<*>) #-}
+  (<*>) = liftM2 ($)
+instance Monad m => Monad (S m) where
+  {-# INLINE return #-}
+  return a = S $ \b -> return (a, b)
+  {-# INLINE (>>=) #-}
+  m >>= k = S $ \b -> runS m b >>= \(a, b) -> runS (k a) b
+
+attemptOneN :: (Traversable t, MonadCatch m) => (t a -> r) -> t (m (m a, a)) -> m r
+attemptOneN f = liftM (f . fst) . flip runS False . Traversable.mapM each where
+  each m = S $ \b -> m >>= \(ma, a) ->
+    if b then return (a, b) else liftM (flip (,) True) ma <<+ return (a, b)
+
+attemptOne1N :: (Traversable t, MonadCatch m) => (a -> t b -> r) -> m (m a, a) -> t (m (m b, b)) -> m r
+attemptOne1N f mma mmbs = mma >>= \(ma, a) ->
+  f `liftM` ma `ap` Traversable.mapM (>>= fst) mmbs
+
+   <<+   attemptOneN (f a) mmbs
 
 -------------------------------------------------------------------------------
 
@@ -308,16 +319,11 @@ childL2of4 f b0 b1 cb2 b3 = childLaux cb2 (\ b2 -> f b0 b1 b2 b3)
 childL3of4 :: (MonadCatch m, Node b3) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> b1 -> b2 -> (c,b3) -> ((c, Generic b3) , Generic b3 -> m a)
 childL3of4 f b0 b1 b2 cb3 = childLaux cb3 (\ b3 -> f b0 b1 b2 b3)
 
-childLMofN :: (MonadCatch m, Node b) => Int -> ([b] -> a) -> [(c,b)] -> ((c, Generic b) , Generic b -> m a)
-childLMofN m f cbs = childLaux (cbs !! m) (\ b' -> f $ atIndex m (const b') (map snd cbs))
-
--------------------------------------------------------------------------------
-
--- | Modify the value in a list at specified index.
-atIndex :: Int -> (a -> a) -> [a] -> [a]
-atIndex i f as = [ if n == i then f a else a
-                 | (a,n) <- zip as [0..]
-                 ]
+childLMofN :: (MonadCatch m, Node b, Traversable t) =>
+  Int -> (t b -> a) -> t (c,b) -> ((c, Generic b) , Generic b -> m a)
+childLMofN m f cbs =
+  childLaux (Foldable.toList cbs !! m) $ \ b' -> f $ snd $
+    Traversable.mapAccumL (\n (_, v) -> (n + 1, if n == m then b' else v)) 0 cbs
 
 -------------------------------------------------------------------------------
 
@@ -330,12 +336,12 @@ liftArgument3 f ma mb mc = join (liftM3 f ma mb mc)
 liftArgument4 :: Monad m => (a -> b -> c -> d -> m e) -> m a -> m b -> m c -> m d -> m e
 liftArgument4 f ma mb mc md = join (liftM4 f ma mb mc md)
 
-liftArgumentN :: Monad m => ([a] -> m b) -> [m a] -> m b
-liftArgumentN f mas = sequence mas >>= f
+liftArgumentN :: (Traversable t, Monad m) => (t a -> m b) -> t (m a) -> m b
+liftArgumentN f mas = Traversable.sequence mas >>= f
 
-liftArgument1N :: Monad m => (a -> [b] -> m c) -> m a -> [m b] -> m c
+liftArgument1N :: (Traversable t, Monad m) => (a -> t b -> m c) -> m a -> t (m b) -> m c
 liftArgument1N f ma mbs = do a  <- ma
-                             bs <- sequence mbs
+                             bs <- Traversable.sequence mbs
                              f a bs
 
 -------------------------------------------------------------------------------

@@ -38,6 +38,12 @@ data Nat1 :: Nat -> * where
 
 data Proxy (t :: Nat) = Proxy
 
+
+
+{-# INLINE nthArg #-}
+
+
+
 -- specializing the C/C2 apparatus to our intended use case
 --
 -- the type refinement in the C constraint eventually determines the
@@ -46,9 +52,10 @@ nthArg :: forall n fun c x dt m z.
            (MonadCatch m, Node x,
             C n fun c x dt ((c, Generic x), Generic x -> m dt) z) =>
            Nat1 n -> fun -> z
-nthArg _ =
+nthArg _ fun =
   method (Proxy :: Proxy n)
            (childLaux :: ((c, x) -> (x -> dt) -> ((c, Generic x), Generic x -> m dt)))
+           fun
 
 
 
@@ -74,10 +81,12 @@ class C (n :: Nat) (fun :: *) c x dt r z where
 
 instance (x ~ dom, C2 cod dt r z', z ~ ((c, x) -> z')) =>
   C TyZ (dom -> cod) c x dt r z where
+  {-# INLINE method #-}
   method _ k fun = \y -> method2 (k y) fun
 
 instance (C n cod c x dt r z', z ~ (dom -> z')) =>
   C (TyS n) (dom -> cod) c x dt r z where
+  {-# INLINE method #-}
   method _ k fun = \x -> method (Proxy :: Proxy n) k (fun x)
 
 
@@ -92,8 +101,10 @@ class C2 (fun :: *) dt r z where
 -- case 1: fun is a function
 instance (C2 cod dt r z', z ~ (dom -> z')) =>
   C2 (dom -> cod) dt r z where
+  {-# INLINE method2 #-}
   method2 k fun = \x -> method2 k (($ x) . fun)
 
 -- case 2: fun is not a function
 instance (not_a_fun ~ dt, r ~ z) => C2 not_a_fun dt r z where
+  {-# INLINE method2 #-}
   method2 k fun = k fun
