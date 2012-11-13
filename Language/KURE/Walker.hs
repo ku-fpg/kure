@@ -21,7 +21,7 @@ module Language.KURE.Walker
         , hasChild
         , hasChildT
 
-          -- * Tree Walkers
+        -- * Tree Walkers
         , Walker(..)
 
         -- * Rewrite Traversals

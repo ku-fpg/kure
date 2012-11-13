@@ -62,8 +62,8 @@ import Language.KURE.Combinators
 
 -- | An abstract representation of a transformation from a value of type @a@ in a context @c@ to a monadic value of type @m b@.
 --   The 'Translate' type is the basis of the entire KURE library.
-data Translate c m a b = Translate { -- | Apply a 'Translate' to a value and its context.
-                                     apply :: c -> a -> m b}
+newtype Translate c m a b = Translate { -- | Apply a 'Translate' to a value and its context.
+                                        apply :: c -> a -> m b}
 
 -- | The primitive  way of building a 'Translate'.
 translate :: (c -> a -> m b) -> Translate c m a b
