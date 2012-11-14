@@ -65,13 +65,8 @@ import Control.Monad hiding (sequence, mapM)
 import Control.Arrow
 
 import Data.Monoid
-
--- import Data.Traversable (Traversable)
--- import qualified Data.Foldable as Foldable
--- import qualified Data.Traversable as Traversable
 import Data.Foldable
 import Data.Traversable
-
 
 import Language.KURE.Combinators
 import Language.KURE.Translate

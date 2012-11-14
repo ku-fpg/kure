@@ -47,7 +47,6 @@ module Language.KURE.Translate
         , testLensT
         , bidirectionalL
         , pureL
-
 ) where
 
 import Prelude hiding (id, (.), mapM)

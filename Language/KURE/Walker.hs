@@ -79,8 +79,6 @@ module Language.KURE.Walker
 
         -- ** Testing Paths
         ,  testPathT
-
-
 ) where
 
 import Prelude hiding (id)
