@@ -58,15 +58,20 @@ module Language.KURE.Utilities
        , childLMofN
 ) where
 
+import Prelude hiding (sequence, mapM, or)
+
 import Control.Applicative
-import Control.Monad
+import Control.Monad hiding (sequence, mapM)
 import Control.Arrow
 
 import Data.Monoid
 
-import Data.Traversable (Traversable)
-import qualified Data.Foldable as Foldable
-import qualified Data.Traversable as Traversable
+-- import Data.Traversable (Traversable)
+-- import qualified Data.Foldable as Foldable
+-- import qualified Data.Traversable as Traversable
+import Data.Foldable
+import Data.Traversable
+
 
 import Language.KURE.Combinators
 import Language.KURE.Translate
@@ -166,16 +171,16 @@ attemptAny4' f (b1,a1) (b2,a2) (b3,a3) (b4,a4) = if b1 || b2 || b3 || b4
                                                   else fail "failed for all four children"
 
 attemptAnyN' :: (Traversable t, Monad m) => (t a -> b) -> t (Bool,a) -> m b
-attemptAnyN' f bas = let (bs,as) = fmap fst &&& fmap snd $ bas
-                      in if Foldable.or bs
+attemptAnyN' f bas = let (bs,as) = (fmap fst &&& fmap snd) $ bas
+                      in if or bs
                           then return (f as)
-                          else fail ("failed for all " ++ show (length $ Foldable.toList bs) ++ " children")
+                          else fail ("failed for all " ++ show (length $ toList bs) ++ " children")
 
 attemptAny1N' :: (Traversable t, Monad m) => (a1 -> t a2 -> r) -> (Bool,a1) -> t (Bool,a2) -> m r
-attemptAny1N' f (b,a) bas = let (bs,as) = fmap fst &&& fmap snd $ bas
-                             in if b || Foldable.or bs
+attemptAny1N' f (b,a) bas = let (bs,as) = (fmap fst &&& fmap snd) $ bas
+                             in if b || or bs
                                  then return (f a as)
-                                 else fail ("failed for all " ++ show (1 + length (Foldable.toList bs)) ++ " children")
+                                 else fail ("failed for all " ++ show (1 + length (toList bs)) ++ " children")
 
 attemptAny2 :: Monad m => (a1 -> a2 -> r) -> m (Bool,a1) -> m (Bool,a2) -> m r
 attemptAny2 f = liftArgument2 (attemptAny2' f)
@@ -253,14 +258,14 @@ instance Monad m => Monad (S s m) where
   m >>= f = S $ \ b -> runS m b >>= \(a, b') -> runS (f a) b'
 
 attemptOneN :: (Traversable t, MonadCatch m) => (t a -> r) -> t (m (m a, a)) -> m r
-attemptOneN f = (>>= final) . flip runS False . Traversable.mapM each where
+attemptOneN f = (>>= final) . flip runS False . mapM each where
   each m = S $ \b -> m >>= \(ma, a) -> if b then return (a, b) else liftM (,True) ma <<+ return (a, b)
   final (x, b) = if b then return (f x) else fail "failed for all children"
 
 attemptOne1N :: (Traversable t, MonadCatch m) => (a -> t b -> r) -> m (m a, a) -> t (m (m b, b)) -> m r
 attemptOne1N f mmaa mmbbs = do
   (ma, a) <- mmaa
-  mbbs    <- Traversable.sequence mmbbs
+  mbbs    <- sequence mmbbs
   ((\a' -> f a' $ fmap snd mbbs) `liftM` ma) <<+ attemptOneN (f a) (fmap return mbbs)
 
 -------------------------------------------------------------------------------
@@ -325,12 +330,12 @@ childLMofN :: (MonadCatch m, Node b, Traversable t) =>
   Int -> (t b -> a) -> t (c,b) -> ((c, Generic b) , Generic b -> m a)
 childLMofN = \m f cbs ->
   childLaux (cbs `atIndex` m) $ \ b' -> f $ snd $
-    Traversable.mapAccumL (\n (_, b) -> n `seq` (n + 1, if n == m then b' else b)) 0 cbs
+    mapAccumL (\n (_, b) -> n `seq` (n + 1, if n == m then b' else b)) 0 cbs
 
   where
     -- helper function for looking up the nth element in a container
     atIndex :: Traversable t => t a -> Int -> a
-    atIndex as n = snd $ Foldable.foldl' snoc (0, initial) as where
+    atIndex as n = snd $ foldl' snoc (0, initial) as where
       initial = error "childLMofN: index too large!"
       snoc (m, found) a = m `seq` (m+1,) $ if n == m then a else found
 
@@ -346,11 +351,11 @@ liftArgument4 :: Monad m => (a -> b -> c -> d -> m e) -> m a -> m b -> m c -> m 
 liftArgument4 f ma mb mc md = join (liftM4 f ma mb mc md)
 
 liftArgumentN :: (Traversable t, Monad m) => (t a -> m b) -> t (m a) -> m b
-liftArgumentN f mas = Traversable.sequence mas >>= f
+liftArgumentN f mas = sequence mas >>= f
 
 liftArgument1N :: (Traversable t, Monad m) => (a -> t b -> m c) -> m a -> t (m b) -> m c
 liftArgument1N f ma mbs = do a  <- ma
-                             bs <- Traversable.sequence mbs
+                             bs <- sequence mbs
                              f a bs
 
 -------------------------------------------------------------------------------

@@ -61,12 +61,13 @@ module Language.KURE.Combinators
            , constant
 ) where
 
-import Prelude hiding (id , (.))
+import Prelude hiding (id , (.), foldr)
 
 import Control.Monad
 import Control.Category
 import Control.Arrow
 
+import Data.Foldable
 import Data.Monoid
 import Data.List (isPrefixOf)
 
@@ -90,7 +91,7 @@ class Monad m => MonadCatch m where
 ma <<+ mb = ma `catchM` const mb
 
 -- | Select the first monadic computation that succeeds, discarding any thereafter.
-catchesM :: MonadCatch m => [m a] -> m a
+catchesM :: (Foldable f, MonadCatch m) => f (m a) -> m a
 catchesM = foldr (<<+) (fail "catchesM failed")
 
 -- | Catch a failing monadic computation, making it succeed with a constant value.
@@ -210,15 +211,15 @@ repeatR r = r >>> tryR (repeatR r)
 r1 >+> r2 = attemptR r1 >>> readerT (\ (b,_) -> snd ^>> if b then tryR r2 else r2)
 
 -- | Sequence a list of 'Arrow's, succeeding if any succeed.
-orR :: (CategoryCatch arr, ArrowApply arr) => [arr a a] -> arr a a
+orR :: (Foldable f, CategoryCatch arr, ArrowApply arr) => f (arr a a) -> arr a a
 orR = foldr (>+>) (failT "orR failed")
 
 -- | Sequence a list of 'Category's, succeeding if all succeed.
-andR :: Category arr => [arr a a] -> arr a a
+andR :: (Foldable f, Category arr) => f (arr a a) -> arr a a
 andR = foldr (>>>) id
 
 -- | Select the first 'CategoryCatch' that succeeds, discarding any thereafter.
-catchesT :: CategoryCatch arr => [arr a b] -> arr a b
+catchesT :: (Foldable f, CategoryCatch arr) => f (arr a b) -> arr a b
 catchesT = foldr (<+) (failT "catchesT failed")
 
 ------------------------------------------------------------------------------------------

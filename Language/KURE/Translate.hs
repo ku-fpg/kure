@@ -50,12 +50,16 @@ module Language.KURE.Translate
 
 ) where
 
-import Prelude hiding (id, (.))
+import Prelude hiding (id, (.), mapM)
+
 import Control.Applicative
-import Control.Monad
+import Control.Monad hiding (mapM)
 import Control.Category
 import Control.Arrow
+
+import Data.Traversable
 import Data.Monoid
+
 import Language.KURE.Combinators
 
 ------------------------------------------------------------------------------------------
@@ -99,7 +103,7 @@ exposeT :: Monad m => Translate c m a (c,a)
 exposeT = translate (curry return)
 
 -- | Map a 'Translate' over a list.
-mapT :: Monad m => Translate c m a b -> Translate c m [a] [b]
+mapT :: (Traversable t, Monad m) => Translate c m a b -> Translate c m (t a) (t b)
 mapT t = translate (mapM . apply t)
 
 -- | An identity 'Rewrite' with side-effects.
