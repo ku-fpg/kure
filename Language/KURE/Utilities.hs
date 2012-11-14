@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 -- |
 -- Module: Language.KURE.Utilities
 -- Copyright: (c) 2012 The University of Kansas
@@ -246,21 +248,20 @@ instance Monad m => Applicative (S s m) where
   (<*>) = liftM2 ($)
 instance Monad m => Monad (S s m) where
   {-# INLINE return #-}
-  return a = S $ \b -> return (a, b)
+  return a = S $ \ b -> return (a, b)
   {-# INLINE (>>=) #-}
-  m >>= k = S $ \_b -> runS m _b >>= \(a, _b) -> runS (k a) _b
+  m >>= f = S $ \ b -> runS m b >>= \(a, b') -> runS (f a) b'
 
 attemptOneN :: (Traversable t, MonadCatch m) => (t a -> r) -> t (m (m a, a)) -> m r
-attemptOneN f = liftM (f . fst) . flip runS False . Traversable.mapM each where
-  each m = S $ \b -> m >>= \(ma, a) ->
-    if b then return (a, b) else liftM (flip (,) True) ma <<+ return (a, b)
+attemptOneN f = (>>= final) . flip runS False . Traversable.mapM each where
+  each m = S $ \b -> m >>= \(ma, a) -> if b then return (a, b) else liftM (,True) ma <<+ return (a, b)
+  final (x, b) = if b then return (f x) else fail "failed for all children"
 
 attemptOne1N :: (Traversable t, MonadCatch m) => (a -> t b -> r) -> m (m a, a) -> t (m (m b, b)) -> m r
 attemptOne1N f mmaa mmbbs = do
   (ma, a) <- mmaa
-  mbbs <- Traversable.sequence mmbbs
-  (<<+) (flip liftM ma $ \a' -> f a' $ fmap snd mbbs) $
-        attemptOneN (f a) (fmap return mbbs)
+  mbbs    <- Traversable.sequence mmbbs
+  ((\a' -> f a' $ fmap snd mbbs) `liftM` ma) <<+ attemptOneN (f a) (fmap return mbbs)
 
 -------------------------------------------------------------------------------
 
@@ -331,7 +332,7 @@ childLMofN = \m f cbs ->
     atIndex :: Traversable t => t a -> Int -> a
     atIndex as n = snd $ Foldable.foldl' snoc (0, initial) as where
       initial = error "childLMofN: index too large!"
-      snoc (m, found) a = m `seq` (,) (m + 1) $ if n == m then a else found
+      snoc (m, found) a = m `seq` (m+1,) $ if n == m then a else found
 
 -------------------------------------------------------------------------------
 

@@ -61,10 +61,7 @@ module Language.KURE.Combinators
            , constant
 ) where
 
--- As of GHC 7.6 the Prelude no longer exports "catch".
--- However, this only causes a warning, so I'm leaving it for now
--- for backwards compatibility.
-import Prelude hiding (id , (.), catch)
+import Prelude hiding (id , (.))
 
 import Control.Monad
 import Control.Category
