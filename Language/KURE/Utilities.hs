@@ -254,7 +254,7 @@ instance Monad m => Monad (S s m) where
 
 attemptOneN :: (Traversable t, MonadCatch m) => (t a -> r) -> t (m (m a, a)) -> m r
 attemptOneN f = (>>= final) . flip runS False . mapM each where
-  each m = S $ \b -> m >>= \(ma, a) -> if b then return (a, b) else liftM (,True) ma <<+ return (a, b)
+  each m = S $ \ b -> m >>= \(ma, a) -> if b then return (a, b) else liftM (,True) ma <<+ return (a, b)
   final (x, b) = if b then return (f x) else fail "failed for all children"
 
 attemptOne1N :: (Traversable t, MonadCatch m) => (a -> t b -> r) -> m (m a, a) -> t (m (m b, b)) -> m r
@@ -321,18 +321,15 @@ childL2of4 f b0 b1 cb2 b3 = childLaux cb2 (\ b2 -> f b0 b1 b2 b3)
 childL3of4 :: (MonadCatch m, Node b3) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> b1 -> b2 -> (c,b3) -> ((c, Generic b3) , Generic b3 -> m a)
 childL3of4 f b0 b1 b2 cb3 = childLaux cb3 (\ b3 -> f b0 b1 b2 b3)
 
-childLMofN :: (MonadCatch m, Node b, Traversable t) =>
-  Int -> (t b -> a) -> t (c,b) -> ((c, Generic b) , Generic b -> m a)
-childLMofN = \m f cbs ->
-  childLaux (cbs `atIndex` m) $ \ b' -> f $ snd $
+childLMofN :: (MonadCatch m, Node b, Traversable t) => Int -> (t b -> a) -> t (c,b) -> ((c, Generic b) , Generic b -> m a)
+childLMofN = \ m f cbs ->
+  childLaux (toList cbs !! m) $ \ b' -> f $ snd $
     mapAccumL (\n (_, b) -> n `seq` (n + 1, if n == m then b' else b)) 0 cbs
+    -- Rather than using map snd and atIndex (2 traversals), we do both at once with a single traversal
 
-  where
-    -- helper function for looking up the nth element in a container
-    atIndex :: Traversable t => t a -> Int -> a
-    atIndex as n = snd $ foldl' snoc (0, initial) as where
-      initial = error "childLMofN: index too large!"
-      snoc (m, found) a = m `seq` (m+1,) $ if n == m then a else found
+--   Modify the value in a traversable at specified index.
+-- atIndex :: Traversable t => (a -> a) -> Int -> t a -> t a
+-- atIndex f n = snd . mapAccumL (\ m a -> m `seq` (m + 1, if m == n then f a else a)) 0
 
 -------------------------------------------------------------------------------
 

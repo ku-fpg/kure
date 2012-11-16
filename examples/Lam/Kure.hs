@@ -138,4 +138,7 @@ appAllR r1 r2 = appT r1 r2 App
 appAnyR :: RewriteExp -> RewriteExp -> RewriteExp
 appAnyR r1 r2 = appT' (attemptR r1) (attemptR r2) (attemptAny2 App)
 
+appOneR :: RewriteExp -> RewriteExp -> RewriteExp
+appOneR r1 r2 = appT' (withArgumentT r1) (withArgumentT r2) (attemptOne2 App)
+
 -------------------------------------------------------------------------------
