@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts, ScopedTypeVariables #-}
 
 -- |
 -- Module: Language.KURE.Walker
@@ -36,6 +36,9 @@ module Language.KURE.Walker
         , onebuR
         , prunetdR
         , innermostR
+        , allLargestR
+        , anyLargestR
+        , oneLargestR
 
         -- * Translate Traversals
         , childT
@@ -48,6 +51,9 @@ module Language.KURE.Walker
         , crushbuT
         , collectT
         , collectPruneT
+        , allLargestT
+        , oneLargestT
+        , summandIsTypeT
 
         -- * Paths
         -- ** Absolute Paths
@@ -74,11 +80,11 @@ module Language.KURE.Walker
         , rootL
 
         -- ** Applying transformations at the end of Paths
-        ,  pathR
-        ,  pathT
+        , pathR
+        , pathT
 
         -- ** Testing Paths
-        ,  testPathT
+        , testPathT
 ) where
 
 import Prelude hiding (id)
@@ -139,7 +145,7 @@ class (MonadCatch m, Node a) => Walker c m a where
   -- | Apply a 'Generic' 'Translate' to all immediate children, succeeding if they all succeed.
   --   The results are combined in a 'Monoid'.
   allT :: Monoid b => Translate c m (Generic a) b -> Translate c m a b
-  allT t = modFailMsg ("allT failed: " ++) $
+  allT t = prefixFailMsg "allT failed: " $
            do n <- numChildrenT
               mconcat (childrenT n (const t))
 
@@ -151,7 +157,7 @@ class (MonadCatch m, Node a) => Walker c m a where
 
   -- | Apply a 'Generic' 'Rewrite' to all immediate children, succeeding if they all succeed.
   allR :: Rewrite c m (Generic a) -> Rewrite c m a
-  allR r = modFailMsg ("allR failed: " ++) $
+  allR r = prefixFailMsg "allR failed: " $
            do n <- numChildrenT
               andR (childrenR n (const r))
 
@@ -185,13 +191,13 @@ childrenR n rs = [ childR i (rs i) | i <- [0..(n-1)] ]
 
 -- | Fold a tree in a top-down manner, using a single 'Translate' for each 'Node'.
 foldtdT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-foldtdT t = modFailMsg ("foldtdT failed: " ++) $
+foldtdT t = prefixFailMsg "foldtdT failed: " $
             let go = t `mappend` allT go
              in go
 
 -- | Fold a tree in a bottom-up manner, using a single 'Translate' for each 'Node'.
 foldbuT :: (Walker c m a, Monoid b, a ~ Generic a) => Translate c m (Generic a) b -> Translate c m (Generic a) b
-foldbuT t = modFailMsg ("foldbuT failed: " ++) $
+foldbuT t = prefixFailMsg "foldbuT failed: " $
             let go = allT go `mappend` t
              in go
 
@@ -233,20 +239,20 @@ collectPruneT t = prunetdT (t >>^ return)
 
 -- | Apply a 'Rewrite' in a top-down manner, succeeding if they all succeed.
 alltdR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-alltdR r = modFailMsg ("alltdR failed: " ++) $
+alltdR r = prefixFailMsg "alltdR failed: " $
            let go = r >>> allR go
             in go
 
 -- | Apply a 'Rewrite' in a bottom-up manner, succeeding if they all succeed.
 allbuR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-allbuR r = modFailMsg ("allbuR failed: " ++) $
+allbuR r = prefixFailMsg "allbuR failed: " $
            let go = allR go >>> r
             in go
 
 -- | Apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal,
 --   succeeding if they all succeed.
 allduR :: (Walker c m a, a ~ Generic a) => Rewrite c m (Generic a) -> Rewrite c m (Generic a)
-allduR r = modFailMsg ("allduR failed: " ++) $
+allduR r = prefixFailMsg "allduR failed: " $
            let go = r >>> allR go >>> r
             in go
 
@@ -412,5 +418,42 @@ pathT = focusT . pathL
 -- | Check if it is possible to construct a 'Lens' along this path from the current 'Node'.
 testPathT :: (Walker c m a, a ~ Generic a) => Path -> Translate c m a Bool
 testPathT = testLensT . pathL
+
+-------------------------------------------------------------------------------
+
+-- | Apply a 'Rewrite' to the largest node(s) that satisfy the predicate, requiring all to succeed.
+allLargestR :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) Bool -> Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+allLargestR p r = prefixFailMsg "allLargestR failed: " $
+                  let go = ifM p r (allR go)
+                   in go
+
+-- | Apply a 'Rewrite' to the largest node(s) that satisfy the predicate, succeeding if any succeed.
+anyLargestR :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) Bool -> Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+anyLargestR p r = setFailMsg "anyLargestR failed" $
+                  let go = ifM p r (anyR go)
+                   in go
+
+-- | Apply a 'Rewrite' to the first node for which it can succeed among the largest node(s) that satisfy the predicate.
+oneLargestR :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) Bool -> Rewrite c m (Generic a) -> Rewrite c m (Generic a)
+oneLargestR p r = setFailMsg "oneLargestR failed" $
+                  let go = ifM p r (oneR go)
+                   in go
+
+-- | Apply a 'Translate' to the largest node(s) that satisfy the predicate, combining the results in a monoid.
+allLargestT :: (Walker c m a, a ~ Generic a, Monoid b) => Translate c m (Generic a) Bool -> Translate c m (Generic a) b -> Translate c m (Generic a) b
+allLargestT p t = prefixFailMsg "allLargestT failed: " $
+                  let go = ifM p t (allT go)
+                   in go
+
+-- | Apply a 'Translate' to the first node for which it can succeed among the largest node(s) that satisfy the predicate.
+oneLargestT :: (Walker c m a, a ~ Generic a) => Translate c m (Generic a) Bool -> Translate c m (Generic a) b -> Translate c m (Generic a) b
+oneLargestT p t = setFailMsg "oneLargestT failed" $
+                  let go = ifM p t (oneT go)
+                   in go
+
+-- | Test if the type of the current ('Generic') 'Node' matches the type of the argument.
+--   Note that the argument /value/ is never inspected, it is merely a proxy for a type argument.
+summandIsTypeT :: forall c m a. Walker c m a => a -> Translate c m (Generic a) Bool
+summandIsTypeT _ = contextfreeT (testM . (retractM :: (Generic a -> m a)))
 
 -------------------------------------------------------------------------------
