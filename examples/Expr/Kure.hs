@@ -201,14 +201,14 @@ assignR r = assignT r Assign
 
 varT :: (Name -> b) -> TranslateE Expr b
 varT f = contextfreeT $ \ e -> case e of
-                                 Var v -> pure (f v)
+                                 Var v -> return (f v)
                                  _     -> fail "not a Var"
 
 ---------------------------------------------------------------------------
 
 litT :: (Int -> b) -> TranslateE Expr b
 litT f = contextfreeT $ \ e -> case e of
-                                 Lit v -> pure (f v)
+                                 Lit v -> return (f v)
                                  _     -> fail "not a Lit"
 
 ---------------------------------------------------------------------------
