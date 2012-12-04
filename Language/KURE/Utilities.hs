@@ -18,14 +18,6 @@ module Language.KURE.Utilities
        , fromKureM
          -- * Error Messages
        , missingChild
-         -- * Generic Combinators
-         -- $genericdoc
-       , allTgeneric
-       , oneTgeneric
-       , allRgeneric
-       , anyRgeneric
-       , oneRgeneric
-       , childLgeneric
          -- * Attempt Combinators
          -- ** anyR Support
          -- $attemptAnydoc
@@ -64,7 +56,6 @@ import Control.Applicative
 import Control.Monad hiding (sequence, mapM)
 import Control.Arrow
 
-import Data.Monoid
 import Data.Foldable
 import Data.Traversable
 
@@ -118,30 +109,6 @@ instance Applicative KureM where
 
 -- (<*>) :: KureM (a -> b) -> KureM a -> KureM b
    (<*>) = ap
-
-------------------------------------------------------------------------------------------
-
--- $genericdoc
--- These functions are to aid with defining 'Walker' instances for the 'Generic' type.
--- See the \"Expr\" example.
-
-allTgeneric :: (Walker c m a, Monoid b) => Translate c m (Generic a) b -> c -> a -> m b
-allTgeneric t c a = inject `liftM` apply (allT t) c a
-
-oneTgeneric :: Walker c m a => Translate c m (Generic a) b -> c -> a -> m b
-oneTgeneric t c a = inject `liftM` apply (oneT t) c a
-
-allRgeneric :: Walker c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
-allRgeneric r c a = inject `liftM` apply (allR r) c a
-
-anyRgeneric :: Walker c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
-anyRgeneric r c a = inject `liftM` apply (anyR r) c a
-
-oneRgeneric :: Walker c m a => Rewrite c m (Generic a) -> c -> a -> m (Generic a)
-oneRgeneric r c a = inject `liftM` apply (oneR r) c a
-
-childLgeneric :: Walker c m a => Int -> c -> a -> m ((c, Generic a), Generic a -> m (Generic a))
-childLgeneric n c a = (liftM.second.result.liftM) inject $ apply (lensT $ childL n) c a
 
 -------------------------------------------------------------------------------
 
@@ -288,40 +255,40 @@ missingChild n = "there is no child number " ++ show n
 --
 -- In the mean time, if you need a few more than provided here, drop me an email and I'll add them.
 
-childLaux :: (MonadCatch m, Node b) => (c,b) -> (b -> a) -> ((c, Generic b), Generic b -> m a)
+childLaux :: (MonadCatch m, Node g, Injection a g, Injection b g) => (c,b) -> (b -> a) -> ((c, g), g -> m g)
 childLaux cb g = (second inject cb, liftM (inject.g) . retractM)
 
-childL0of1 :: (MonadCatch m, Node b) => (b -> a) -> (c,b) -> ((c, Generic b) , Generic b -> m a)
+childL0of1 :: (MonadCatch m, Node g, Injection a g, Injection b g) => (b -> a) -> (c,b) -> ((c, g) , g -> m g)
 childL0of1 f cb = childLaux cb f
 
-childL0of2 :: (MonadCatch m, Node b0) => (b0 -> b1 -> a) -> (c,b0) -> b1 -> ((c, Generic b0) , Generic b0 -> m a)
+childL0of2 :: (MonadCatch m, Node g, Injection a g, Injection b0 g) => (b0 -> b1 -> a) -> (c,b0) -> b1 -> ((c, g) , g -> m g)
 childL0of2 f cb0 b1 = childLaux cb0 (\ b0 -> f b0 b1)
 
-childL1of2 :: (MonadCatch m, Node b1) => (b0 -> b1 -> a) -> b0 -> (c,b1) -> ((c, Generic b1) , Generic b1 -> m a)
+childL1of2 :: (MonadCatch m, Node g, Injection a g, Injection b1 g) => (b0 -> b1 -> a) -> b0 -> (c,b1) -> ((c, g) , g -> m g)
 childL1of2 f b0 cb1 = childLaux cb1 (\ b1 -> f b0 b1)
 
-childL0of3 :: (MonadCatch m, Node b0) => (b0 -> b1 -> b2 -> a) -> (c,b0) -> b1 -> b2 -> ((c, Generic b0) , Generic b0 -> m a)
+childL0of3 :: (MonadCatch m, Node g, Injection a g, Injection b0 g) => (b0 -> b1 -> b2 -> a) -> (c,b0) -> b1 -> b2 -> ((c, g) , g -> m g)
 childL0of3 f cb0 b1 b2 = childLaux cb0 (\ b0 -> f b0 b1 b2)
 
-childL1of3 :: (MonadCatch m, Node b1) => (b0 -> b1 -> b2 -> a) -> b0 -> (c,b1) -> b2 -> ((c, Generic b1) , Generic b1 -> m a)
+childL1of3 :: (MonadCatch m, Node g, Injection a g, Injection b1 g) => (b0 -> b1 -> b2 -> a) -> b0 -> (c,b1) -> b2 -> ((c, g) , g -> m g)
 childL1of3 f b0 cb1 b2 = childLaux cb1 (\ b1 -> f b0 b1 b2)
 
-childL2of3 :: (MonadCatch m, Node b2) => (b0 -> b1 -> b2 -> a) -> b0 -> b1 -> (c,b2) -> ((c, Generic b2) , Generic b2 -> m a)
+childL2of3 :: (MonadCatch m, Node g, Injection a g, Injection b2 g) => (b0 -> b1 -> b2 -> a) -> b0 -> b1 -> (c,b2) -> ((c, g) , g -> m g)
 childL2of3 f b0 b1 cb2 = childLaux cb2 (\ b2 -> f b0 b1 b2)
 
-childL0of4 :: (MonadCatch m, Node b0) => (b0 -> b1 -> b2 -> b3 -> a) -> (c,b0) -> b1 -> b2 -> b3 -> ((c, Generic b0) , Generic b0 -> m a)
+childL0of4 :: (MonadCatch m, Node g, Injection a g, Injection b0 g) => (b0 -> b1 -> b2 -> b3 -> a) -> (c,b0) -> b1 -> b2 -> b3 -> ((c, g) , g -> m g)
 childL0of4 f cb0 b1 b2 b3 = childLaux cb0 (\ b0 -> f b0 b1 b2 b3)
 
-childL1of4 :: (MonadCatch m, Node b1) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> (c,b1) -> b2 -> b3 -> ((c, Generic b1) , Generic b1 -> m a)
+childL1of4 :: (MonadCatch m, Node g, Injection a g, Injection b1 g) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> (c,b1) -> b2 -> b3 -> ((c, g) , g -> m g)
 childL1of4 f b0 cb1 b2 b3 = childLaux cb1 (\ b1 -> f b0 b1 b2 b3)
 
-childL2of4 :: (MonadCatch m, Node b2) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> b1 -> (c,b2) -> b3 -> ((c, Generic b2) , Generic b2 -> m a)
+childL2of4 :: (MonadCatch m, Node g, Injection a g, Injection b2 g) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> b1 -> (c,b2) -> b3 -> ((c, g) , g -> m g)
 childL2of4 f b0 b1 cb2 b3 = childLaux cb2 (\ b2 -> f b0 b1 b2 b3)
 
-childL3of4 :: (MonadCatch m, Node b3) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> b1 -> b2 -> (c,b3) -> ((c, Generic b3) , Generic b3 -> m a)
+childL3of4 :: (MonadCatch m, Node g, Injection a g, Injection b3 g) => (b0 -> b1 -> b2 -> b3 -> a) -> b0 -> b1 -> b2 -> (c,b3) -> ((c, g) , g -> m g)
 childL3of4 f b0 b1 b2 cb3 = childLaux cb3 (\ b3 -> f b0 b1 b2 b3)
 
-childLMofN :: (MonadCatch m, Node b, Traversable t) => Int -> (t b -> a) -> t (c,b) -> ((c, Generic b) , Generic b -> m a)
+childLMofN :: (MonadCatch m, Node g, Injection a g, Injection b g, Traversable t) => Int -> (t b -> a) -> t (c,b) -> ((c, g) , g -> m g)
 childLMofN = \ m f cbs ->
   childLaux (toList cbs !! m) $ \ b' -> f $ snd $
     mapAccumL (\n (_, b) -> n `seq` (n + 1, if n == m then b' else b)) 0 cbs

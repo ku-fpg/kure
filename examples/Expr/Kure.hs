@@ -15,9 +15,6 @@ import Language.KURE.Utilities
 
 import Expr.AST
 
--- NOTE: allT, oneT, allR, anyR and oneR have been defined just to serve as examples:
---       the difference in efficiency with the default instances is negligible.
-
 ---------------------------------------------------------------------------
 
 data Context = Context AbsolutePath [(Name,Expr)] -- A list of bindings.
@@ -55,40 +52,6 @@ applyE t = runKureM Right Left . apply t initialContext
 data GenericExpr = GExpr Expr
                  | GCmd Cmd
 
-instance Node GenericExpr where
-  type Generic GenericExpr = GenericExpr
-
-  numChildren (GExpr e) = numChildren e
-  numChildren (GCmd c)  = numChildren c
-
----------------------------------------------------------------------------
-
-instance Walker Context KureM GenericExpr where
-
-  childL n = lens $ translate $ \ c g -> case g of
-                                           GExpr e -> childLgeneric n c e
-                                           GCmd cm -> childLgeneric n c cm
-
-  allT t = translate $ \ c g -> case g of
-                                  GExpr e -> allTgeneric t c e
-                                  GCmd cm -> allTgeneric t c cm
-
-  oneT t = translate $ \ c g -> case g of
-                                  GExpr e -> oneTgeneric t c e
-                                  GCmd cm -> oneTgeneric t c cm
-
-  allR r = rewrite $ \ c g -> case g of
-                                GExpr e -> allRgeneric r c e
-                                GCmd cm -> allRgeneric r c cm
-
-  anyR r = rewrite $ \ c g -> case g of
-                                GExpr e -> anyRgeneric r c e
-                                GCmd cm -> anyRgeneric r c cm
-
-  oneR r = rewrite $ \ c g -> case g of
-                                GExpr e -> oneRgeneric r c e
-                                GCmd cm -> oneRgeneric r c cm
-
 ---------------------------------------------------------------------------
 
 instance Injection Expr GenericExpr where
@@ -97,85 +60,113 @@ instance Injection Expr GenericExpr where
   retract (GExpr e) = Just e
   retract _         = Nothing
 
-instance Node Expr where
-  type Generic Expr = GenericExpr
-
-  numChildren (Add _ _)  = 2
-  numChildren (ESeq _ _) = 2
-  numChildren (Var _)    = 0
-  numChildren (Lit _)    = 0
-
-instance Walker Context KureM Expr where
-  childL n = lens $
-    case n of
-      0 ->    addT  exposeT id (childL0of2 Add)
-           <+ eseqT exposeT id (childL0of2 ESeq)
-      1 ->    addT  id exposeT (childL1of2 Add)
-           <+ eseqT id exposeT (childL1of2 ESeq)
-      _ -> fail (missingChild n)
-
-  allT t =  varT (\ _ -> mempty)
-         <+ litT (\ _ -> mempty)
-         <+ addT (extractT t) (extractT t) mappend
-         <+ eseqT (extractT t) (extractT t) mappend
-
-  oneT t =  addT' (extractT t) (extractT t) (<<+)
-         <+ eseqT' (extractT t) (extractT t) (<<+)
-         <+ fail "oneT failed"
-
-  allR r =  varT Var
-         <+ litT Lit
-         <+ addAllR (extractR r) (extractR r)
-         <+ eseqAllR (extractR r) (extractR r)
-
-  anyR r =  addAnyR (extractR r) (extractR r)
-         <+ eseqAnyR (extractR r) (extractR r)
-         <+ fail "anyR failed"
-
-  oneR r =  addOneR (extractR r) (extractR r)
-         <+ eseqOneR (extractR r) (extractR r)
-         <+ fail "oneR failed"
-
----------------------------------------------------------------------------
-
 instance Injection Cmd GenericExpr where
   inject = GCmd
 
   retract (GCmd c) = Just c
   retract _        = Nothing
 
-instance Node Cmd where
-  type Generic Cmd = GenericExpr
+---------------------------------------------------------------------------
 
-  numChildren (Seq _ _)    = 2
-  numChildren (Assign _ _) = 1
+instance Node GenericExpr where
+  numChildren (GExpr e) = case e of
+                            Add _ _   -> 2
+                            ESeq _ _  -> 2
+                            Var _     -> 0
+                            Lit _     -> 0
 
-instance Walker Context KureM Cmd where
-  childL n = lens $
-    case n of
-      0 ->    seqT exposeT id (childL0of2 Seq)
-           <+ assignT exposeT (childL1of2 Assign)
-      1 ->    seqT id exposeT (childL1of2 Seq)
-           <+ fail (missingChild n)
-      _ -> fail (missingChild n)
+  numChildren (GCmd c)  = case c of
+                            Seq _ _     -> 2
+                            Assign _ _  -> 1
 
-  allT t =  seqT (extractT t) (extractT t) mappend
-         <+ assignT (extractT t) (\ _ -> id)
+---------------------------------------------------------------------------
 
-  oneT t =  seqT' (extractT t) (extractT t) (<<+)
-         <+ assignT (extractT t) (\ _ -> id)
-         <+ fail "oneT failed"
+-- NOTE: allT, oneT, allR, anyR and oneR have been overwritten just to serve as examples.
+--       There is no actual need to do this here: the default definitions would be fine.
 
-  allR r =  seqAllR (extractR r) (extractR r)
-         <+ assignR (extractR r)
+instance Walker Context KureM GenericExpr where
 
-  anyR r =  seqAnyR (extractR r) (extractR r)
-         <+ assignR (extractR r)
-         <+ fail "anyR failed"
+  childL n = lens $ translate $ \ c g -> case g of
+                                           GExpr e -> apply childLexpr c e
+                                           GCmd cm -> apply childLcmd c cm
+    where
+      childLexpr = case n of
+                     0 ->    addT  exposeT id (childL0of2 Add)
+                          <+ eseqT exposeT id (childL0of2 ESeq)
+                     1 ->    addT  id exposeT (childL1of2 Add)
+                          <+ eseqT id exposeT (childL1of2 ESeq)
+                     _ -> fail (missingChild n)
 
-  oneR r =  seqOneR (extractR r) (extractR r)
-         <+ assignR (extractR r)
-         <+ fail "oneR failed"
+      childLcmd = case n of
+                    0 ->    seqT exposeT id (childL0of2 Seq)
+                         <+ assignT exposeT (childL1of2 Assign)
+                    1 ->    seqT id exposeT (childL1of2 Seq)
+                         <+ fail (missingChild n)
+                    _ -> fail (missingChild n)
+
+
+  allT t = setFailMsg "allT failed" $
+           translate $ \ c g -> case g of
+                                  GExpr e -> apply allTexpr c e
+                                  GCmd cm -> apply allTcmd c cm
+    where
+      allTexpr =    varT (\ _ -> mempty)
+                 <+ litT (\ _ -> mempty)
+                 <+ addT (extractT t) (extractT t) mappend
+                 <+ eseqT (extractT t) (extractT t) mappend
+
+      allTcmd =     seqT (extractT t) (extractT t) mappend
+                 <+ assignT (extractT t) (\ _ -> id)
+
+
+  oneT t = setFailMsg "oneT failed" $
+           translate $ \ c g -> case g of
+                                  GExpr e -> apply oneTexpr c e
+                                  GCmd cm -> apply oneTcmd c cm
+    where
+      oneTexpr =    addT' (extractT t) (extractT t) (<<+)
+                 <+ eseqT' (extractT t) (extractT t) (<<+)
+
+      oneTcmd  =    seqT' (extractT t) (extractT t) (<<+)
+                 <+ assignT (extractT t) (\ _ -> id)
+
+
+  allR r = setFailMsg "allR failed" $
+           rewrite $ \ c g -> case g of
+                                GExpr e -> inject <$> apply allRexpr c e
+                                GCmd cm -> inject <$> apply allRcmd c cm
+    where
+      allRexpr =    varT Var
+                 <+ litT Lit
+                 <+ addAllR (extractR r) (extractR r)
+                 <+ eseqAllR (extractR r) (extractR r)
+
+      allRcmd  =    seqAllR (extractR r) (extractR r)
+                 <+ assignR (extractR r)
+
+
+  anyR r = setFailMsg "anyR failed" $
+           rewrite $ \ c g -> case g of
+                                GExpr e -> inject <$> apply anyRexpr c e
+                                GCmd cm -> inject <$> apply anyRcmd c cm
+    where
+      anyRexpr =    addAnyR (extractR r) (extractR r)
+                 <+ eseqAnyR (extractR r) (extractR r)
+
+      anyRcmd  =    seqAnyR (extractR r) (extractR r)
+                 <+ assignR (extractR r)
+
+
+  oneR r = setFailMsg "oneR failed" $
+           rewrite $ \ c g -> case g of
+                                GExpr e -> inject <$> apply oneRexpr c e
+                                GCmd cm -> inject <$> apply oneRcmd c cm
+    where
+      oneRexpr =    addOneR (extractR r) (extractR r)
+                 <+ eseqOneR (extractR r) (extractR r)
+
+      oneRcmd  =    seqOneR (extractR r) (extractR r)
+                 <+ assignR (extractR r)
 
 ---------------------------------------------------------------------------
 

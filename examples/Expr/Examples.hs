@@ -128,7 +128,7 @@ test4b :: Bool
 test4b = applyE (extractR $ oneLargestR isExpr incrLitGR) cmd4 == Right result4b
 
 test4c :: Bool
-test4c = applyE (extractR $ allLargestR isExpr incrLitGR) cmd4 == Left "allLargestR failed: not an Assign"
+test4c = applyE (extractR $ allLargestR isExpr incrLitGR) cmd4 == Left "allLargestR failed: allR failed"
 
 -----------------------------------------------------------------
 

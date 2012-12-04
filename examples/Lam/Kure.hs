@@ -86,7 +86,6 @@ applyExp f = runLamM . apply f initialContext
 -------------------------------------------------------------------------------
 
 instance Node Exp where
-   type Generic Exp = Exp  -- Exp is its own Generic
 
    numChildren (Var _)   = 0
    numChildren (Lam _ _) = 1

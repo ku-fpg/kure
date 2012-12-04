@@ -15,7 +15,6 @@ type RewriteA = TranslateA Arith
 --------------------------------------------------------------------------------------
 
 instance Node Arith where
-  type Generic Arith = Arith
 
   numChildren (Lit _)   = 0
   numChildren (Add _ _) = 2
