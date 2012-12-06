@@ -8,12 +8,61 @@ import Lam.AST
 import Lam.Kure
 
 import Data.List (nub)
-import Control.Arrow
+
+import Control.Applicative
+import Control.Monad
 import Control.Category
+
+-----------------------------------------------------------------
+
+newtype LamM a = LamM {lamM :: Int -> (Int, Either String a)}
+
+runLamM :: LamM a -> Either String a
+runLamM m = snd (lamM m 0)
+
+instance Monad LamM where
+  return a = LamM (\n -> (n,Right a))
+  (LamM f) >>= gg = LamM $ \ n -> case f n of
+                                    (n', Left msg) -> (n', Left msg)
+                                    (n', Right a)  -> lamM (gg a) n'
+  fail msg = LamM (\ n -> (n, Left msg))
+
+instance MonadCatch LamM where
+  (LamM st) `catchM` f = LamM $ \ n -> case st n of
+                                         (n', Left msg) -> lamM (f msg) n'
+                                         (n', Right a)  -> (n', Right a)
+
+instance Functor LamM where
+  fmap = liftM
+
+instance Applicative LamM where
+  pure  = return
+  (<*>) = ap
+
+-------------------------------------------------------------------------------
+
+suggestName :: LamM Name
+suggestName = LamM (\n -> ((n+1), Right (show n)))
+
+freshName :: [Name] -> LamM Name
+freshName vs = do v <- suggestName
+                  if v `elem` vs
+                    then freshName vs
+                    else return v
+
+-------------------------------------------------------------------------------
+
+type RewriteE     = RewriteExp LamM
+type TranslateE b = TranslateExp LamM b
+
+-------------------------------------------------------------------------------
+
+applyExp :: TranslateE b -> Exp -> Either String b
+applyExp f = runLamM . apply f initialContext
 
 ------------------------------------------------------------------------
 
-freeVarsT :: TranslateExp [Name]
+freeVarsT :: TranslateE [Name]
 freeVarsT = fmap nub $ crushbuT $ do (c, Var v) <- exposeT
                                      guardM (v `freeIn` c)
                                      return [v]
@@ -22,12 +71,12 @@ freeVars :: Exp -> [Name]
 freeVars = either error id . applyExp freeVarsT
 
 -- Only works for lambdas, fails for all others
-alphaLam :: [Name] -> RewriteExp
+alphaLam :: [Name] -> RewriteE
 alphaLam frees = do Lam v e <- id
                     v' <- constT $ freshName $ frees ++ v : freeVars e
                     lamT (tryR $ substExp v (Var v')) (\ _ -> Lam v')
 
-substExp :: Name -> Exp -> RewriteExp
+substExp :: Name -> Exp -> RewriteE
 substExp v s = rules_var <+ rules_lam <+ rule_app
  where
         -- From Lambda Calc Textbook, the 6 rules.
@@ -45,16 +94,16 @@ substExp v s = rules_var <+ rules_lam <+ rule_app
 
 ------------------------------------------------------------------------
 
-beta_reduce :: RewriteExp
+beta_reduce :: RewriteE
 beta_reduce = withPatFailMsg "Cannot beta-reduce, not app-lambda." $
                 do App (Lam v _) e2 <- id
                    pathT [0,0] (tryR $ substExp v e2)
 
-eta_expand :: RewriteExp
+eta_expand :: RewriteE
 eta_expand = rewrite $ \ c f -> do v <- freshName (bindings c)
                                    return $ Lam v (App f (Var v))
 
-eta_reduce :: RewriteExp
+eta_reduce :: RewriteE
 eta_reduce = withPatFailMsg "Cannot eta-reduce, not lambda-app-var." $
                do Lam v1 (App f (Var v2)) <- id
                   guardMsg (v1 == v2) $ "Cannot eta-reduce, " ++ v1 ++ " /= " ++ v2
@@ -62,17 +111,17 @@ eta_reduce = withPatFailMsg "Cannot eta-reduce, not lambda-app-var." $
 
 -- This might not actually be normal order evaluation
 -- Contact the  KURE maintainer if you can correct this definition.
-normal_order_eval :: RewriteExp
+normal_order_eval :: RewriteE
 normal_order_eval = anytdR (repeatR beta_reduce)
 
 -- This might not actually be applicative order evaluation
 -- Contact the KURE maintainer if you can correct this definition.
-applicative_order_eval :: RewriteExp
+applicative_order_eval :: RewriteE
 applicative_order_eval = innermostR beta_reduce
 
 ------------------------------------------------------------------------
 
-type LamTest = (RewriteExp,String,Exp,Maybe Exp)
+type LamTest = (RewriteE, String, Exp, Maybe Exp)
 
 runLamTest :: LamTest -> (Bool, String)
 runLamTest (r,_,e,me) = case (applyExp r e , me) of

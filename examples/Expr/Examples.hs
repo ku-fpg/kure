@@ -2,9 +2,20 @@ module Expr.Examples where
 
 import Language.KURE
 import Language.KURE.Injection
+import Language.KURE.Utilities
 
 import Expr.AST
 import Expr.Kure
+
+-----------------------------------------------------------------
+
+type RewriteE a     = Rewrite Context KureM a
+type TranslateE a b = Translate Context KureM a b
+
+-----------------------------------------------------------------
+
+applyE :: TranslateE a b -> a -> Either String b
+applyE t = runKureM Right Left . apply t initialContext
 
 -----------------------------------------------------------------
 
@@ -128,7 +139,7 @@ test4b :: Bool
 test4b = applyE (extractR $ oneLargestR isExpr incrLitGR) cmd4 == Right result4b
 
 test4c :: Bool
-test4c = applyE (extractR $ allLargestR isExpr incrLitGR) cmd4 == Left "allLargestR failed: allR failed"
+test4c = applyE (extractR $ allLargestR isExpr incrLitGR) cmd4 == Left "allLargestR failed: allR failed: allR failed: not a Lit"
 
 -----------------------------------------------------------------
 
