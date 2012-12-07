@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Expr.Kure where
 
@@ -65,7 +65,7 @@ instance Injection Cmd GenericExpr where
 (<*>) :: Monad m => m (a -> b) -> m a -> m b
 (<*>) = ap
 
-instance Node Context GenericExpr where
+instance Walker Context GenericExpr where
 
   childrenL = multiLens $ translate $ \ c g -> case g of
                 GExpr e  -> injectLensReturn $ apply childrenLexpr c e

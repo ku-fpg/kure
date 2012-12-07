@@ -1,20 +1,13 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Fib.Kure where
 
 import Language.KURE
-import Language.KURE.Utilities(KureM)
 import Fib.AST
 
 --------------------------------------------------------------------------------------
 
--- | For this simple example, the context is just an 'AbsolutePath', and 'Translate' always operates on 'Arith'.
-type TranslateA b = Translate AbsolutePath KureM Arith b
-type RewriteA = TranslateA Arith
-
---------------------------------------------------------------------------------------
-
-instance Node AbsolutePath Arith where
+instance Walker AbsolutePath Arith where
 
   childrenL = multiLens $ translate $ \ c e ->
     let c0 = extendAbsPath 0 c

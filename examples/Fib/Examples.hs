@@ -4,10 +4,16 @@ import Prelude hiding (id , (.), snd)
 import Control.Category
 
 import Language.KURE
-import Language.KURE.Utilities(runKureM)
+import Language.KURE.Utilities(KureM,runKureM)
 
 import Fib.AST
-import Fib.Kure
+import Fib.Kure()
+
+-----------------------------------------------------------------------
+
+-- | For this simple example, the context is just an 'AbsolutePath', and 'Translate' always operates on 'Arith'.
+type TranslateA b = Translate AbsolutePath KureM Arith b
+type RewriteA = TranslateA Arith
 
 -----------------------------------------------------------------------
 

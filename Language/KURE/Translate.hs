@@ -381,7 +381,7 @@ pureL f g = bidirectionalL $ bidirectional (arr f) (arr g)
 
 -- | A 'MuliLens' is a way to focus on a list of sub-structures of type @b@ from a structure of type @a@.
 newtype MultiLens c m a b = MultiLens { -- | Convert a 'MultiLens' into a 'Translate' that produces a sub-structure (and its context) and an unfocussing function.
-                              multiLensT :: Translate c m a ([(c,b)], [b] -> m a)}
+                                        multiLensT :: Translate c m a ([(c,b)], [b] -> m a)}
 
 -- | The primitive way of building a 'MultiLens'.
 --   If the unfocussing function is applied to the values focussed on then it should succeed,

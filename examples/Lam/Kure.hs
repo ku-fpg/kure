@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Lam.Kure where
 
@@ -43,7 +43,7 @@ type RewriteExp m     = TranslateExp m Exp
 
 -------------------------------------------------------------------------------
 
-instance Node Context Exp where
+instance Walker Context Exp where
    childrenL = multiLens $
                   appT exposeT exposeT (\ ce1 ce2 -> ([ce1,ce2], \ [e1',e2'] -> return (App e1' e2')))
                <+ lamT exposeT         (\ v ce    -> ([ce],      \ [e]       -> return (Lam v e)))
