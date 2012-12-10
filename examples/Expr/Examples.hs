@@ -1,8 +1,6 @@
 module Expr.Examples where
 
 import Language.KURE
-import Language.KURE.Injection
-import Language.KURE.Utilities
 
 import Expr.AST
 import Expr.Kure
@@ -24,7 +22,7 @@ inlineR = withPatFailMsg "only variables can be inlined." $
           do (c, Var v) <- exposeT
              constT (lookupDef v c)
 
-inlineGR :: RewriteE GenericExpr
+inlineGR :: RewriteE Generic
 inlineGR = promoteR inlineR
 
 -----------------------------------------------------------------
@@ -114,10 +112,10 @@ cmd4 = Seq cmd4a (Seq cmd4b cmd4c)
 incrLitR :: RewriteE Expr
 incrLitR = litT (Lit . succ)
 
-incrLitGR :: RewriteE GenericExpr
+incrLitGR :: RewriteE Generic
 incrLitGR = promoteR incrLitR
 
-isExpr :: TranslateE GenericExpr Bool
+isExpr :: TranslateE Generic Bool
 isExpr = summandIsTypeT (undefined :: Expr)
 
 result4a :: Cmd

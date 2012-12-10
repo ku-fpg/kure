@@ -4,7 +4,6 @@ import Prelude hiding (id , (.), snd)
 import Control.Category
 
 import Language.KURE
-import Language.KURE.Utilities(KureM,runKureM)
 
 import Fib.AST
 import Fib.Kure()

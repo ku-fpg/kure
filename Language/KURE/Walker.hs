@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeFamilies, FlexibleContexts, ScopedTypeVariables, ConstraintKinds #-}
+{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables #-}
 
 -- |
 -- Module: Language.KURE.Walker
@@ -95,58 +95,57 @@ import Prelude hiding (id)
 import Data.Maybe (isJust)
 import Data.Monoid
 import Data.List
+
 import Control.Monad
 import Control.Arrow
 import Control.Category hiding ((.))
 
-import Language.KURE.Combinators
+import Language.KURE.Catch
 import Language.KURE.Translate
+import Language.KURE.Lens
 import Language.KURE.Injection
+import Language.KURE.Combinators
 
 -------------------------------------------------------------------------------
 
 -- | 'Walker' captures the ability to walk over a tree containing nodes of type @g@,
 --   using a specific context @c@.
 --
---   Minimal complete definition: 'childrenL'.
+--   Minimal complete definition: 'allR'.
 --
---   Default definitions are provided for 'allT', 'oneT', 'allR', 'anyR' and 'oneR', but they may be overridden for efficiency.
+--   Default definitions are provided for 'anyR', 'oneR', 'allT', 'oneT', and 'childL',
+--   but they may be overridden for efficiency.
 
 class Walker c g where
 
-  -- | Construct a 'MultiLens' to the children of the current 'Node'.
-  childrenL :: MonadCatch m => MultiLens c m g g
+  -- | Apply a 'Generic' 'Rewrite' to all immediate children, succeeding if they all succeed.
+  allR :: MonadCatch m => Rewrite c m g -> Rewrite c m g
 
   -- | Apply a 'Generic' 'Translate' to all immediate children, succeeding if they all succeed.
   --   The results are combined in a 'Monoid'.
   allT :: (MonadCatch m, Monoid b) => Translate c m g b -> Translate c m g b
-  allT t = prefixFailMsg "allT failed: " $
-           allFocusT childrenL t
+  allT = unwrapAllT . allR . wrapAllT
   {-# INLINE allT #-}
 
   -- | Apply a 'Generic' 'Translate' to the first immediate child for which it can succeed.
   oneT :: MonadCatch m => Translate c m g b -> Translate c m g b
-  oneT t = setFailMsg "oneT failed" $
-           oneFocusT childrenL t
+  oneT = unwrapOneT . allR . wrapOneT
   {-# INLINE oneT #-}
-
-  -- | Apply a 'Generic' 'Rewrite' to all immediate children, succeeding if they all succeed.
-  allR :: MonadCatch m => Rewrite c m g -> Rewrite c m g
-  allR r = prefixFailMsg "allR failed: " $
-           allFocusR childrenL r
-  {-# INLINE allR #-}
 
   -- | Apply a 'Generic' 'Rewrite' to all immediate children, suceeding if any succeed.
   anyR :: MonadCatch m => Rewrite c m g -> Rewrite c m g
-  anyR r = setFailMsg "anyR failed" $
-           anyFocusR childrenL r
+  anyR = unwrapAnyR . allR . wrapAnyR
   {-# INLINE anyR #-}
 
   -- | Apply a 'Generic' 'Rewrite' to the first immediate child for which it can succeed.
   oneR :: MonadCatch m => Rewrite c m g -> Rewrite c m g
-  oneR r = setFailMsg "oneR failed" $
-           oneFocusR childrenL r
+  oneR = unwrapOneR . allR . wrapOneR
   {-# INLINE oneR #-}
+
+  -- | Construct a 'Lens' to the n-th child 'Node'.
+  childL :: MonadCatch m => Int -> Lens c m g g
+  childL = childL_default
+  {-# INLINE childL #-}
 
 ------------------------------------------------------------------------------------------
 
@@ -162,11 +161,6 @@ hasChildT n = do c <- numChildrenT
 {-# INLINE hasChildT #-}
 
 -------------------------------------------------------------------------------
-
--- | Construct a 'Lens' to the n-th child 'Node'.
-childL :: (Walker c g, MonadCatch m) => Int -> Lens c m g g
-childL n = indexL n childrenL
-{-# INLINE childL #-}
 
 -- | Apply a 'Translate' to a specified child.
 childT :: (Walker c g, MonadCatch m) => Int -> Translate c m g b -> Translate c m g b
@@ -203,7 +197,7 @@ onetdT t = setFailMsg "onetdT failed" $
 
 -- | Apply a 'Translate' to the first 'Node' for which it can succeed, in a bottom-up traversal.
 onebuT :: (Walker c g, MonadCatch m) => Translate c m g b -> Translate c m g b
-onebuT t = setFailMsg "onetdT failed" $
+onebuT t = setFailMsg "onebuT failed" $
            let go = oneT go <+ t
             in go
 {-# INLINE onebuT #-}
@@ -290,7 +284,7 @@ onetdR r = setFailMsg "onetdR failed" $
 
 -- | Apply a 'Rewrite' to the first 'Node' for which it can succeed, in a bottom-up traversal.
 onebuR :: (Walker c g, MonadCatch m) => Rewrite c m g -> Rewrite c m g
-onebuR r = setFailMsg "onetdR failed" $
+onebuR r = setFailMsg "onebuR failed" $
            let go = oneR go <+ r
             in go
 {-# INLINE onebuR #-}
@@ -312,7 +306,7 @@ innermostR r = setFailMsg "innermostR failed" $
 -------------------------------------------------------------------------------
 
 -- | A path from the root.
-newtype AbsolutePath = AbsolutePath [Int]
+newtype AbsolutePath = AbsolutePath [Int] deriving Eq
 
 instance Show AbsolutePath where
   show (AbsolutePath p) = show (reverse p)
@@ -370,32 +364,26 @@ abs2pathT there = do here <- absPathT
 
 -- | Find the 'Path's to every 'Node' that satisfies the predicate.
 pathsToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g [Path]
-pathsToT q = collectT (acceptR q "pathsToT" >>> absPathT) >>= mapM abs2pathT
+pathsToT q = collectT (acceptR q >>> absPathT) >>= mapM abs2pathT
 {-# INLINE pathsToT #-}
 
 -- | Find the 'Path' to the first 'Node' that satisfies the predicate (in a pre-order traversal).
 onePathToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g Path
 onePathToT q = setFailMsg "No matching nodes found." $
-               onetdT (acceptR q "pathsToT" >>> absPathT) >>= abs2pathT
+               onetdT (acceptR q >>> absPathT) >>= abs2pathT
 {-# INLINE onePathToT #-}
-
--- Note: The below definition is a hack.
--- Really we should have a more general "oneFocusT" that allows the Translate to depend on the integer, then this would be a trivial instantiation.
--- However, as oneFocusT (and family) are used A LOT, and this is just used once, I'm making do some code duplication for now.
 
 -- | Find the 'Path' to the first descendent 'Node' that satisfies the predicate (in a pre-order traversal).
 oneNonEmptyPathToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g Path
 oneNonEmptyPathToT q = setFailMsg "No matching nodes found." $
-                        do (cgs,_) <- multiLensT childrenL
-                           let ncgs = zip [0..] cgs
-                           constT $ catchesM $ map (\ (n,(c,g)) -> (n:) `liftM` apply (onePathToT q) c g) ncgs
+                       do start <- absPathT
+                          onetdT (acceptR q >>> absPathT >>> acceptR (/= start)) >>= abs2pathT
 {-# INLINE oneNonEmptyPathToT #-}
 
 -- | Find the 'Path's to every 'Node' that satisfies the predicate, ignoring 'Node's below successes.
 prunePathsToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g [Path]
-prunePathsToT q = collectPruneT (acceptR q "pathsToT" >>> absPathT) >>= mapM abs2pathT
+prunePathsToT q = collectPruneT (acceptR q >>> absPathT) >>= mapM abs2pathT
 {-# INLINE prunePathsToT #-}
-
 
 -- local function used by uniquePathToT and uniquePrunePathToT
 requireUniquePath :: Monad m => Translate c m [Path] Path
@@ -419,7 +407,7 @@ uniquePrunePathToT q = prunePathsToT q >>> requireUniquePath
 
 -- | Construct a 'Lens' by following a 'Path'.
 pathL :: (Walker c g, MonadCatch m) => Path -> Lens c m g g
-pathL = andR . map childL
+pathL = foldr (>>>) id . map childL
 {-# INLINE pathL #-}
 
 -- | Construct a 'Lens' that points to the last 'Node' at which the 'Path' can be followed.
@@ -499,5 +487,232 @@ oneLargestT p t = setFailMsg "oneLargestT failed" $
 summandIsTypeT :: forall c m a g. (MonadCatch m, Injection a g) => a -> Translate c m g Bool
 summandIsTypeT _ = arr (isJust . (retract :: (g -> Maybe a)))
 {-# INLINE summandIsTypeT #-}
+
+-------------------------------------------------------------------------------
+
+data P a b = P a b
+
+pSnd :: P a b -> b
+pSnd (P _ b) = b
+{-# INLINE pSnd #-}
+
+checkSuccessPMaybe :: Monad m => String -> m (Maybe a) -> m a
+checkSuccessPMaybe msg ma = ma >>= retractWithFailMsgM msg
+{-# INLINE checkSuccessPMaybe #-}
+
+-------------------------------------------------------------------------------
+
+-- $AllT_doc
+-- These are used for defining 'allT' in terms of 'allR'.
+-- However, they are unlikely to be of use to the KURE user.
+
+newtype AllT w m a = AllT (m (P a w))
+
+unAllT :: AllT w m a -> m (P a w)
+unAllT (AllT mw) = mw
+{-# INLINE unAllT #-}
+
+instance (Monoid w, Monad m) => Monad (AllT w m) where
+-- return :: a -> AllT w m a
+   return a = AllT $ return (P a mempty)
+   {-# INLINE return #-}
+
+-- fail :: String -> AllT w m a
+   fail = AllT . fail
+   {-# INLINE fail #-}
+
+-- (>>=) :: AllT w m a -> (a -> AllT w m d) -> AllT w m d
+   ma >>= f = AllT $ do P a w1 <- unAllT ma
+                        P d w2 <- unAllT (f a)
+                        return (P d (w1 <> w2))
+   {-# INLINE (>>=) #-}
+
+instance (Monoid w, MonadCatch m) => MonadCatch (AllT w m) where
+-- catchM :: AllT w m a -> (String -> AllT w m a) -> AllT w m a
+   catchM (AllT ma) f = AllT $ ma `catchM` (unAllT . f)
+   {-# INLINE catchM #-}
+
+
+-- | Wrap a 'Translate' using the 'AllT' monad transformer.
+wrapAllT :: Monad m => Translate c m g b -> Rewrite c (AllT b m) g
+wrapAllT t = readerT $ \ a -> resultT (AllT . liftM (P a)) t
+{-# INLINE wrapAllT #-}
+
+-- | Unwrap a 'Translate' from the 'AllT' monad transformer.
+unwrapAllT :: MonadCatch m => Rewrite c (AllT b m) g -> Translate c m g b
+unwrapAllT = prefixFailMsg "allT failed:" . resultT (liftM pSnd . unAllT)
+{-# INLINE unwrapAllT #-}
+
+-------------------------------------------------------------------------------
+
+-- We could probably build this on top of OneR or AllT
+
+-- $OneT_doc
+-- These are used for defining 'oneT' in terms of 'allR'.
+-- However, they are unlikely to be of use to the KURE user.
+
+newtype OneT w m a = OneT (Maybe w -> m (P a (Maybe w)))
+
+unOneT :: OneT w m a -> Maybe w -> m (P a (Maybe w))
+unOneT (OneT f) = f
+{-# INLINE unOneT #-}
+
+instance Monad m => Monad (OneT w m) where
+-- return :: a -> OneT w m a
+   return a = OneT $ \ mw -> return (P a mw)
+   {-# INLINE return #-}
+
+-- fail :: String -> OneT w m a
+   fail msg = OneT (\ _ -> fail msg)
+   {-# INLINE fail #-}
+
+-- (>>=) :: OneT w m a -> (a -> OneT w m d) -> OneT w m d
+   ma >>= f = OneT $ do \ mw1 -> do P a mw2 <- unOneT ma mw1
+                                    unOneT (f a) mw2
+   {-# INLINE (>>=) #-}
+
+instance MonadCatch m => MonadCatch (OneT w m) where
+-- catchM :: OneT w m a -> (String -> OneT w m a) -> OneT w m a
+   catchM (OneT g) f = OneT $ \ mw -> g mw `catchM` (($ mw) . unOneT . f)
+   {-# INLINE catchM #-}
+
+
+-- | Wrap a 'Translate' using the 'OneT' monad transformer.
+wrapOneT :: MonadCatch m => Translate c m g b -> Rewrite c (OneT b m) g
+wrapOneT t = rewrite $ \ c a -> OneT $ \ mw -> case mw of
+                                                 Just w  -> return (P a (Just w))
+                                                 Nothing -> ((P a . Just) `liftM` apply t c a) <<+ return (P a mw)
+{-# INLINE wrapOneT #-}
+
+-- | Unwrap a 'Translate' from the 'OneT' monad transformer.
+unwrapOneT :: Monad m => Rewrite c (OneT b m) g -> Translate c m g b
+unwrapOneT = resultT (checkSuccessPMaybe "oneT failed" . liftM pSnd . ($ Nothing) . unOneT)
+{-# INLINE unwrapOneT #-}
+
+-------------------------------------------------------------------------------
+
+data PInt a = PInt {-# UNPACK #-} !Int a
+
+secondPInt :: (a -> b) -> PInt a -> PInt b
+secondPInt f = \ (PInt i a) -> PInt i (f a)
+{-# INLINE secondPInt #-}
+
+-------------------------------------------------------------------------------
+
+-- This is hideous.
+-- Admittedly, part of the problem is using MonadCatch.  If allR just used Monad, this (and other things) would be much simpler.
+-- And currently, the only use of MonadCatch is that it allows the error message to be modified.
+
+-- Failure should not occur, so it doesn't really matter where the KureM monad sits in the GetChild stack.
+-- I've arbitrarily made it a local failure.
+
+newtype GetChild c g a = GetChild (Int -> PInt (KureM a, Maybe (c,g)))
+
+unGetChild :: GetChild c g a -> Int -> PInt (KureM a, Maybe (c,g))
+unGetChild (GetChild f) = f
+{-# INLINE unGetChild #-}
+
+instance Monad (GetChild c g) where
+-- return :: a -> GetChild c g a
+   return a = GetChild $ \ i -> PInt i (return a, Nothing)
+   {-# INLINE return #-}
+
+-- fail :: String -> GetChild c g a
+   fail msg = GetChild $ \ i -> PInt i (fail msg, Nothing)
+   {-# INLINE fail #-}
+
+-- (>>=) :: GetChild c g a -> (a -> GetChild c g b) -> GetChild c g b
+   ma >>= f = GetChild $ \ i0 -> let PInt i1 (kma, mcg) = unGetChild ma i0
+                                  in runKureM (\ a   -> (secondPInt.second) (mplus mcg) $ unGetChild (f a) i1)
+                                              (\ msg -> PInt i1 (fail msg, mcg))
+                                              kma
+   {-# INLINE (>>=) #-}
+
+instance MonadCatch (GetChild c g) where
+-- catchM :: GetChild c g a -> (String -> GetChild c g a) -> GetChild c g a
+   ma `catchM` f = GetChild $ \ i0 -> let p@(PInt i1 (kma, mcg)) = unGetChild ma i0
+                                       in runKureM (\ _   -> p)
+                                                   (\ msg -> (secondPInt.second) (mplus mcg) $ unGetChild (f msg) i1)
+                                                   kma
+   {-# INLINE catchM #-}
+
+
+wrapGetChild :: Int -> Rewrite c (GetChild c g) g
+wrapGetChild n = rewrite $ \ c a -> GetChild $ \ m -> PInt (m + 1)
+                                                           (return a, if n == m then Just (c, a) else Nothing)
+{-# INLINE wrapGetChild #-}
+
+unwrapGetChild :: Rewrite c (GetChild c g) g -> Translate c Maybe g (c,g)
+unwrapGetChild r = translate $ \ c a -> let PInt _ (_,mcg) = unGetChild (apply r c a) 0
+                                         in mcg
+{-# INLINE unwrapGetChild #-}
+
+getChild :: Walker c g => Int -> Translate c Maybe g (c, g)
+getChild = unwrapGetChild . allR . wrapGetChild
+{-# INLINE getChild #-}
+
+-------------------------------------------------------------------------------
+
+newtype SetChild a = SetChild (Int -> PInt (KureM a))
+
+unSetChild :: SetChild a -> Int -> PInt (KureM a)
+unSetChild (SetChild f) = f
+{-# INLINE unSetChild #-}
+
+instance Monad SetChild where
+-- return :: a -> SetChild c g a
+   return a = SetChild $ \ i -> PInt i (return a)
+   {-# INLINE return #-}
+
+-- fail :: String -> SetChild c g a
+   fail msg = SetChild $ \ i -> PInt i (fail msg)
+   {-# INLINE fail #-}
+
+-- (>>=) :: SetChild c g a -> (a -> SetChild c g b) -> SetChild c g b
+   ma >>= f = SetChild $ \ i0 -> let PInt i1 ka = unSetChild ma i0
+                                  in runKureM (\ a   -> unSetChild (f a) i1)
+                                              (\ msg -> PInt i1 (fail msg))
+                                              ka
+   {-# INLINE (>>=) #-}
+
+instance MonadCatch SetChild where
+-- catchM :: SetChild c g a -> (String -> SetChild c g a) -> SetChild c g a
+   ma `catchM` f = SetChild $ \ i0 -> let PInt i1 ka = unSetChild ma i0
+                                       in runKureM (\ _   -> PInt i1 ka)
+                                                   (\ msg -> unSetChild (f msg) i1)
+                                                   ka
+   {-# INLINE catchM #-}
+
+
+wrapSetChild :: Int -> g -> Rewrite c SetChild g
+wrapSetChild n g = contextfreeT $ \ a -> SetChild $ \ m -> PInt (m + 1)
+                                                                (return $ if n == m then g else a)
+{-# INLINE wrapSetChild #-}
+
+unwrapSetChild :: Monad m => Rewrite c SetChild g -> Rewrite c m g
+unwrapSetChild r = rewrite $ \ c a -> let PInt _ ka = unSetChild (apply r c a) 0
+                                       in runKureM return fail ka
+{-# INLINE unwrapSetChild #-}
+
+setChild :: (Walker c g, Monad m) => Int -> g -> Rewrite c m g
+setChild n = unwrapSetChild . allR . wrapSetChild n
+{-# INLINE setChild #-}
+
+-------------------------------------------------------------------------------
+
+childL_default :: forall c m g. (Walker c g, MonadCatch m) => Int -> Lens c m g g
+childL_default n = lens $ do cg <- getter
+                             k  <- setter
+                             return (cg, k)
+  where
+    getter :: Translate c m g (c,g)
+    getter = translate $ \ c a -> maybe (fail $ "there is no child number " ++ show n) return (apply (getChild n) c a)
+    {-# INLINE getter #-}
+
+    setter :: Translate c m g (g -> m g)
+    setter = translate $ \ c a -> return (\ b -> apply (setChild n b) c a)
+    {-# INLINE setter #-}
+
+{-# INLINE childL_default #-}
 
 -------------------------------------------------------------------------------

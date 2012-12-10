@@ -1,6 +1,6 @@
 module Lam.Examples where
 
-import Prelude hiding (id, (.))
+import Prelude hiding (id)
 
 import Language.KURE
 
@@ -11,7 +11,7 @@ import Data.List (nub)
 
 import Control.Applicative
 import Control.Monad
-import Control.Category
+import Control.Category hiding ((.))
 
 -----------------------------------------------------------------
 
@@ -28,9 +28,10 @@ instance Monad LamM where
   fail msg = LamM (\ n -> (n, Left msg))
 
 instance MonadCatch LamM where
+
   (LamM st) `catchM` f = LamM $ \ n -> case st n of
-                                         (n', Left msg) -> lamM (f msg) n'
-                                         (n', Right a)  -> (n', Right a)
+                                        (n', Left msg) -> lamM (f msg) n'
+                                        (n', Right a)  -> (n', Right a)
 
 instance Functor LamM where
   fmap = liftM

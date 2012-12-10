@@ -6,7 +6,7 @@ Description:	     The Kansas University Rewrite Engine (KURE) is a DSL for strat
 		     KURE is similar to StrategyLib, but has a lightweight generic traversal mechanism
                      using type families rather than SYB.
                      The basic transformation functionality can be found in "Language.KURE.Translate",
-                     and  the traversal functionality can be found in "Language.KURE.Walker".
+                     and the traversal functionality can be found in "Language.KURE.Walker".
                      Several basic examples of using KURE are provided in the source-code bundle.
                      For a larger example, see the HERMIT package.
 
@@ -37,11 +37,16 @@ Library
   Ghc-Options: -Wall
   Exposed-modules:
        Language.KURE
+       Language.KURE.BiTranslate
+       Language.KURE.Catch
        Language.KURE.Combinators
-       Language.KURE.Translate
+       Language.KURE.Combinators.Arrow
+       Language.KURE.Combinators.Monad
+       Language.KURE.Combinators.Translate
        Language.KURE.Injection
+       Language.KURE.Lens
+       Language.KURE.Translate
        Language.KURE.Walker
-       Language.KURE.Utilities
 
 
 

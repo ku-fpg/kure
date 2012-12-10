@@ -21,25 +21,20 @@ module Language.KURE.Injection
        -- * Monad Injections
        , injectM
        , retractM
+       , retractWithFailMsgM
        -- * Translate Injections
        , injectT
        , retractT
        , extractT
        , promoteT
        , promoteWithFailMsgT
-       , exposeInjectT
        -- * Rewrite Injections
        , extractR
        , promoteR
        , extractWithFailMsgR
        , promoteWithFailMsgR
-       -- * Lens Injections
-       , injectL
-       , retractL
-       , injectLensReturn
 ) where
 
-import Control.Monad
 import Control.Arrow
 
 import Language.KURE.Translate
@@ -75,6 +70,7 @@ injectM :: (Monad m, Injection a g) => a -> m g
 injectM = return . inject
 {-# INLINE injectM #-}
 
+-- | As 'retractM', but takes a custom error message to use if retraction fails.
 retractWithFailMsgM :: (Monad m, Injection a g) => String -> g -> m a
 retractWithFailMsgM msg = maybe (fail msg) return . retract
 {-# INLINE retractWithFailMsgM #-}
@@ -137,29 +133,5 @@ promoteWithFailMsgR msg r = retractWithFailMsgT msg >>> r >>> injectT
 promoteR  :: (Monad m, Injection a g) => Rewrite c m a -> Rewrite c m g
 promoteR = promoteWithFailMsgR "promoteR failed"
 {-# INLINE promoteR #-}
-
--------------------------------------------------------------------------------
-
--- | A 'Lens' to the injection of a value.
-injectL  :: (Monad m, Injection a g) => Lens c m a g
-injectL = lens $ translate $ \ c a -> return ((c, inject a), retractM)
-{-# INLINE injectL #-}
-
--- | A 'Lens' to the retraction of a value.
-retractL :: (Monad m, Injection a g) => Lens c m g a
-retractL = lens $ translate $ \ c -> retractM >=> (\ a -> return ((c,a), injectM))
-{-# INLINE retractL #-}
-
--- | This function can be useful when defining 'childrenL' instances (and probably isn't useful anywhere else).
-injectLensReturn :: (Monad m, Injection a g) => m ([(c,b)], [b] -> m a) -> m ([(c,b)], [b] -> m g)
-injectLensReturn = liftM (\ (cb,f) -> (cb, liftM inject . f))
-{-# INLINE injectLensReturn #-}
-
--------------------------------------------------------------------------------
-
--- | Expose the current context and an injection of the current value.
-exposeInjectT :: (Monad m, Injection a g) => Translate c m a (c,g)
-exposeInjectT = translate (\ c a -> return (c, inject a))
-{-# INLINE exposeInjectT #-}
 
 -------------------------------------------------------------------------------
