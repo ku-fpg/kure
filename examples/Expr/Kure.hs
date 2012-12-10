@@ -42,14 +42,14 @@ data Generic = GExpr Expr
 instance Injection Expr Generic where
   inject = GExpr
 
-  retract (GExpr e) = Just e
-  retract _         = Nothing
+  project (GExpr e) = Just e
+  project _         = Nothing
 
 instance Injection Cmd Generic where
   inject = GCmd
 
-  retract (GCmd c) = Just c
-  retract _        = Nothing
+  project (GCmd c) = Just c
+  project _        = Nothing
 
 ---------------------------------------------------------------------------
 

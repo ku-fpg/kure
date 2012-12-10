@@ -20,7 +20,7 @@ module Language.KURE.Lens
         , bidirectionalL
         , pureL
         , injectL
-        , retractL
+        , projectL
 ) where
 
 import Prelude hiding (id, (.))
@@ -108,12 +108,12 @@ pureL f g = bidirectionalL $ bidirectional (arr f) (arr g)
 
 -- | A 'Lens' to the injection of a value.
 injectL  :: (Monad m, Injection a g) => Lens c m a g
-injectL = lens $ translate $ \ c a -> return ((c, inject a), retractM)
+injectL = lens $ translate $ \ c a -> return ((c, inject a), projectM)
 {-# INLINE injectL #-}
 
--- | A 'Lens' to the retraction of a value.
-retractL :: (Monad m, Injection a g) => Lens c m g a
-retractL = lens $ translate $ \ c -> retractM >=> (\ a -> return ((c,a), injectM))
-{-# INLINE retractL #-}
+-- | A 'Lens' to the projection of a value.
+projectL :: (Monad m, Injection a g) => Lens c m g a
+projectL = lens $ translate $ \ c -> projectM >=> (\ a -> return ((c,a), injectM))
+{-# INLINE projectL #-}
 
 -------------------------------------------------------------------------------

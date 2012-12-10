@@ -485,7 +485,7 @@ oneLargestT p t = setFailMsg "oneLargestT failed" $
 -- | Test if the type of the current ('Generic') 'Node' matches the type of the argument.
 --   Note that the argument /value/ is never inspected, it is merely a proxy for a type argument.
 summandIsTypeT :: forall c m a g. (MonadCatch m, Injection a g) => a -> Translate c m g Bool
-summandIsTypeT _ = arr (isJust . (retract :: (g -> Maybe a)))
+summandIsTypeT _ = arr (isJust . (project :: (g -> Maybe a)))
 {-# INLINE summandIsTypeT #-}
 
 -------------------------------------------------------------------------------
@@ -497,7 +497,7 @@ pSnd (P _ b) = b
 {-# INLINE pSnd #-}
 
 checkSuccessPMaybe :: Monad m => String -> m (Maybe a) -> m a
-checkSuccessPMaybe msg ma = ma >>= retractWithFailMsgM msg
+checkSuccessPMaybe msg ma = ma >>= projectWithFailMsgM msg
 {-# INLINE checkSuccessPMaybe #-}
 
 -------------------------------------------------------------------------------
