@@ -69,6 +69,7 @@ module Language.KURE.Walker
         -- ** Relative Paths
         , Path
         , rootPath
+        , rootPathT
         , pathsToT
         , onePathToT
         , oneNonEmptyPathToT
@@ -323,20 +324,27 @@ extendAbsPath n (AbsolutePath ns) = AbsolutePath (n:ns)
 {-# INLINE extendAbsPath #-}
 
 -- | Contexts that are instances of 'PathContext' contain the current 'AbsolutePath'.
---   Any user-defined combinators (typically 'childL' and congruence combinators) should update the 'AbsolutePath' using 'extendAbsPath'.
+--   Any user-defined combinators (typically 'allR' and congruence combinators) should update the 'AbsolutePath' using '@@'.
 class PathContext c where
-  -- | Find the current path.
-  contextPath :: c -> AbsolutePath
+  -- | Retrieve the current absolute path.
+  absPath :: c -> AbsolutePath
+
+  -- | Extend the current absolute path.
+  (@@) :: c -> Int -> c
 
 -- | The simplest instance of 'PathContext' is 'AbsolutePath' itself.
 instance PathContext AbsolutePath where
--- contextPath :: AbsolutePath -> AbsolutePath
-   contextPath p = p
-   {-# INLINE contextPath #-}
+-- absPath :: AbsolutePath -> AbsolutePath
+   absPath p = p
+   {-# INLINE absPath #-}
 
--- | Find the 'AbsolutePath' to the current 'Node'.
+-- (@@) :: AbsolutePath -> Int -> AbsolutePath
+   (@@) = flip extendAbsPath
+   {-# INLINE (@@) #-}
+
+-- | Lifted version of 'absPath'.
 absPathT :: (PathContext c, Monad m) => Translate c m a AbsolutePath
-absPathT = contextT >>^ contextPath
+absPathT = absPath `liftM` contextT
 {-# INLINE absPathT #-}
 
 -------------------------------------------------------------------------------
@@ -344,16 +352,22 @@ absPathT = contextT >>^ contextPath
 -- | A path is a route to descend the tree from an arbitrary 'Node'.
 type Path = [Int]
 
--- | Convert an 'AbsolutePath' into a 'Path' starting at the root.
-rootPath :: AbsolutePath -> Path
-rootPath (AbsolutePath p) = reverse p
+-- | Retrieve the 'Path' from the root to the current node.
+rootPath :: PathContext c => c -> Path
+rootPath c = let AbsolutePath p = absPath c
+              in reverse p
 {-# INLINE rootPath #-}
+
+-- | Lifted version of 'rootPath'.
+rootPathT :: (PathContext c, Monad m) => Translate c m a Path
+rootPathT = rootPath `liftM` contextT
+{-# INLINE rootPathT #-}
 
 --  Provided the first 'AbsolutePath' is a prefix of the second 'AbsolutePath',
 --  computes the 'Path' from the end of the first to the end of the second.
 rmPathPrefix :: AbsolutePath -> AbsolutePath -> Maybe Path
 rmPathPrefix (AbsolutePath p1) (AbsolutePath p2) = do guard (p1 `isSuffixOf` p2)
-                                                      return (drop (length p1) (reverse p2))
+                                                      return $ drop (length p1) (reverse p2)
 {-# INLINE rmPathPrefix #-}
 
 --  Construct a 'Path' from the current 'Node' to the end of the given 'AbsolutePath', provided that 'AbsolutePath' passes through the current 'Node'.

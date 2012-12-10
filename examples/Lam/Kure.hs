@@ -13,13 +13,12 @@ import Lam.AST
 data Context = Context AbsolutePath [Name] -- bound variable names
 
 instance PathContext Context where
-  contextPath (Context p _) = p
+  absPath (Context p _) = p
+
+  (Context p vs) @@ n = Context (extendAbsPath n p) vs
 
 addBinding :: Name -> Context -> Context
 addBinding v (Context p vs) = Context p (v:vs)
-
-(@@) :: Context -> Int -> Context
-(Context p vs) @@ n = Context (extendAbsPath n p) vs
 
 initialContext :: Context
 initialContext = Context rootAbsPath []

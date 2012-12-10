@@ -14,7 +14,9 @@ data Context = Context AbsolutePath [(Name,Expr)] -- A list of bindings.
                                                   -- We assume no shadowing in the language.
 
 instance PathContext Context where
-  contextPath (Context p _) = p
+  absPath (Context p _) = p
+
+  (Context p defs) @@ n = Context (extendAbsPath n p) defs
 
 addDef :: Name -> Expr -> Context -> Context
 addDef v e (Context p defs) = Context p ((v,e):defs)
@@ -22,9 +24,6 @@ addDef v e (Context p defs) = Context p ((v,e):defs)
 updateContextCmd :: Cmd -> Context -> Context
 updateContextCmd (Seq c1 c2)  = updateContextCmd c2 . updateContextCmd c1
 updateContextCmd (Assign v e) = (addDef v e)
-
-(@@) :: Context -> Int -> Context
-(Context p defs) @@ n = Context (extendAbsPath n p) defs
 
 initialContext :: Context
 initialContext = Context rootAbsPath []
