@@ -148,7 +148,10 @@ catchesT = foldr (<+) (fail "catchesT failed")
 data PBool a = PBool !Bool a
 
 checkSuccessPBool :: Monad m => String -> m (PBool a) -> m a
-checkSuccessPBool msg m = m >>= \(PBool b a) -> if b then return a else fail msg
+checkSuccessPBool msg m = do PBool b a <- m
+                             if b
+                               then return a
+                               else fail msg
 {-# INLINE checkSuccessPBool #-}
 
 -------------------------------------------------------------------------------
@@ -183,7 +186,7 @@ instance Monad m => Monad (AnyR m) where
 
 instance MonadCatch m => MonadCatch (AnyR m) where
 -- catchM :: AnyR m a -> (String -> AnyR m a) -> AnyR m a
-   catchM (AnyR mba) f = AnyR (mba `catchM` (unAnyR . f))
+   catchM ma f = AnyR (unAnyR ma `catchM` (unAnyR . f))
    {-# INLINE catchM #-}
 
 -- | Wrap a 'Rewrite' using the 'AnyR' monad transformer.
