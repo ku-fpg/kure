@@ -101,7 +101,7 @@ import Control.Monad
 import Control.Arrow
 import Control.Category hiding ((.))
 
-import Language.KURE.Catch
+import Language.KURE.MonadCatch
 import Language.KURE.Translate
 import Language.KURE.Lens
 import Language.KURE.Injection
@@ -419,6 +419,10 @@ uniquePrunePathToT q = prunePathsToT q >>> requireUniquePath
 
 -------------------------------------------------------------------------------
 
+tryL :: MonadCatch m => Lens c m g g -> Lens c m g g
+tryL l = l `catchL` (\ _ -> id)
+{-# INLINE tryL #-}
+
 -- | Construct a 'Lens' by following a 'Path'.
 pathL :: (Walker c g, MonadCatch m) => Path -> Lens c m g g
 pathL = serialise . map childL
@@ -426,12 +430,12 @@ pathL = serialise . map childL
 
 -- | Construct a 'Lens' that points to the last 'Node' at which the 'Path' can be followed.
 exhaustPathL :: (Walker c g, MonadCatch m) => Path -> Lens c m g g
-exhaustPathL = foldr (\ n l -> tryR (childL n >>> l)) id
+exhaustPathL = foldr (\ n l -> tryL (childL n >>> l)) id
 {-# INLINE exhaustPathL #-}
 
 -- | Repeat as many iterations of the 'Path' as possible.
 repeatPathL :: (Walker c g, MonadCatch m) => Path -> Lens c m g g
-repeatPathL p = let go = tryR (pathL p >>> go)
+repeatPathL p = let go = tryL (pathL p >>> go)
                  in go
 {-# INLINE repeatPathL #-}
 
@@ -595,7 +599,7 @@ instance MonadCatch m => MonadCatch (OneT w m) where
 wrapOneT :: MonadCatch m => Translate c m g b -> Rewrite c (OneT b m) g
 wrapOneT t = rewrite $ \ c a -> OneT $ \ mw -> case mw of
                                                  Just w  -> return (P a (Just w))
-                                                 Nothing -> ((P a . Just) `liftM` apply t c a) <<+ return (P a mw)
+                                                 Nothing -> ((P a . Just) `liftM` apply t c a) <+ return (P a mw)
 {-# INLINE wrapOneT #-}
 
 -- | Unwrap a 'Translate' from the 'OneT' monad transformer.

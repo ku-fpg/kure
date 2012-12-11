@@ -15,12 +15,12 @@ module Language.KURE
 	( module Language.KURE.Translate
 	, module Language.KURE.Walker
         , module Language.KURE.Combinators
-        , module Language.KURE.Catch
+        , module Language.KURE.MonadCatch
         , module Language.KURE.Injection
 ) where
 
 import Language.KURE.Combinators
-import Language.KURE.Catch
+import Language.KURE.MonadCatch
 import Language.KURE.Translate
 import Language.KURE.Injection
 import Language.KURE.Walker

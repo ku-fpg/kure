@@ -38,13 +38,13 @@ Library
   Exposed-modules:
        Language.KURE
        Language.KURE.BiTranslate
-       Language.KURE.Catch
        Language.KURE.Combinators
        Language.KURE.Combinators.Arrow
        Language.KURE.Combinators.Monad
        Language.KURE.Combinators.Translate
        Language.KURE.Injection
        Language.KURE.Lens
+       Language.KURE.MonadCatch
        Language.KURE.Translate
        Language.KURE.Walker
 

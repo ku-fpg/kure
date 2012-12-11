@@ -16,11 +16,17 @@ module Language.KURE.Combinators.Translate
         , exposeT
         , readerT
         , resultT
+        , catchesT
         , mapT
           -- * Rewrite Combinators
+        , tryR
         , andR
         , orR
         , (>+>)
+        , repeatR
+        , acceptR
+        , accepterR
+        , changedR
         , sideEffectR
           -- * Monad Transformers
           -- ** anyR Support
@@ -44,7 +50,8 @@ import Data.Foldable
 import Data.Traversable
 
 import Language.KURE.Combinators.Arrow
-import Language.KURE.Catch
+import Language.KURE.Combinators.Monad
+import Language.KURE.MonadCatch
 import Language.KURE.Translate
 
 ------------------------------------------------------------------------------------------
@@ -99,6 +106,43 @@ orR :: (Functor f, Foldable f, MonadCatch m) => f (Rewrite c m a) -> Rewrite c m
 orR = unwrapAnyR . andR . fmap wrapAnyR
 {-# INLINE orR #-}
 
+-- | As 'acceptR', but takes a custom fail message.
+acceptWithFailMsgR :: Monad m => (a -> Bool) -> String -> Rewrite c m a
+acceptWithFailMsgR p msg = readerT $ \ a -> if p a then id else fail msg
+{-# INLINE acceptWithFailMsgR #-}
+
+-- | Look at the argument to an 'Rewrite', and choose to be either the identity rewrite or a failure.
+acceptR :: Monad m => (a -> Bool) -> Rewrite c m a
+acceptR p = acceptWithFailMsgR p "acceptR: predicate failed"
+{-# INLINE acceptR #-}
+
+-- | A generalisation of 'acceptR' where the predicate is a 'Translate'.
+accepterR :: Monad m => Translate c m a Bool -> Rewrite c m a
+accepterR t = ifM t idR (fail "accepterR: predicate failed")
+{-# INLINE accepterR #-}
+
+-- | Catch a failing 'Category', making it into an identity.
+tryR :: MonadCatch m => Rewrite c m a -> Rewrite c m a
+tryR r = r <+ id
+{-# INLINE tryR #-}
+
+-- | Makes an 'Rewrite' fail if the result value equals the argument value.
+changedR :: (MonadCatch m, Eq a) => Rewrite c m a -> Rewrite c m a
+changedR r = readerT (\ a -> r >>> acceptWithFailMsgR (/= a) "changedR: value is unchanged")
+{-# INLINE changedR #-}
+
+-- | Repeat a 'Rewrite' until it fails, then return the result before the failure.
+--   Requires at least the first attempt to succeed.
+repeatR :: MonadCatch m => Rewrite c m a -> Rewrite c m a
+repeatR r = let go = r >>> tryR go
+             in go
+{-# INLINE repeatR #-}
+
+-- | Attempt each 'Translate' until one succeeds, then return that result and discard the rest of the 'Translate's.
+catchesT :: MonadCatch m => [Translate c m a b] -> Translate c m a b
+catchesT = foldr (<+) (fail "catchesT failed")
+{-# INLINE catchesT #-}
+
 -------------------------------------------------------------------------------
 
 data PBool a = PBool !Bool a
@@ -144,7 +188,7 @@ instance MonadCatch m => MonadCatch (AnyR m) where
 
 -- | Wrap a 'Rewrite' using the 'AnyR' monad transformer.
 wrapAnyR :: MonadCatch m => Rewrite c m a -> Rewrite c (AnyR m) a
-wrapAnyR r = rewrite $ \ c a -> AnyR $ (PBool True `liftM` apply r c a) <<+ return (PBool False a)
+wrapAnyR r = rewrite $ \ c a -> AnyR $ (PBool True `liftM` apply r c a) <+ return (PBool False a)
 {-# INLINE wrapAnyR #-}
 
 -- | Unwrap a 'Rewrite' from the 'AnyR' monad transformer.
@@ -190,7 +234,7 @@ instance MonadCatch m => MonadCatch (OneR m) where
 wrapOneR :: MonadCatch m => Rewrite c m g -> Rewrite c (OneR m) g
 wrapOneR r = rewrite $ \ c a -> OneR $ \ b -> if b
                                                 then return (PBool True a)
-                                                else (PBool True `liftM` apply r c a) <<+ return (PBool False a)
+                                                else (PBool True `liftM` apply r c a) <+ return (PBool False a)
 {-# INLINE wrapOneR #-}
 
 -- | Unwrap a 'Rewrite' from the 'OneR' monad transformer.

@@ -37,7 +37,7 @@ import Control.Arrow
 
 import Data.Monoid
 
-import Language.KURE.Catch
+import Language.KURE.MonadCatch
 
 ------------------------------------------------------------------------------------------
 
@@ -154,16 +154,6 @@ instance Monad m => Category (Translate c m) where
    t2 . t1 = translate (\ c -> apply t1 c >=> apply t2 c)
    {-# INLINE (.) #-}
 
--- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
-instance MonadCatch m => BiCatch (Translate c m) where
-
--- failT :: String -> Translate c m a b
-   failT = fail
-   {-# INLINE failT #-}
-
--- catchT :: Translate c m a b -> (String -> Translate c m a b) -> Translate c m a b
-   catchT = catchM
-   {-# INLINE catchT #-}
 
 -- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance Monad m => Arrow (Translate c m) where

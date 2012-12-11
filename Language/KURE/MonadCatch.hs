@@ -1,5 +1,5 @@
 -- |
--- Module: Language.KURE.Catch
+-- Module: Language.KURE.MonadCatch
 -- Copyright: (c) 2012 The University of Kansas
 -- License: BSD3
 --
@@ -7,9 +7,9 @@
 -- Stability: beta
 -- Portability: ghc
 --
--- This module provides classes for catch-like operations on 'Monad's and two-paramater classes such as 'Category' and 'Arrow'.
+-- This module provides classes for catch-like operations on 'Monad's.
 
-module Language.KURE.Catch
+module Language.KURE.MonadCatch
            ( -- * Monads with a Catch
              MonadCatch(..)
              -- ** The KURE Monad
@@ -17,7 +17,7 @@ module Language.KURE.Catch
            , runKureM
            , fromKureM
              -- ** Combinators
-           , (<<+)
+           , (<+)
            , catchesM
            , tryM
            , mtryM
@@ -28,32 +28,20 @@ module Language.KURE.Catch
            , setFailMsg
            , prefixFailMsg
            , withPatFailMsg
-             -- * Two-paramater types with Catch and Failure
-           , BiCatch(..)
-           , (<+)
-           , acceptR
-           , accepterR
-           , tryR
-           , changedR
-           , repeatR
-           , catchesT
 ) where
 
-import Prelude hiding (id , (.), foldr)
+import Prelude hiding (foldr)
 
 import Control.Applicative
 import Control.Monad
-import Control.Category
-import Control.Arrow
 
 import Data.Foldable
 import Data.List (isPrefixOf)
 import Data.Monoid
 
-import Language.KURE.Combinators.Arrow
 import Language.KURE.Combinators.Monad
 
-infixl 3 <+, <<+
+infixl 3 <+
 
 ------------------------------------------------------------------------------------------
 
@@ -123,18 +111,18 @@ instance Applicative KureM where
 -------------------------------------------------------------------------------
 
 -- | A monadic catch that ignores the error message.
-(<<+) :: MonadCatch m => m a -> m a -> m a
-ma <<+ mb = ma `catchM` const mb
-{-# INLINE (<<+) #-}
+(<+) :: MonadCatch m => m a -> m a -> m a
+ma <+ mb = ma `catchM` const mb
+{-# INLINE (<+) #-}
 
 -- | Select the first monadic computation that succeeds, discarding any thereafter.
 catchesM :: (Foldable f, MonadCatch m) => f (m a) -> m a
-catchesM = foldr (<<+) (fail "catchesM failed")
+catchesM = foldr (<+) (fail "catchesM failed")
 {-# INLINE catchesM #-}
 
 -- | Catch a failing monadic computation, making it succeed with a constant value.
 tryM :: MonadCatch m => a -> m a -> m a
-tryM a ma = ma <<+ return a
+tryM a ma = ma <+ return a
 {-# INLINE tryM #-}
 
 -- | Catch a failing monadic computation, making it succeed with 'mempty'.
@@ -149,7 +137,7 @@ attemptM ma = liftM Right ma `catchM` (return . Left)
 
 -- | Determine if a monadic computation succeeds.
 testM :: MonadCatch m => m a -> m Bool
-testM ma = liftM (const True) ma <<+ return False
+testM ma = liftM (const True) ma <+ return False
 {-# INLINE testM #-}
 
 -- | Fail if the 'Monad' succeeds; succeed with @()@ if it fails.
@@ -179,74 +167,5 @@ prefixFailMsg msg = modFailMsg (msg ++)
 withPatFailMsg :: MonadCatch m => String -> m a -> m a
 withPatFailMsg msg = modFailMsg (\ e -> if "Pattern match failure" `isPrefixOf` e then msg else e)
 {-# INLINE withPatFailMsg #-}
-
-------------------------------------------------------------------------------------------
-
--- | A class of two-paramater type constructors with failure and catching.
---
--- The following law is expected to hold:
---
--- > failT msg `catchT` f == f msg
---
--- Additionally, KURE requires that if @bi a@ is an instance of 'Monad',
--- and bi is an instance of 'BiCatch', then
---
--- > fail == failT
-
-class BiCatch bi where
-  -- | Fail with the given error message.
-  failT :: String -> bi a b
-
-  -- | Catch an exception with a handler that can depend on the error message.
-  catchT :: bi a b -> (String -> bi a b) -> bi a b
-
-
--- | Left-biased choice.
-(<+) :: BiCatch bi => bi a b -> bi a b -> bi a b
-f <+ g = f `catchT` \ _ -> g
-{-# INLINE (<+) #-}
-
--- | Look at the argument to the 'Arrow' before choosing which 'Arrow' to use.
-reader :: ArrowApply bi => (a -> bi a b) -> bi a b
-reader f = (f &&& id) ^>> app
-{-# INLINE reader #-}
-
--- | Look at the argument to an 'Arrow', and choose to be either the identity arrow or a failure.
-acceptWithFailMsgR :: (BiCatch bi, ArrowApply bi) => (a -> Bool) -> String -> bi a a
-acceptWithFailMsgR p msg = reader $ \ a -> if p a then id else failT msg
-{-# INLINE acceptWithFailMsgR #-}
-
--- | Look at the argument to an 'Arrow', and choose to be either the identity arrow or a failure.
-acceptR :: (BiCatch bi, ArrowApply bi) => (a -> Bool) -> bi a a
-acceptR p = acceptWithFailMsgR p "acceptR: predicate failed"
-{-# INLINE acceptR #-}
-
--- | Look at the argument to an 'Arrow', and choose to be either the identity arrow or a failure.
---   This is a generalisation of 'acceptR' to any 'Arrow'.
-accepterR :: (BiCatch bi, ArrowApply bi) => bi a Bool -> bi a a
-accepterR t = forkFirst t >>> reader (\ (b,a) -> if b then constant a else failT "accepterR: predicate failed")
-{-# INLINE accepterR #-}
-
--- | Catch a failing 'Category', making it into an identity.
-tryR :: (BiCatch bi, Category bi) => bi a a -> bi a a
-tryR r = r <+ id
-{-# INLINE tryR #-}
-
--- | Makes an 'Arrow' fail if the result value equals the argument value.
-changedR :: (BiCatch bi, ArrowApply bi, Eq a) => bi a a -> bi a a
-changedR r = reader (\ a -> r >>> acceptWithFailMsgR (/= a) "changedR: value is unchanged")
-{-# INLINE changedR #-}
-
--- | Repeat a 'Category' until it fails, then return the result before the failure.
---   Requires at least the first attempt to succeed.
-repeatR :: (BiCatch bi, Category bi) => bi a a -> bi a a
-repeatR r = let go = r >>> tryR go
-             in go
-{-# INLINE repeatR #-}
-
--- | Select the first 'BiCatch' that succeeds, discarding any thereafter.
-catchesT :: (Foldable f, BiCatch bi) => f (bi a b) -> bi a b
-catchesT = foldr (<+) (failT "catchesT failed")
-{-# INLINE catchesT #-}
 
 ------------------------------------------------------------------------------------------

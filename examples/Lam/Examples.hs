@@ -1,7 +1,5 @@
 module Lam.Examples where
 
-import Prelude hiding (id)
-
 import Language.KURE
 
 import Lam.AST
@@ -11,7 +9,7 @@ import Data.List (nub)
 
 import Control.Applicative
 import Control.Monad
-import Control.Category hiding ((.))
+import Control.Category ((>>>))
 
 -----------------------------------------------------------------
 
@@ -73,7 +71,7 @@ freeVars = either error id . applyExp freeVarsT
 
 -- Only works for lambdas, fails for all others
 alphaLam :: [Name] -> RewriteE
-alphaLam frees = do Lam v e <- id
+alphaLam frees = do Lam v e <- idR
                     v' <- constT $ freshName $ frees ++ v : freeVars e
                     lamT (tryR $ substExp v (Var v')) (\ _ -> Lam v')
 
@@ -83,21 +81,21 @@ substExp v s = rules_var <+ rules_lam <+ rule_app
         -- From Lambda Calc Textbook, the 6 rules.
         rules_var = whenM (varT (==v)) (return s)                   -- Rule 1
 
-        rules_lam = do Lam n e <- id
+        rules_lam = do Lam n e <- idR
                        guardM (n /= v)                              -- Rule 3
                        guardM (v `elem` freeVars e)                 -- Rule 4a
                        if n `elem` freeVars s
                         then alphaLam (freeVars s) >>> rules_lam    -- Rule 5
                         else lamR (substExp v s)                    -- Rule 4b
 
-        rule_app = do App _ _ <- id
+        rule_app = do App _ _ <- idR
                       anyR (substExp v s)                           -- Rule 6
 
 ------------------------------------------------------------------------
 
 beta_reduce :: RewriteE
 beta_reduce = withPatFailMsg "Cannot beta-reduce, not app-lambda." $
-                do App (Lam v _) e2 <- id
+                do App (Lam v _) e2 <- idR
                    pathT [0,0] (tryR $ substExp v e2)
 
 eta_expand :: RewriteE
@@ -106,7 +104,7 @@ eta_expand = rewrite $ \ c f -> do v <- freshName (bindings c)
 
 eta_reduce :: RewriteE
 eta_reduce = withPatFailMsg "Cannot eta-reduce, not lambda-app-var." $
-               do Lam v1 (App f (Var v2)) <- id
+               do Lam v1 (App f (Var v2)) <- idR
                   guardMsg (v1 == v2) $ "Cannot eta-reduce, " ++ v1 ++ " /= " ++ v2
                   return f
 

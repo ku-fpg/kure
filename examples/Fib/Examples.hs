@@ -1,8 +1,5 @@
 module Fib.Examples where
 
-import Prelude hiding (id , (.), snd)
-import Control.Category
-
 import Language.KURE
 
 import Fib.AST
@@ -25,7 +22,7 @@ applyFib r = runKureM Right Left . apply r rootAbsPath
 --   Requires the argument to Fib to be a Literal.
 fibLitR :: RewriteA
 fibLitR = withPatFailMsg "fibLitR failed: not of form Fib (Lit n)" $
-          do Fib (Lit n) <- id
+          do Fib (Lit n) <- idR
              case n of
                0  ->  return (Lit 0)
                1  ->  return (Lit 1)
@@ -36,13 +33,13 @@ fibLitR = withPatFailMsg "fibLitR failed: not of form Fib (Lit n)" $
 -- | Compute the addition of two literals.
 addLitR :: RewriteA
 addLitR = withPatFailMsg "addLitR failed" $
-          do Add (Lit m) (Lit n) <- id
+          do Add (Lit m) (Lit n) <- idR
              return (Lit (m + n))
 
 -- | Compute the subtraction of two literals.
 subLitR :: RewriteA
 subLitR = withPatFailMsg "subLitR failed" $
-          do Sub (Lit m) (Lit n) <- id
+          do Sub (Lit m) (Lit n) <- idR
              return (Lit (m - n))
 
 -----------------------------------------------------------------------

@@ -16,9 +16,11 @@ module Language.KURE.Lens
         , lensT
         , focusR
         , focusT
+        , pureL
+        , failL
+        , catchL
         , testLensT
         , bidirectionalL
-        , pureL
         , injectL
         , projectL
 ) where
@@ -29,7 +31,7 @@ import Control.Monad
 import Control.Category
 import Control.Arrow
 
-import Language.KURE.Catch
+import Language.KURE.MonadCatch
 import Language.KURE.Translate
 import Language.KURE.BiTranslate
 import Language.KURE.Injection
@@ -77,20 +79,18 @@ instance Monad m => Category (Lens c m) where
                                              return ((cd,d),kd >=> kb)
    {-# INLINE (.) #-}
 
+-- | The failing 'Lens'.
+failL :: Monad m => String -> Lens c m a b
+failL = lens . fail
+{-# INLINE failL #-}
+
 -- | A 'Lens' is deemed to have failed (and thus can be caught) if either it fails on the way down, or,
 --   crucially, if it would fail on the way up for an unmodified value.  However, actual failure on the way up is not caught
 --   (as by then it is too late to use an alternative 'Lens').  This means that, in theory, a use of 'catch' could cause a succeeding 'Lens' application to fail.
 --   But provided 'lens' is used correctly, this should never happen.
-
-instance MonadCatch m => BiCatch (Lens c m) where
-
--- failT :: String -> Lens c m a b
-   failT = lens . fail
-   {-# INLINE failT #-}
-
--- catchT :: Lens c m a b -> (String -> Lens c m a b) -> Lens c m a b
-   l1 `catchT` l2 = lens (attemptM (focusR l1 id) >>= either (lensT . l2) (const (lensT l1)))
-   {-# INLINE catchT #-}
+catchL :: MonadCatch m => Lens c m a b -> (String -> Lens c m a b) -> Lens c m a b
+l1 `catchL` l2 = lens (attemptM (focusR l1 idR) >>= either (lensT . l2) (const (lensT l1)))
+{-# INLINE catchL #-}
 
 -- | Construct a 'Lens' from a 'BiTranslate'.
 bidirectionalL :: Monad m => BiTranslate c m a b -> Lens c m a b

@@ -24,7 +24,7 @@ import Prelude hiding (id, (.))
 
 import Control.Category
 
-import Language.KURE.Catch
+import Language.KURE.MonadCatch
 import Language.KURE.Translate
 
 ------------------------------------------------------------------------------------------
