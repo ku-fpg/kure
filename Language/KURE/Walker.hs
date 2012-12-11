@@ -421,7 +421,7 @@ uniquePrunePathToT q = prunePathsToT q >>> requireUniquePath
 
 -- | Construct a 'Lens' by following a 'Path'.
 pathL :: (Walker c g, MonadCatch m) => Path -> Lens c m g g
-pathL = foldr (>>>) id . map childL
+pathL = serialise . map childL
 {-# INLINE pathL #-}
 
 -- | Construct a 'Lens' that points to the last 'Node' at which the 'Path' can be followed.
