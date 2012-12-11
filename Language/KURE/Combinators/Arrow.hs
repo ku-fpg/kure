@@ -21,10 +21,17 @@ module Language.KURE.Combinators.Arrow
            , forkFirst
            , forkSecond
            , constant
+           , serialise
+           , parallelise
 ) where
 
-import Control.Category
+import Prelude hiding (id, foldr)
+
+import Control.Category hiding ((.))
 import Control.Arrow
+
+import Data.Monoid
+import Data.Foldable
 
 ------------------------------------------------------------------------------------------
 
@@ -70,7 +77,19 @@ forkSecond sf = fork >>> second sf
 
 -- | An arrow with a constant result.
 constant :: Arrow bi => b -> bi a b
-constant b = arr (const b)
+constant = arr . const
 {-# INLINE constant #-}
+
+-------------------------------------------------------------------------------
+
+-- | Sequence (from left to right) a collection of 'Category's.
+serialise :: (Foldable f, Category bi) => f (bi a a) -> bi a a
+serialise = foldr (>>>) id
+{-# INLINE serialise #-}
+
+-- | Apply a collection of 'Arrow's to the same input, combining their results in a monoid.
+parallelise :: (Foldable f, Arrow bi, Monoid b) => f (bi a b) -> bi a b
+parallelise = foldr (\ f g -> (f &&& g) >>^ uncurry mappend) (constant mempty)
+{-# INLINE parallelise #-}
 
 -------------------------------------------------------------------------------

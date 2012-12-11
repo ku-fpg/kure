@@ -43,6 +43,7 @@ import Control.Monad (liftM)
 import Data.Foldable
 import Data.Traversable
 
+import Language.KURE.Combinators.Arrow
 import Language.KURE.Catch
 import Language.KURE.Translate
 
@@ -85,7 +86,7 @@ resultT f t = translate (\ c -> f . apply t c)
 
 -- | Perform a collection of rewrites in sequence, requiring all to succeed.
 andR :: (Foldable f, Monad m) => f (Rewrite c m a) -> Rewrite c m a
-andR = foldr (>>>) id
+andR = serialise
 {-# INLINE andR #-}
 
 -- | Perform two rewrites in sequence, succeeding if one or both succeed.
