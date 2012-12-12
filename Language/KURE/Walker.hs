@@ -63,7 +63,6 @@ module Language.KURE.Walker
         -- ** Absolute Paths
         , AbsolutePath
         , rootAbsPath
-        , extendAbsPath
         , PathContext(..)
         , absPathT
         -- ** Relative Paths
@@ -318,10 +317,6 @@ rootAbsPath :: AbsolutePath
 rootAbsPath = AbsolutePath []
 {-# INLINE rootAbsPath #-}
 
--- | Extend an 'AbsolutePath' by one descent.
-extendAbsPath :: Int -> AbsolutePath -> AbsolutePath
-extendAbsPath n (AbsolutePath ns) = AbsolutePath (n:ns)
-{-# INLINE extendAbsPath #-}
 
 -- | Contexts that are instances of 'PathContext' contain the current 'AbsolutePath'.
 --   Any user-defined combinators (typically 'allR' and congruence combinators) should update the 'AbsolutePath' using '@@'.
@@ -329,17 +324,17 @@ class PathContext c where
   -- | Retrieve the current absolute path.
   absPath :: c -> AbsolutePath
 
-  -- | Extend the current absolute path.
+  -- | Extend the current absolute path by one descent.
   (@@) :: c -> Int -> c
 
 -- | The simplest instance of 'PathContext' is 'AbsolutePath' itself.
 instance PathContext AbsolutePath where
 -- absPath :: AbsolutePath -> AbsolutePath
-   absPath p = p
+   absPath = id
    {-# INLINE absPath #-}
 
 -- (@@) :: AbsolutePath -> Int -> AbsolutePath
-   (@@) = flip extendAbsPath
+   (AbsolutePath ns) @@ n = AbsolutePath (n:ns)
    {-# INLINE (@@) #-}
 
 -- | Lifted version of 'absPath'.
