@@ -118,43 +118,44 @@ import Language.KURE.Combinators
 
 class Walker c g where
 
-  -- | Apply a 'Generic' 'Rewrite' to all immediate children, succeeding if they all succeed.
+  -- | Apply a 'Rewrite' to all immediate children, succeeding if they all succeed.
   allR :: MonadCatch m => Rewrite c m g -> Rewrite c m g
 
-  -- | Apply a 'Generic' 'Translate' to all immediate children, succeeding if they all succeed.
+  -- | Apply a 'Translate' to all immediate children, succeeding if they all succeed.
   --   The results are combined in a 'Monoid'.
   allT :: (MonadCatch m, Monoid b) => Translate c m g b -> Translate c m g b
   allT = unwrapAllT . allR . wrapAllT
   {-# INLINE allT #-}
 
-  -- | Apply a 'Generic' 'Translate' to the first immediate child for which it can succeed.
+  -- | Apply a 'Translate' to the first immediate child for which it can succeed.
   oneT :: MonadCatch m => Translate c m g b -> Translate c m g b
   oneT = unwrapOneT . allR . wrapOneT
   {-# INLINE oneT #-}
 
-  -- | Apply a 'Generic' 'Rewrite' to all immediate children, suceeding if any succeed.
+  -- | Apply a 'Rewrite' to all immediate children, suceeding if any succeed.
   anyR :: MonadCatch m => Rewrite c m g -> Rewrite c m g
   anyR = unwrapAnyR . allR . wrapAnyR
   {-# INLINE anyR #-}
 
-  -- | Apply a 'Generic' 'Rewrite' to the first immediate child for which it can succeed.
+  -- | Apply a 'Rewrite' to the first immediate child for which it can succeed.
   oneR :: MonadCatch m => Rewrite c m g -> Rewrite c m g
   oneR = unwrapOneR . allR . wrapOneR
   {-# INLINE oneR #-}
 
-  -- | Construct a 'Lens' to the n-th child 'Node'.
+  -- | Construct a 'Lens' to the n-th child node.
   childL :: MonadCatch m => Int -> Lens c m g g
   childL = childL_default
   {-# INLINE childL #-}
 
 ------------------------------------------------------------------------------------------
 
--- | Lifted version of 'numChildren'.
+-- | Count the number of children of the current node.
 numChildrenT :: (Walker c g, MonadCatch m) => Translate c m g Int
 numChildrenT = getSum `liftM` allT (return $ Sum 1)
 {-# INLINE numChildrenT #-}
 
--- | Lifted version of 'hasChild'.
+-- | Determine if the current node has a child of the specified number.
+--   Useful when defining custom versions of 'childL'.
 hasChildT :: (Walker c g, MonadCatch m) => Int -> Translate c m g Bool
 hasChildT n = do c <- numChildrenT
                  return (n >= 0 && n < c)
@@ -174,28 +175,28 @@ childR n = focusR (childL n)
 
 -------------------------------------------------------------------------------
 
--- | Fold a tree in a top-down manner, using a single 'Translate' for each 'Node'.
+-- | Fold a tree in a top-down manner, using a single 'Translate' for each node.
 foldtdT :: (Walker c g, MonadCatch m, Monoid b) => Translate c m g b -> Translate c m g b
 foldtdT t = prefixFailMsg "foldtdT failed: " $
             let go = t `mappend` allT go
              in go
 {-# INLINE foldtdT #-}
 
--- | Fold a tree in a bottom-up manner, using a single 'Translate' for each 'Node'.
+-- | Fold a tree in a bottom-up manner, using a single 'Translate' for each node.
 foldbuT :: (Walker c g, MonadCatch m, Monoid b) => Translate c m g b -> Translate c m g b
 foldbuT t = prefixFailMsg "foldbuT failed: " $
             let go = allT go `mappend` t
              in go
 {-# INLINE foldbuT #-}
 
--- | Apply a 'Translate' to the first 'Node' for which it can succeed, in a top-down traversal.
+-- | Apply a 'Translate' to the first node for which it can succeed, in a top-down traversal.
 onetdT :: (Walker c g, MonadCatch m) => Translate c m g b -> Translate c m g b
 onetdT t = setFailMsg "onetdT failed" $
            let go = t <+ oneT go
             in go
 {-# INLINE onetdT #-}
 
--- | Apply a 'Translate' to the first 'Node' for which it can succeed, in a bottom-up traversal.
+-- | Apply a 'Translate' to the first node for which it can succeed, in a bottom-up traversal.
 onebuT :: (Walker c g, MonadCatch m) => Translate c m g b -> Translate c m g b
 onebuT t = setFailMsg "onebuT failed" $
            let go = oneT go <+ t
@@ -275,14 +276,14 @@ anyduR r = setFailMsg "anyduR failed" $
             in go
 {-# INLINE anyduR #-}
 
--- | Apply a 'Rewrite' to the first 'Node' for which it can succeed, in a top-down traversal.
+-- | Apply a 'Rewrite' to the first node for which it can succeed, in a top-down traversal.
 onetdR :: (Walker c g, MonadCatch m) => Rewrite c m g -> Rewrite c m g
 onetdR r = setFailMsg "onetdR failed" $
            let go = r <+ oneR go
             in go
 {-# INLINE onetdR #-}
 
--- | Apply a 'Rewrite' to the first 'Node' for which it can succeed, in a bottom-up traversal.
+-- | Apply a 'Rewrite' to the first node for which it can succeed, in a bottom-up traversal.
 onebuR :: (Walker c g, MonadCatch m) => Rewrite c m g -> Rewrite c m g
 onebuR r = setFailMsg "onebuR failed" $
            let go = oneR go <+ r
@@ -344,7 +345,7 @@ absPathT = absPath `liftM` contextT
 
 -------------------------------------------------------------------------------
 
--- | A path is a route to descend the tree from an arbitrary 'Node'.
+-- | A path is a route to descend the tree from an arbitrary node.
 type Path = [Int]
 
 -- | Retrieve the 'Path' from the root to the current node.
@@ -365,31 +366,31 @@ rmPathPrefix (AbsolutePath p1) (AbsolutePath p2) = do guard (p1 `isSuffixOf` p2)
                                                       return $ drop (length p1) (reverse p2)
 {-# INLINE rmPathPrefix #-}
 
---  Construct a 'Path' from the current 'Node' to the end of the given 'AbsolutePath', provided that 'AbsolutePath' passes through the current 'Node'.
+--  Construct a 'Path' from the current node to the end of the given 'AbsolutePath', provided that 'AbsolutePath' passes through the current node.
 abs2pathT :: (PathContext c, Monad m) => AbsolutePath -> Translate c m a Path
 abs2pathT there = do here <- absPathT
                      maybe (fail "Absolute path does not pass through current node.") return (rmPathPrefix here there)
 {-# INLINE abs2pathT #-}
 
--- | Find the 'Path's to every 'Node' that satisfies the predicate.
+-- | Find the 'Path's to every node that satisfies the predicate.
 pathsToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g [Path]
 pathsToT q = collectT (acceptR q >>> absPathT) >>= mapM abs2pathT
 {-# INLINE pathsToT #-}
 
--- | Find the 'Path' to the first 'Node' that satisfies the predicate (in a pre-order traversal).
+-- | Find the 'Path' to the first node that satisfies the predicate (in a pre-order traversal).
 onePathToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g Path
 onePathToT q = setFailMsg "No matching nodes found." $
                onetdT (acceptR q >>> absPathT) >>= abs2pathT
 {-# INLINE onePathToT #-}
 
--- | Find the 'Path' to the first descendent 'Node' that satisfies the predicate (in a pre-order traversal).
+-- | Find the 'Path' to the first descendent node that satisfies the predicate (in a pre-order traversal).
 oneNonEmptyPathToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g Path
 oneNonEmptyPathToT q = setFailMsg "No matching nodes found." $
                        do start <- absPathT
                           onetdT (acceptR q >>> absPathT >>> acceptR (/= start)) >>= abs2pathT
 {-# INLINE oneNonEmptyPathToT #-}
 
--- | Find the 'Path's to every 'Node' that satisfies the predicate, ignoring 'Node's below successes.
+-- | Find the 'Path's to every node that satisfies the predicate, ignoring nodes below successes.
 prunePathsToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g [Path]
 prunePathsToT q = collectPruneT (acceptR q >>> absPathT) >>= mapM abs2pathT
 {-# INLINE prunePathsToT #-}
@@ -402,12 +403,12 @@ requireUniquePath = contextfreeT $ \ ps -> case ps of
                                              _   -> fail $ "Ambiguous: " ++ show (length ps) ++ " matching nodes found."
 {-# INLINE requireUniquePath #-}
 
--- | Find the 'Path' to the 'Node' that satisfies the predicate, failing if that does not uniquely identify a 'Node'.
+-- | Find the 'Path' to the node that satisfies the predicate, failing if that does not uniquely identify a node.
 uniquePathToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g Path
 uniquePathToT q = pathsToT q >>> requireUniquePath
 {-# INLINE uniquePathToT #-}
 
--- | Build a 'Path' to the 'Node' that satisfies the predicate, failing if that does not uniquely identify a 'Node' (ignoring 'Node's below successes).
+-- | Build a 'Path' to the node that satisfies the predicate, failing if that does not uniquely identify a node (ignoring nodes below successes).
 uniquePrunePathToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g Path
 uniquePrunePathToT q = prunePathsToT q >>> requireUniquePath
 {-# INLINE uniquePrunePathToT #-}
@@ -423,7 +424,7 @@ pathL :: (Walker c g, MonadCatch m) => Path -> Lens c m g g
 pathL = serialise . map childL
 {-# INLINE pathL #-}
 
--- | Construct a 'Lens' that points to the last 'Node' at which the 'Path' can be followed.
+-- | Construct a 'Lens' that points to the last node at which the 'Path' can be followed.
 exhaustPathL :: (Walker c g, MonadCatch m) => Path -> Lens c m g g
 exhaustPathL = foldr (\ n l -> tryL (childL n >>> l)) id
 {-# INLINE exhaustPathL #-}
@@ -453,7 +454,7 @@ pathT = focusT . pathL
 
 -------------------------------------------------------------------------------
 
--- | Check if it is possible to construct a 'Lens' along this path from the current 'Node'.
+-- | Check if it is possible to construct a 'Lens' along this path from the current node.
 testPathT :: (Walker c g, MonadCatch m) => Path -> Translate c m g Bool
 testPathT = testLensT . pathL
 {-# INLINE testPathT #-}
@@ -495,7 +496,7 @@ oneLargestT p t = setFailMsg "oneLargestT failed" $
                    in go
 {-# INLINE oneLargestT #-}
 
--- | Test if the type of the current ('Generic') 'Node' matches the type of the argument.
+-- | Test if the type of the current node summand matches the type of the argument.
 --   Note that the argument /value/ is never inspected, it is merely a proxy for a type argument.
 summandIsTypeT :: forall c m a g. (MonadCatch m, Injection a g) => a -> Translate c m g Bool
 summandIsTypeT _ = arr (isJust . (project :: (g -> Maybe a)))
@@ -515,7 +516,6 @@ checkSuccessPMaybe msg ma = ma >>= projectWithFailMsgM msg
 
 -------------------------------------------------------------------------------
 
--- $AllT_doc
 -- These are used for defining 'allT' in terms of 'allR'.
 -- However, they are unlikely to be of use to the KURE user.
 
@@ -560,7 +560,6 @@ unwrapAllT = prefixFailMsg "allT failed:" . resultT (liftM pSnd . unAllT)
 
 -- We could probably build this on top of OneR or AllT
 
--- $OneT_doc
 -- These are used for defining 'oneT' in terms of 'allR'.
 -- However, they are unlikely to be of use to the KURE user.
 

@@ -106,7 +106,7 @@ orR :: (Functor f, Foldable f, MonadCatch m) => f (Rewrite c m a) -> Rewrite c m
 orR = unwrapAnyR . andR . fmap wrapAnyR
 {-# INLINE orR #-}
 
--- | As 'acceptR', but takes a custom fail message.
+-- | As 'acceptR', but takes a custom failure message.
 acceptWithFailMsgR :: Monad m => (a -> Bool) -> String -> Rewrite c m a
 acceptWithFailMsgR p msg = readerT $ \ a -> if p a then id else fail msg
 {-# INLINE acceptWithFailMsgR #-}

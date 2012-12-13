@@ -12,9 +12,6 @@
 -- This module provides a type class for injective functions (and their projections),
 -- and some useful interactions with 'Translate'.
 --
--- A particularly useful instance of 'Injection' is from @a@ to 'Generic' @a@,
--- and that case is the primary purpose of most of these combinators.
-
 module Language.KURE.Injection
        ( -- * Injection Class
          Injection(..)
