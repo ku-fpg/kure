@@ -18,6 +18,7 @@ module Language.KURE.Combinators.Translate
         , resultT
         , catchesT
         , mapT
+        , joinT
           -- * Rewrite Combinators
         , tryR
         , andR
@@ -142,6 +143,10 @@ repeatR r = let go = r >>> tryR go
 catchesT :: MonadCatch m => [Translate c m a b] -> Translate c m a b
 catchesT = foldr (<+) (fail "catchesT failed")
 {-# INLINE catchesT #-}
+
+joinT :: (Monad m) => Translate c m (m a) a
+joinT = contextfreeT id
+{-# INLINE joinT #-}
 
 -------------------------------------------------------------------------------
 
