@@ -19,6 +19,7 @@ module Language.KURE.Combinators.Translate
         , catchesT
         , mapT
         , joinT
+        , guardT
           -- * Rewrite Combinators
         , tryR
         , andR
@@ -147,6 +148,11 @@ catchesT = foldr (<+) (fail "catchesT failed")
 joinT :: (Monad m) => Translate c m (m a) a
 joinT = contextfreeT id
 {-# INLINE joinT #-}
+
+guardT :: (Monad m) => Translate c m Bool ()
+guardT = contextfreeT guardM
+{-# INLINE guardT #-}
+
 
 -------------------------------------------------------------------------------
 
