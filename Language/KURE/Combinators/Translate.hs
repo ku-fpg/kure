@@ -159,8 +159,8 @@ guardT = contextfreeT guardM
 {-# INLINE guardT #-}
 
 -- | trace output of the value being rewritten; use for debugging only.
-debugR :: (Monad m, Show a) => String -> Int -> Rewrite c m a
-debugR msg n = acceptR (\ a -> trace (msg ++ " : " ++ take n (show a)) True)
+debugR :: (Monad m, Show a) => Int -> String -> Rewrite c m a
+debugR n msg = acceptR (\ a -> trace (msg ++ " : " ++ take n (show a)) True)
 
 -------------------------------------------------------------------------------
 
