@@ -30,6 +30,7 @@ module Language.KURE.Combinators.Translate
         , accepterR
         , changedR
         , sideEffectR
+        , debugR
           -- * Monad Transformers
           -- ** anyR Support
           -- $AnyR_doc
@@ -50,6 +51,8 @@ import Control.Monad (liftM)
 
 import Data.Foldable
 import Data.Traversable
+
+import Debug.Trace
 
 import Language.KURE.Combinators.Arrow
 import Language.KURE.Combinators.Monad
@@ -145,14 +148,19 @@ catchesT :: MonadCatch m => [Translate c m a b] -> Translate c m a b
 catchesT = foldr (<+) (fail "catchesT failed")
 {-# INLINE catchesT #-}
 
+-- | Joins a monadic returned value.
 joinT :: (Monad m) => Translate c m (m a) a
 joinT = contextfreeT id
 {-# INLINE joinT #-}
 
+-- | Fails if passed a False, identity if passed True.
 guardT :: (Monad m) => Translate c m Bool ()
 guardT = contextfreeT guardM
 {-# INLINE guardT #-}
 
+-- | trace output of the value being rewritten; use for debugging only.
+debugR :: (Monad m, Show a) => String -> Int -> Rewrite c m a
+debugR msg n = acceptR (\ a -> trace (msg ++ " : " ++ take n (show a)) True)
 
 -------------------------------------------------------------------------------
 
