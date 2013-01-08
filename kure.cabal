@@ -42,6 +42,7 @@ Library
        Language.KURE.Combinators.Arrow
        Language.KURE.Combinators.Monad
        Language.KURE.Combinators.Translate
+       Language.KURE.Debug
        Language.KURE.Injection
        Language.KURE.Lens
        Language.KURE.MonadCatch

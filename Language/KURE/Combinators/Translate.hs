@@ -30,7 +30,6 @@ module Language.KURE.Combinators.Translate
         , accepterR
         , changedR
         , sideEffectR
-        , debugR
           -- * Monad Transformers
           -- ** anyR Support
           -- $AnyR_doc
@@ -51,8 +50,6 @@ import Control.Monad (liftM)
 
 import Data.Foldable
 import Data.Traversable
-
-import Debug.Trace
 
 import Language.KURE.Combinators.Arrow
 import Language.KURE.Combinators.Monad
@@ -157,10 +154,6 @@ joinT = contextfreeT id
 guardT :: (Monad m) => Translate c m Bool ()
 guardT = contextfreeT guardM
 {-# INLINE guardT #-}
-
--- | trace output of the value being rewritten; use for debugging only.
-debugR :: (Monad m, Show a) => Int -> String -> Rewrite c m a
-debugR n msg = acceptR (\ a -> trace (msg ++ " : " ++ take n (show a)) True)
 
 -------------------------------------------------------------------------------
 
