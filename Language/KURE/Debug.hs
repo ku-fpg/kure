@@ -13,8 +13,6 @@ module Language.KURE.Debug (
         debugR
 ) where
 
-import Prelude hiding (id, map, foldr, mapM)
-
 import Debug.Trace
 
 import Language.KURE.Combinators.Translate

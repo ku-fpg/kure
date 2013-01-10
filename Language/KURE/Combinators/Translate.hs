@@ -145,13 +145,13 @@ catchesT :: MonadCatch m => [Translate c m a b] -> Translate c m a b
 catchesT = foldr (<+) (fail "catchesT failed")
 {-# INLINE catchesT #-}
 
--- | Joins a monadic returned value.
-joinT :: (Monad m) => Translate c m (m a) a
+-- | An identity translation that resembles a monadic 'join'.
+joinT :: Translate c m (m a) a
 joinT = contextfreeT id
 {-# INLINE joinT #-}
 
--- | Fails if passed a False, identity if passed True.
-guardT :: (Monad m) => Translate c m Bool ()
+-- | Fail if the Boolean is False, succeed if the Boolean is True.
+guardT :: Monad m => Translate c m Bool ()
 guardT = contextfreeT guardM
 {-# INLINE guardT #-}
 
