@@ -14,9 +14,11 @@ data Context = Context AbsolutePath [(Name,Expr)] -- A list of bindings.
                                                   -- We assume no shadowing in the language.
 
 instance PathContext Context where
-  absPath (Context p _) = p
+-- absPath :: Context -> AbsolutePath
+   absPath (Context p _) = p
 
-  (Context p defs) @@ n = Context (extendAbsPath n p) defs
+-- (@@) :: Context -> Int -> Context
+   (Context p defs) @@ n = Context (p @@ n) defs
 
 addDef :: Name -> Expr -> Context -> Context
 addDef v e (Context p defs) = Context p ((v,e):defs)
@@ -29,7 +31,7 @@ initialContext :: Context
 initialContext = Context rootAbsPath []
 
 lookupDef :: Monad m => Name -> Context -> m Expr
-lookupDef v (Context _ defs) = maybe (fail $ v ++ " not found in context") return $ lookup v defs
+lookupDef v (Context _ defs) = maybe (fail $ v ++ " not found in context") return (lookup v defs)
 
 ---------------------------------------------------------------------------
 
