@@ -15,7 +15,7 @@ License:             BSD3
 License-file:        LICENSE
 Author:              Neil Sculthorpe and Andy Gill
 Maintainer:          Neil Sculthorpe <neil@ittc.ku.edu>
-Copyright:           (c) 2012 The University of Kansas
+Copyright:           (c) 2012--2013 The University of Kansas
 Homepage:            http://www.ittc.ku.edu/csdl/fpg/Tools/KURE
 Stability:	     beta
 build-type: 	     Simple

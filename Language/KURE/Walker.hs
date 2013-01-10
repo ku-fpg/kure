@@ -2,7 +2,7 @@
 
 -- |
 -- Module: Language.KURE.Walker
--- Copyright: (c) 2012 The University of Kansas
+-- Copyright: (c) 2012--2013 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
