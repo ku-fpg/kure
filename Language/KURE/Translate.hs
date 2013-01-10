@@ -46,7 +46,7 @@ import Language.KURE.MonadCatch
 newtype Translate c m a b = Translate { -- | Apply a 'Translate' to a value and its context.
                                         apply :: c -> a -> m b}
 
--- | The primitive  way of building a 'Translate'.
+-- | The primitive way of building a 'Translate'.
 translate :: (c -> a -> m b) -> Translate c m a b
 translate = Translate
 {-# INLINE translate #-}
