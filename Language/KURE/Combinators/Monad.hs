@@ -13,6 +13,7 @@ module Language.KURE.Combinators.Monad
            ( -- * Monadic Conditionals
              guardMsg
            , guardM
+           , guardMsgM
            , ifM
            , whenM
            , unlessM
@@ -31,6 +32,12 @@ guardMsg b msg = unless b (fail msg)
 guardM ::  Monad m => Bool -> m ()
 guardM b = guardMsg b "guardM failed"
 {-# INLINE guardM #-}
+
+-- | As 'guardMsg', but with an @m Bool@ as argument.
+guardMsgM :: Monad m => m Bool -> String -> m ()
+guardMsgM mb msg = do b <- mb
+                      guardMsg b msg
+{-# INLINE guardMsgM #-}
 
 -- | if-then-else lifted over a monadic predicate.
 ifM ::  Monad m => m Bool -> m a -> m a -> m a
