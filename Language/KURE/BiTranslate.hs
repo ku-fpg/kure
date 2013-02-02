@@ -7,7 +7,7 @@
 -- Stability: beta
 -- Portability: ghc
 --
--- A bi-directional translation is a tranlsation that can be applied in either direction.
+-- A bi-directional translation is a translation that can be applied in either direction.
 
 module Language.KURE.BiTranslate
        (  -- * Bi-directional Translations
