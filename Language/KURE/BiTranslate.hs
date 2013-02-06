@@ -17,7 +17,8 @@ module Language.KURE.BiTranslate
         , forewardT
         , backwardT
         , whicheverR
-        , invert
+        , invertBiT
+        , beforeBiR
 ) where
 
 import Prelude hiding (id, (.))
@@ -49,9 +50,9 @@ whicheverR r = forewardT r <+ backwardT r
 {-# INLINE whicheverR #-}
 
 -- | Invert the forewards and backwards directions of a 'BiTranslate'.
-invert :: BiTranslate c m a b -> BiTranslate c m b a
-invert (BiTranslate t1 t2) = BiTranslate t2 t1
-{-# INLINE invert #-}
+invertBiT :: BiTranslate c m a b -> BiTranslate c m b a
+invertBiT (BiTranslate t1 t2) = BiTranslate t2 t1
+{-# INLINE invertBiT #-}
 
 instance Monad m => Category (BiTranslate c m) where
 -- id :: BiTranslate c m a a
@@ -61,5 +62,11 @@ instance Monad m => Category (BiTranslate c m) where
 -- (.) :: BiTranslate c m b d -> BiTranslate c m a b -> BiTranslate c m a d
    (BiTranslate f1 b1) . (BiTranslate f2 b2) = BiTranslate (f1 . f2) (b2 . b1)
    {-# INLINE (.) #-}
+
+
+-- | Perform the argument translation before /either/ direction of the bidirectional rewrite.
+beforeBiR :: Monad m => Translate c m a b -> (b -> BiRewrite c m a) -> BiRewrite c m a
+beforeBiR t f = bidirectional (t >>= (forewardT . f)) (t >>= (backwardT . f))
+{-# INLINE beforeBiR #-}
 
 ------------------------------------------------------------------------------------------
