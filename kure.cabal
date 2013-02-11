@@ -1,14 +1,19 @@
 Name:                kure
-Version:             2.6.19
+Version:             2.6.20
 Synopsis:            Combinators for Strategic Programming
-Description:	     The Kansas University Rewrite Engine (KURE) is a DSL for strategic rewriting.
+Description:	     The Kansas University Rewrite Engine (KURE) is a domain-specific language for strategic rewriting.
 	 	     KURE shares concepts with Stratego, but unlike Stratego, KURE is strongly typed.
 		     KURE is similar to StrategyLib, but has a lightweight generic traversal mechanism
-                     rather than using SYB.
+                     rather than using Scrap Your Boilerplate.
+
                      The basic transformation functionality can be found in "Language.KURE.Translate",
                      and the traversal functionality can be found in "Language.KURE.Walker".
                      Several basic examples of using KURE are provided in the source-code bundle.
-                     For a larger example, see the HERMIT package.
+                     For larger examples, see the HERMIT or HTML-KURE packages.
+
+                     You can read about KURE in the following article:
+
+                     "KURE: A Haskell-Embedded Strategic Programming Language with Custom Closed Universes".  Neil Sculthorpe and Nicolas Frisby and Andy Gill.  2013.
 
 Category:            Language
 License:             BSD3
@@ -16,7 +21,7 @@ License-file:        LICENSE
 Author:              Neil Sculthorpe and Andy Gill
 Maintainer:          Neil Sculthorpe <neil@ittc.ku.edu>
 Copyright:           (c) 2012--2013 The University of Kansas
-Homepage:            http://www.ittc.ku.edu/csdl/fpg/Tools/KURE
+Homepage:            http://www.ittc.ku.edu/csdl/fpg/software/kure.html
 Stability:	     beta
 build-type: 	     Simple
 Cabal-Version:       >= 1.6
