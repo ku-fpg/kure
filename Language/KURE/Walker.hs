@@ -95,6 +95,7 @@ import Prelude hiding (id)
 import Data.Maybe (isJust)
 import Data.Monoid
 import Data.List
+import Data.DList (singleton, toList)
 
 import Control.Monad
 import Control.Arrow
@@ -222,12 +223,12 @@ crushbuT t = foldbuT (mtryM t)
 
 -- | An always successful traversal that collects the results of all successful applications of a 'Translate' in a list.
 collectT :: (Walker c g, MonadCatch m) => Translate c m g b -> Translate c m g [b]
-collectT t = crushtdT (t >>^ return)
+collectT t = crushtdT (t >>^ singleton) >>^ toList
 {-# INLINE collectT #-}
 
 -- | Like 'collectT', but does not traverse below successes.
 collectPruneT :: (Walker c g, MonadCatch m) => Translate c m g b -> Translate c m g [b]
-collectPruneT t = prunetdT (t >>^ return)
+collectPruneT t = prunetdT (t >>^ singleton) >>^ toList
 {-# INLINE collectPruneT #-}
 
 -------------------------------------------------------------------------------

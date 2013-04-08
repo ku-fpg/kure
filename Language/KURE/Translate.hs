@@ -166,6 +166,10 @@ instance Monad m => Arrow (Translate c m) where
    first t = translate $ \ c (a,z) -> liftM (\ b -> (b,z)) (apply t c a)
    {-# INLINE first #-}
 
+-- second :: Translate c m a b -> Translate c m (z,a) (z,b)
+   second t = translate $ \ c (z,a) -> liftM (\ b -> (z,b)) (apply t c a)
+   {-# INLINE second #-}
+
 -- (***) :: Translate c m a1 b1 -> Translate c m a2 b2 -> Translate c m (a1,a2) (b1,b2)
    t1 *** t2 = translate $ \ c (a,b) -> liftM2 (,) (apply t1 c a) (apply t2 c b)
    {-# INLINE (***) #-}

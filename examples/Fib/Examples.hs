@@ -13,7 +13,7 @@ type RewriteA = TranslateA Arith
 
 -----------------------------------------------------------------------
 
-applyFib :: RewriteA -> Arith -> Either String Arith
+applyFib :: TranslateA b -> Arith -> Either String b
 applyFib r = runKureM Right Left . apply r rootAbsPath
 
 -----------------------------------------------------------------------

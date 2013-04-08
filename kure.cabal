@@ -1,5 +1,5 @@
 Name:                kure
-Version:             2.6.20
+Version:             2.6.21
 Synopsis:            Combinators for Strategic Programming
 Description:	     The Kansas University Rewrite Engine (KURE) is a domain-specific language for strategic rewriting.
 	 	     KURE shares concepts with Stratego, but unlike Stratego, KURE is strongly typed.
@@ -38,7 +38,8 @@ Extra-Source-Files:
     examples/Expr/Examples.hs
 
 Library
-  Build-Depends: base >= 4.5 && < 5
+  Build-Depends: base >= 4.5 && < 5,
+                 dlist >= 0.2 && < 1
   Ghc-Options: -Wall
   Exposed-modules:
        Language.KURE
