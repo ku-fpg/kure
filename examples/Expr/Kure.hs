@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts #-}
 
 module Expr.Kure where
 
@@ -7,31 +7,7 @@ import Control.Monad
 import Language.KURE
 
 import Expr.AST
-
----------------------------------------------------------------------------
-
-data Context = Context AbsolutePath [(Name,Expr)] -- A list of bindings.
-                                                  -- We assume no shadowing in the language.
-
-instance PathContext Context where
--- absPath :: Context -> AbsolutePath
-   absPath (Context p _) = p
-
--- (@@) :: Context -> Int -> Context
-   (Context p defs) @@ n = Context (p @@ n) defs
-
-addDef :: Name -> Expr -> Context -> Context
-addDef v e (Context p defs) = Context p ((v,e):defs)
-
-updateContextCmd :: Cmd -> Context -> Context
-updateContextCmd (Seq c1 c2)  = updateContextCmd c2 . updateContextCmd c1
-updateContextCmd (Assign v e) = (addDef v e)
-
-initialContext :: Context
-initialContext = Context rootAbsPath []
-
-lookupDef :: Monad m => Name -> Context -> m Expr
-lookupDef v (Context _ defs) = maybe (fail $ v ++ " not found in context") return (lookup v defs)
+import Expr.Context
 
 ---------------------------------------------------------------------------
 
@@ -88,42 +64,42 @@ seqOneR r1 r2 = unwrapOneR $ seqAllR (wrapOneR r1) (wrapOneR r2)
 
 ---------------------------------------------------------------------------
 
-assignT :: Monad m => Translate Context m Expr a -> (Name -> a -> b) -> Translate Context m Cmd b
+assignT :: (ExtendPath c Int, Monad m) => Translate c m Expr a -> (Name -> a -> b) -> Translate c m Cmd b
 assignT t f = translate $ \ c cm -> case cm of
                                       Assign n e -> f n <$> apply t (c @@ 0) e
                                       _          -> fail "not an Assign"
 
-assignR :: Monad m => Rewrite Context m Expr -> Rewrite Context m Cmd
+assignR :: (ExtendPath c Int, Monad m) => Rewrite c m Expr -> Rewrite c m Cmd
 assignR r = assignT r Assign
 
 ---------------------------------------------------------------------------
 
-varT :: Monad m => (Name -> b) -> Translate Context m Expr b
+varT :: Monad m => (Name -> b) -> Translate c m Expr b
 varT f = contextfreeT $ \ e -> case e of
                                  Var v -> return (f v)
                                  _     -> fail "not a Var"
 
 ---------------------------------------------------------------------------
 
-litT :: Monad m => (Int -> b) -> Translate Context m Expr b
+litT :: Monad m => (Int -> b) -> Translate c m Expr b
 litT f = contextfreeT $ \ e -> case e of
                                  Lit v -> return (f v)
                                  _     -> fail "not a Lit"
 
 ---------------------------------------------------------------------------
 
-addT :: Monad m => Translate Context m Expr a1 -> Translate Context m Expr a2 -> (a1 -> a2 -> b) -> Translate Context m Expr b
+addT :: (ExtendPath c Int, Monad m) => Translate c m Expr a1 -> Translate c m Expr a2 -> (a1 -> a2 -> b) -> Translate c m Expr b
 addT t1 t2 f = translate $ \ c e -> case e of
                                       Add e1 e2 -> f <$> apply t1 (c @@ 0) e1 <*> apply t2 (c @@ 1) e2
                                       _         -> fail "not an Add"
 
-addAllR :: Monad m => Rewrite Context m Expr -> Rewrite Context m Expr -> Rewrite Context m Expr
+addAllR :: (ExtendPath c Int, Monad m) => Rewrite c m Expr -> Rewrite c m Expr -> Rewrite c m Expr
 addAllR r1 r2 = addT r1 r2 Add
 
-addAnyR :: MonadCatch m => Rewrite Context m Expr -> Rewrite Context m Expr -> Rewrite Context m Expr
+addAnyR :: (ExtendPath c Int, MonadCatch m) => Rewrite c m Expr -> Rewrite c m Expr -> Rewrite c m Expr
 addAnyR r1 r2 = unwrapAnyR $ addAllR (wrapAnyR r1) (wrapAnyR r2)
 
-addOneR :: MonadCatch m => Rewrite Context m Expr -> Rewrite Context m Expr -> Rewrite Context m Expr
+addOneR :: (ExtendPath c Int, MonadCatch m) => Rewrite c m Expr -> Rewrite c m Expr -> Rewrite c m Expr
 addOneR r1 r2 = unwrapOneR $ addAllR (wrapOneR r1) (wrapOneR r2)
 
 ---------------------------------------------------------------------------

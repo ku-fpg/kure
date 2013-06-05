@@ -3,6 +3,7 @@ module Expr.Examples where
 import Language.KURE
 
 import Expr.AST
+import Expr.Context
 import Expr.Kure
 
 -----------------------------------------------------------------

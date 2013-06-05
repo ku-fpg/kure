@@ -17,10 +17,12 @@ module Language.KURE
         , module Language.KURE.Combinators
         , module Language.KURE.MonadCatch
         , module Language.KURE.Injection
+        , module Language.KURE.Path
 ) where
 
 import Language.KURE.Combinators
 import Language.KURE.MonadCatch
 import Language.KURE.Translate
 import Language.KURE.Injection
+import Language.KURE.Path
 import Language.KURE.Walker

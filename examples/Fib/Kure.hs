@@ -1,23 +1,28 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, UndecidableInstances #-}
 
-module Fib.Kure where
+module Fib.Kure (Crumb(..)) where
+
+import Prelude hiding (Left, Right)
 
 import Language.KURE
+
 import Fib.AST
 
 import Control.Monad(liftM, ap)
 
 --------------------------------------------------------------------------------------
 
-instance Walker AbsolutePath Arith where
--- allR :: MonadCatch m => Rewrite AbsolutePath m Arith -> Rewrite AbsolutePath m Arith
+data Crumb = LeftChild | RightChild | OnlyChild deriving (Eq,Show)
+
+instance ExtendPath c Crumb => Walker c Arith where
+-- allR :: (ExtendPath c Crumb, MonadCatch m) => Rewrite c m Arith -> Rewrite c m Arith
    allR r = prefixFailMsg "allR failed: " $
      rewrite $ \ c e ->
          case e of
            Lit n      ->  Lit <$> return n
-           Add e0 e1  ->  Add <$> apply r (c @@ 0) e0 <*> apply r (c @@ 1) e1
-           Sub e0 e1  ->  Sub <$> apply r (c @@ 0) e0 <*> apply r (c @@ 1) e1
-           Fib e0     ->  Fib <$> apply r (c @@ 0) e0
+           Add e0 e1  ->  Add <$> apply r (c @@ LeftChild) e0 <*> apply r (c @@ RightChild) e1
+           Sub e0 e1  ->  Sub <$> apply r (c @@ LeftChild) e0 <*> apply r (c @@ RightChild) e1
+           Fib e0     ->  Fib <$> apply r (c @@ OnlyChild) e0
 
 --------------------------------------------------------------------------------------
 

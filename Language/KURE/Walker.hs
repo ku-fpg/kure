@@ -60,15 +60,7 @@ module Language.KURE.Walker
         , summandIsTypeT
 
         -- * Paths
-        -- ** Absolute Paths
-        , AbsolutePath
-        , rootAbsPath
-        , PathContext(..)
-        , absPathT
-        -- ** Relative Paths
-        , Path
-        , rootPath
-        , rootPathT
+        -- ** Path-based Translations
         , pathsToT
         , onePathToT
         , oneNonEmptyPathToT
@@ -106,6 +98,7 @@ import Language.KURE.Translate
 import Language.KURE.Lens
 import Language.KURE.Injection
 import Language.KURE.Combinators
+import Language.KURE.Path
 
 -------------------------------------------------------------------------------
 
@@ -144,7 +137,7 @@ class Walker c g where
   {-# INLINE oneR #-}
 
   -- | Construct a 'Lens' to the n-th child node.
-  childL :: MonadCatch m => Int -> Lens c m g g
+  childL :: (ReadPath c crumb, Eq crumb, MonadCatch m) => crumb -> Lens c m g g
   childL = childL_default
   {-# INLINE childL #-}
 
@@ -152,25 +145,24 @@ class Walker c g where
 
 -- | Count the number of children of the current node.
 numChildrenT :: (Walker c g, MonadCatch m) => Translate c m g Int
-numChildrenT = getSum `liftM` allT (return $ Sum 1)
+numChildrenT = allT (return $ Sum 1) >>^ getSum
 {-# INLINE numChildrenT #-}
 
--- | Determine if the current node has a child of the specified number.
+-- | Determine if the current node has a child matching the specified crumb.
 --   Useful when defining custom versions of 'childL'.
-hasChildT :: (Walker c g, MonadCatch m) => Int -> Translate c m g Bool
-hasChildT n = do c <- numChildrenT
-                 return (n >= 0 && n < c)
+hasChildT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => crumb -> Translate c m g Bool
+hasChildT cr = allT (lastCrumbT >>^ \ cr' -> Any (if cr == cr' then True else False)) >>^ getAny
 {-# INLINE hasChildT #-}
 
 -------------------------------------------------------------------------------
 
 -- | Apply a 'Translate' to a specified child.
-childT :: (Walker c g, MonadCatch m) => Int -> Translate c m g b -> Translate c m g b
+childT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => crumb -> Translate c m g b -> Translate c m g b
 childT n = focusT (childL n)
 {-# INLINE childT #-}
 
 -- | Apply a 'Rewrite' to a specified child.
-childR :: (Walker c g, MonadCatch m) => Int -> Rewrite c m g -> Rewrite c m g
+childR :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => crumb -> Rewrite c m g -> Rewrite c m g
 childR n = focusR (childL n)
 {-# INLINE childR #-}
 
@@ -307,97 +299,44 @@ innermostR r = setFailMsg "innermostR failed" $
 
 -------------------------------------------------------------------------------
 
--- | A path from the root.
-newtype AbsolutePath = AbsolutePath [Int] deriving Eq
-
-instance Show AbsolutePath where
-  show (AbsolutePath p) = show (reverse p)
-  {-# INLINE show #-}
-
--- | The (empty) 'AbsolutePath' to the root.
-rootAbsPath :: AbsolutePath
-rootAbsPath = AbsolutePath []
-{-# INLINE rootAbsPath #-}
-
-
--- | Contexts that are instances of 'PathContext' contain the current 'AbsolutePath'.
---   Any user-defined combinators (typically 'allR' and congruence combinators) should update the 'AbsolutePath' using '@@'.
-class PathContext c where
-  -- | Retrieve the current absolute path.
-  absPath :: c -> AbsolutePath
-
-  -- | Extend the current absolute path by one descent.
-  (@@) :: c -> Int -> c
-
--- | The simplest instance of 'PathContext' is 'AbsolutePath' itself.
-instance PathContext AbsolutePath where
--- absPath :: AbsolutePath -> AbsolutePath
-   absPath = id
-   {-# INLINE absPath #-}
-
--- (@@) :: AbsolutePath -> Int -> AbsolutePath
-   (AbsolutePath ns) @@ n = AbsolutePath (n:ns)
-   {-# INLINE (@@) #-}
-
--- | Lifted version of 'absPath'.
-absPathT :: (PathContext c, Monad m) => Translate c m a AbsolutePath
-absPathT = absPath `liftM` contextT
-{-# INLINE absPathT #-}
-
--------------------------------------------------------------------------------
-
--- | A path is a route to descend the tree from an arbitrary node.
-type Path = [Int]
-
--- | Retrieve the 'Path' from the root to the current node.
-rootPath :: PathContext c => c -> Path
-rootPath c = let AbsolutePath p = absPath c
-              in reverse p
-{-# INLINE rootPath #-}
-
--- | Lifted version of 'rootPath'.
-rootPathT :: (PathContext c, Monad m) => Translate c m a Path
-rootPathT = rootPath `liftM` contextT
-{-# INLINE rootPathT #-}
-
 --  Provided the first 'AbsolutePath' is a prefix of the second 'AbsolutePath',
 --  computes the 'Path' from the end of the first to the end of the second.
-rmPathPrefix :: AbsolutePath -> AbsolutePath -> Maybe Path
-rmPathPrefix (AbsolutePath p1) (AbsolutePath p2) = do guard (p1 `isSuffixOf` p2)
-                                                      return $ drop (length p1) (reverse p2)
+rmPathPrefix :: Eq crumb => AbsolutePath crumb -> AbsolutePath crumb -> Maybe (Path crumb)
+rmPathPrefix (SnocPath p1) (SnocPath p2) = do guard (p1 `isSuffixOf` p2)
+                                              return $ drop (length p1) (reverse p2)
 {-# INLINE rmPathPrefix #-}
 
 --  Construct a 'Path' from the current node to the end of the given 'AbsolutePath', provided that 'AbsolutePath' passes through the current node.
-abs2pathT :: (PathContext c, Monad m) => AbsolutePath -> Translate c m a Path
+abs2pathT :: (ReadPath c crumb, Eq crumb, Monad m) => AbsolutePath crumb -> Translate c m a (Path crumb)
 abs2pathT there = do here <- absPathT
                      maybe (fail "Absolute path does not pass through current node.") return (rmPathPrefix here there)
 {-# INLINE abs2pathT #-}
 
 -- | Find the 'Path's to every node that satisfies the predicate.
-pathsToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g [Path]
+pathsToT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g [Path crumb]
 pathsToT q = collectT (acceptR q >>> absPathT) >>= mapM abs2pathT
 {-# INLINE pathsToT #-}
 
 -- | Find the 'Path' to the first node that satisfies the predicate (in a pre-order traversal).
-onePathToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g Path
+onePathToT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g (Path crumb)
 onePathToT q = setFailMsg "No matching nodes found." $
                onetdT (acceptR q >>> absPathT) >>= abs2pathT
 {-# INLINE onePathToT #-}
 
 -- | Find the 'Path' to the first descendent node that satisfies the predicate (in a pre-order traversal).
-oneNonEmptyPathToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g Path
+oneNonEmptyPathToT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g (Path crumb)
 oneNonEmptyPathToT q = setFailMsg "No matching nodes found." $
                        do start <- absPathT
                           onetdT (acceptR q >>> absPathT >>> acceptR (/= start)) >>= abs2pathT
 {-# INLINE oneNonEmptyPathToT #-}
 
 -- | Find the 'Path's to every node that satisfies the predicate, ignoring nodes below successes.
-prunePathsToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g [Path]
+prunePathsToT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g [Path crumb]
 prunePathsToT q = collectPruneT (acceptR q >>> absPathT) >>= mapM abs2pathT
 {-# INLINE prunePathsToT #-}
 
 -- local function used by uniquePathToT and uniquePrunePathToT
-requireUniquePath :: Monad m => Translate c m [Path] Path
+requireUniquePath :: Monad m => Translate c m [Path crumb] (Path crumb)
 requireUniquePath = contextfreeT $ \ ps -> case ps of
                                              []  -> fail "No matching nodes found."
                                              [p] -> return p
@@ -405,12 +344,12 @@ requireUniquePath = contextfreeT $ \ ps -> case ps of
 {-# INLINE requireUniquePath #-}
 
 -- | Find the 'Path' to the node that satisfies the predicate, failing if that does not uniquely identify a node.
-uniquePathToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g Path
+uniquePathToT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g (Path crumb)
 uniquePathToT q = pathsToT q >>> requireUniquePath
 {-# INLINE uniquePathToT #-}
 
 -- | Build a 'Path' to the node that satisfies the predicate, failing if that does not uniquely identify a node (ignoring nodes below successes).
-uniquePrunePathToT :: (PathContext c, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g Path
+uniquePrunePathToT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g (Path crumb)
 uniquePrunePathToT q = prunePathsToT q >>> requireUniquePath
 {-# INLINE uniquePrunePathToT #-}
 
@@ -421,42 +360,42 @@ tryL l = l `catchL` (\ _ -> id)
 {-# INLINE tryL #-}
 
 -- | Construct a 'Lens' by following a 'Path'.
-pathL :: (Walker c g, MonadCatch m) => Path -> Lens c m g g
+pathL :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Lens c m g g
 pathL = serialise . map childL
 {-# INLINE pathL #-}
 
 -- | Construct a 'Lens' that points to the last node at which the 'Path' can be followed.
-exhaustPathL :: (Walker c g, MonadCatch m) => Path -> Lens c m g g
+exhaustPathL :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Lens c m g g
 exhaustPathL = foldr (\ n l -> tryL (childL n >>> l)) id
 {-# INLINE exhaustPathL #-}
 
 -- | Repeat as many iterations of the 'Path' as possible.
-repeatPathL :: (Walker c g, MonadCatch m) => Path -> Lens c m g g
+repeatPathL :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Lens c m g g
 repeatPathL p = let go = tryL (pathL p >>> go)
                  in go
 {-# INLINE repeatPathL #-}
 
 -- | Build a 'Lens' from the root to a point specified by an 'AbsolutePath'.
-rootL :: (Walker c g, MonadCatch m) => AbsolutePath -> Lens c m g g
-rootL = pathL . rootPath
+rootL :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => AbsolutePath crumb -> Lens c m g g
+rootL = pathL . snocPathToPath
 {-# INLINE rootL #-}
 
 -------------------------------------------------------------------------------
 
 -- | Apply a 'Rewrite' at a point specified by a 'Path'.
-pathR :: (Walker c g, MonadCatch m) => Path -> Rewrite c m g -> Rewrite c m g
+pathR :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Rewrite c m g -> Rewrite c m g
 pathR = focusR . pathL
 {-# INLINE pathR #-}
 
 -- | Apply a 'Translate' at a point specified by a 'Path'.
-pathT :: (Walker c g, MonadCatch m) => Path -> Translate c m g b -> Translate c m g b
+pathT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Translate c m g b -> Translate c m g b
 pathT = focusT . pathL
 {-# INLINE pathT #-}
 
 -------------------------------------------------------------------------------
 
 -- | Check if it is possible to construct a 'Lens' along this path from the current node.
-testPathT :: (Walker c g, MonadCatch m) => Path -> Translate c m g Bool
+testPathT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Translate c m g Bool
 testPathT = testLensT . pathL
 {-# INLINE testPathT #-}
 
@@ -604,128 +543,85 @@ unwrapOneT = resultT (checkSuccessPMaybe "oneT failed" . liftM pSnd . ($ Nothing
 
 -------------------------------------------------------------------------------
 
-data PInt a = PInt {-# UNPACK #-} !Int a
-
-secondPInt :: (a -> b) -> PInt a -> PInt b
-secondPInt f = \ (PInt i a) -> PInt i (f a)
-{-# INLINE secondPInt #-}
-
--------------------------------------------------------------------------------
-
--- This is hideous.
--- Admittedly, part of the problem is using MonadCatch.  If allR just used Monad, this (and other things) would be much simpler.
+-- If allR just used Monad (rather than MonadCatch), this (and other things) would be simpler.
 -- And currently, the only use of MonadCatch is that it allows the error message to be modified.
 
 -- Failure should not occur, so it doesn't really matter where the KureM monad sits in the GetChild stack.
 -- I've arbitrarily made it a local failure.
 
-newtype GetChild c g a = GetChild (Int -> PInt (KureM a, Maybe (c,g)))
+data GetChild c g a = GetChild (KureM a) (Maybe (c,g))
 
-unGetChild :: GetChild c g a -> Int -> PInt (KureM a, Maybe (c,g))
-unGetChild (GetChild f) = f
-{-# INLINE unGetChild #-}
+getChildSecond :: (Maybe (c,g) -> Maybe (c,g)) -> GetChild c g a -> GetChild c g a
+getChildSecond f (GetChild ka mcg) = GetChild ka (f mcg)
+{-# INLINE getChildSecond #-}
 
 instance Monad (GetChild c g) where
 -- return :: a -> GetChild c g a
-   return a = GetChild $ \ i -> PInt i (return a, Nothing)
+   return a = GetChild (return a) Nothing
    {-# INLINE return #-}
 
 -- fail :: String -> GetChild c g a
-   fail msg = GetChild $ \ i -> PInt i (fail msg, Nothing)
+   fail msg = GetChild (fail msg) Nothing
    {-# INLINE fail #-}
 
 -- (>>=) :: GetChild c g a -> (a -> GetChild c g b) -> GetChild c g b
-   ma >>= f = GetChild $ \ i0 -> let PInt i1 (kma, mcg) = unGetChild ma i0
-                                  in runKureM (\ a   -> (secondPInt.second) (mplus mcg) $ unGetChild (f a) i1)
-                                              (\ msg -> PInt i1 (fail msg, mcg))
-                                              kma
+   (GetChild kma mcg) >>= k = runKureM (\ a   -> getChildSecond (mplus mcg) (k a))
+                                       (\ msg -> GetChild (fail msg) mcg)
+                                       kma
    {-# INLINE (>>=) #-}
 
 instance MonadCatch (GetChild c g) where
 -- catchM :: GetChild c g a -> (String -> GetChild c g a) -> GetChild c g a
-   ma `catchM` f = GetChild $ \ i0 -> let p@(PInt i1 (kma, mcg)) = unGetChild ma i0
-                                       in runKureM (\ _   -> p)
-                                                   (\ msg -> (secondPInt.second) (mplus mcg) $ unGetChild (f msg) i1)
-                                                   kma
+   gc@(GetChild kma mcg) `catchM` k = runKureM (\ _   -> gc)
+                                               (\ msg -> getChildSecond (mplus mcg) (k msg))
+                                               kma
    {-# INLINE catchM #-}
 
 
-wrapGetChild :: Int -> Rewrite c (GetChild c g) g
-wrapGetChild n = rewrite $ \ c a -> GetChild $ \ m -> PInt (m + 1)
-                                                           (return a, if n == m then Just (c, a) else Nothing)
+wrapGetChild :: (ReadPath c crumb, Eq crumb) => crumb -> Rewrite c (GetChild c g) g
+wrapGetChild cr = do cr' <- lastCrumbT
+                     rewrite $ \ c a -> GetChild (return a) (if cr == cr' then Just (c, a) else Nothing)
 {-# INLINE wrapGetChild #-}
 
 unwrapGetChild :: Rewrite c (GetChild c g) g -> Translate c Maybe g (c,g)
-unwrapGetChild r = translate $ \ c a -> let PInt _ (_,mcg) = unGetChild (apply r c a) 0
-                                         in mcg
+unwrapGetChild = resultT (\ (GetChild _ mcg) -> mcg)
 {-# INLINE unwrapGetChild #-}
 
-getChild :: Walker c g => Int -> Translate c Maybe g (c, g)
+getChild :: (ReadPath c crumb, Eq crumb, Walker c g) => crumb -> Translate c Maybe g (c, g)
 getChild = unwrapGetChild . allR . wrapGetChild
 {-# INLINE getChild #-}
 
 -------------------------------------------------------------------------------
 
-newtype SetChild a = SetChild (Int -> PInt (KureM a))
+type SetChild = KureM
 
-unSetChild :: SetChild a -> Int -> PInt (KureM a)
-unSetChild (SetChild f) = f
-{-# INLINE unSetChild #-}
-
-instance Monad SetChild where
--- return :: a -> SetChild c g a
-   return a = SetChild $ \ i -> PInt i (return a)
-   {-# INLINE return #-}
-
--- fail :: String -> SetChild c g a
-   fail msg = SetChild $ \ i -> PInt i (fail msg)
-   {-# INLINE fail #-}
-
--- (>>=) :: SetChild c g a -> (a -> SetChild c g b) -> SetChild c g b
-   ma >>= f = SetChild $ \ i0 -> let PInt i1 ka = unSetChild ma i0
-                                  in runKureM (\ a   -> unSetChild (f a) i1)
-                                              (\ msg -> PInt i1 (fail msg))
-                                              ka
-   {-# INLINE (>>=) #-}
-
-instance MonadCatch SetChild where
--- catchM :: SetChild c g a -> (String -> SetChild c g a) -> SetChild c g a
-   ma `catchM` f = SetChild $ \ i0 -> let PInt i1 ka = unSetChild ma i0
-                                       in runKureM (\ _   -> PInt i1 ka)
-                                                   (\ msg -> unSetChild (f msg) i1)
-                                                   ka
-   {-# INLINE catchM #-}
-
-
-wrapSetChild :: Int -> g -> Rewrite c SetChild g
-wrapSetChild n g = contextfreeT $ \ a -> SetChild $ \ m -> PInt (m + 1)
-                                                                (return $ if n == m then g else a)
+wrapSetChild :: (ReadPath c crumb, Eq crumb) => crumb -> g -> Rewrite c SetChild g
+wrapSetChild cr g = do cr' <- lastCrumbT
+                       if cr == cr' then return g else idR
 {-# INLINE wrapSetChild #-}
 
 unwrapSetChild :: Monad m => Rewrite c SetChild g -> Rewrite c m g
-unwrapSetChild r = rewrite $ \ c a -> let PInt _ ka = unSetChild (apply r c a) 0
-                                       in runKureM return fail ka
+unwrapSetChild = resultT (runKureM return fail)
 {-# INLINE unwrapSetChild #-}
 
-setChild :: (Walker c g, Monad m) => Int -> g -> Rewrite c m g
-setChild n = unwrapSetChild . allR . wrapSetChild n
+setChild :: (ReadPath c crumb, Eq crumb, Walker c g, Monad m) => crumb -> g -> Rewrite c m g
+setChild cr = unwrapSetChild . allR . wrapSetChild cr
 {-# INLINE setChild #-}
 
 -------------------------------------------------------------------------------
 
-childL_default :: forall c m g. (Walker c g, MonadCatch m) => Int -> Lens c m g g
-childL_default n = lens $ do cg <- getter
-                             k  <- setter
-                             return (cg, k)
+childL_default :: forall c crumb m g. (ReadPath c crumb, Eq crumb) => (Walker c g, MonadCatch m) => crumb -> Lens c m g g
+childL_default cr = lens $ do cg <- getter
+                              k  <- setter
+                              return (cg, k)
   where
     getter :: Translate c m g (c,g)
-    getter = translate $ \ c a -> maybe (fail $ "there is no child number " ++ show n) return (apply (getChild n) c a)
+    getter = resultT (projectWithFailMsgM "there is no child matching the crumb.") (getChild cr)
     {-# INLINE getter #-}
 
     setter :: Translate c m g (g -> m g)
-    setter = translate $ \ c a -> return (\ b -> apply (setChild n b) c a)
+    setter = translate $ \ c a -> return (\ b -> apply (setChild cr b) c a)
     {-# INLINE setter #-}
-
 {-# INLINE childL_default #-}
 
 -------------------------------------------------------------------------------

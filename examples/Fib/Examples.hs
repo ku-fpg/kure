@@ -1,20 +1,22 @@
 module Fib.Examples where
 
+import Data.Monoid (mempty)
+
 import Language.KURE
 
 import Fib.AST
-import Fib.Kure()
+import Fib.Kure
 
 -----------------------------------------------------------------------
 
 -- | For this simple example, the context is just an 'AbsolutePath', and 'Translate' always operates on 'Arith'.
-type TranslateA b = Translate AbsolutePath KureM Arith b
+type TranslateA b = Translate (AbsolutePath Crumb) KureM Arith b
 type RewriteA = TranslateA Arith
 
 -----------------------------------------------------------------------
 
 applyFib :: TranslateA b -> Arith -> Either String b
-applyFib r = runKureM Right Left . apply r rootAbsPath
+applyFib r = runKureM Right Left . apply r mempty
 
 -----------------------------------------------------------------------
 

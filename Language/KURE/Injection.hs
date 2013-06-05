@@ -72,7 +72,7 @@ projectWithFailMsgM :: (Monad m, Injection a g) => String -> g -> m a
 projectWithFailMsgM msg = maybe (fail msg) return . project
 {-# INLINE projectWithFailMsgM #-}
 
--- | Projects a value and lifts it into a 'MonadCatch', with the possibility of failure.
+-- | Projects a value and lifts it into a 'Monad', with the possibility of failure.
 projectM :: (Monad m, Injection a g) => g -> m a
 projectM = projectWithFailMsgM "projectM failed"
 {-# INLINE projectM #-}

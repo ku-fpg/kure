@@ -4,39 +4,12 @@ import Language.KURE
 
 import Lam.AST
 import Lam.Kure
+import Lam.Context
+import Lam.Monad
 
 import Data.List (nub)
 
-import Control.Applicative
-import Control.Monad
 import Control.Category ((>>>))
-
------------------------------------------------------------------
-
-newtype LamM a = LamM {lamM :: Int -> (Int, Either String a)}
-
-runLamM :: LamM a -> Either String a
-runLamM m = snd (lamM m 0)
-
-instance Monad LamM where
-  return a = LamM (\n -> (n,Right a))
-  (LamM f) >>= gg = LamM $ \ n -> case f n of
-                                    (n', Left msg) -> (n', Left msg)
-                                    (n', Right a)  -> lamM (gg a) n'
-  fail msg = LamM (\ n -> (n, Left msg))
-
-instance MonadCatch LamM where
-
-  (LamM st) `catchM` f = LamM $ \ n -> case st n of
-                                        (n', Left msg) -> lamM (f msg) n'
-                                        (n', Right a)  -> (n', Right a)
-
-instance Functor LamM where
-  fmap = liftM
-
-instance Applicative LamM where
-  pure  = return
-  (<*>) = ap
 
 -------------------------------------------------------------------------------
 
@@ -51,13 +24,13 @@ freshName vs = do v <- suggestName
 
 -------------------------------------------------------------------------------
 
-type RewriteE     = RewriteExp LamM
-type TranslateE b = TranslateExp LamM b
+type TranslateE b = Translate LamC LamM Exp b
+type RewriteE     = TranslateE Exp
 
 -------------------------------------------------------------------------------
 
 applyExp :: TranslateE b -> Exp -> Either String b
-applyExp f = runLamM . apply f initialContext
+applyExp f = runLamM . apply f initialLamC
 
 ------------------------------------------------------------------------
 
@@ -96,7 +69,7 @@ substExp v s = rules_var <+ rules_lam <+ rule_app
 beta_reduce :: RewriteE
 beta_reduce = withPatFailMsg "Cannot beta-reduce, not app-lambda." $
                 do App (Lam v _) e2 <- idR
-                   pathT [0,0] (tryR $ substExp v e2)
+                   pathT [App_Fun,Lam_Body] (tryR $ substExp v e2)
 
 eta_expand :: RewriteE
 eta_expand = rewrite $ \ c f -> do v <- freshName (bindings c)
