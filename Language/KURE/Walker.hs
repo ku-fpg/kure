@@ -144,7 +144,7 @@ class Walker c g where
 
 -- | List the children of the current node.
 childrenT :: (ReadPath c crumb, Walker c g, MonadCatch m) => Translate c m g [crumb]
-childrenT = collectT lastCrumbT
+childrenT = allT (lastCrumbT >>^ return)
 {-# INLINE childrenT #-}
 
 -------------------------------------------------------------------------------
