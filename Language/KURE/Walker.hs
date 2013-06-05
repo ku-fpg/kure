@@ -55,8 +55,7 @@ module Language.KURE.Walker
         , oneLargestT
 
         -- * Utilitity Translations
-        , numChildrenT
-        , hasChildT
+        , childrenT
         , summandIsTypeT
 
         -- * Paths
@@ -143,16 +142,10 @@ class Walker c g where
 
 ------------------------------------------------------------------------------------------
 
--- | Count the number of children of the current node.
-numChildrenT :: (Walker c g, MonadCatch m) => Translate c m g Int
-numChildrenT = allT (return $ Sum 1) >>^ getSum
-{-# INLINE numChildrenT #-}
-
--- | Determine if the current node has a child matching the specified crumb.
---   Useful when defining custom versions of 'childL'.
-hasChildT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => crumb -> Translate c m g Bool
-hasChildT cr = allT (lastCrumbT >>^ \ cr' -> Any (if cr == cr' then True else False)) >>^ getAny
-{-# INLINE hasChildT #-}
+-- | List the children of the current node.
+childrenT :: (ReadPath c crumb, Walker c g, MonadCatch m) => Translate c m g [crumb]
+childrenT = collectT lastCrumbT
+{-# INLINE childrenT #-}
 
 -------------------------------------------------------------------------------
 
