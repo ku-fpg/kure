@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts #-}
 
 -- |
 -- Module: Language.KURE.Walker
@@ -85,7 +85,6 @@ import Prelude hiding (id)
 
 import Data.Maybe (isJust)
 import Data.Monoid
-import Data.List
 import Data.DList (singleton, toList)
 
 import Control.Monad
@@ -292,41 +291,45 @@ innermostR r = setFailMsg "innermostR failed" $
 
 -------------------------------------------------------------------------------
 
---  Provided the first 'AbsolutePath' is a prefix of the second 'AbsolutePath',
---  computes the 'Path' from the end of the first to the end of the second.
-rmPathPrefix :: Eq crumb => AbsolutePath crumb -> AbsolutePath crumb -> Maybe (Path crumb)
-rmPathPrefix (SnocPath p1) (SnocPath p2) = do guard (p1 `isSuffixOf` p2)
-                                              return $ drop (length p1) (reverse p2)
-{-# INLINE rmPathPrefix #-}
+-- Apply a local Translate, using only a local path as context.
+applySnocPathT :: Translate (SnocPath crumb) m a b -> Translate c m a b
+applySnocPathT t = contextfreeT (apply t mempty)
 
---  Construct a 'Path' from the current node to the end of the given 'AbsolutePath', provided that 'AbsolutePath' passes through the current node.
-abs2pathT :: (ReadPath c crumb, Eq crumb, Monad m) => AbsolutePath crumb -> Translate c m a (Path crumb)
-abs2pathT there = do here <- absPathT
-                     maybe (fail "Absolute path does not pass through current node.") return (rmPathPrefix here there)
-{-# INLINE abs2pathT #-}
 
 -- | Find the 'Path's to every node that satisfies the predicate.
-pathsToT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g [Path crumb]
-pathsToT q = collectT (acceptR q >>> absPathT) >>= mapM abs2pathT
+pathsToT :: forall c crumb g m. (Walker (SnocPath crumb) g, MonadCatch m) => (g -> Bool) -> Translate c m g [Path crumb]
+pathsToT q = applySnocPathT pathsToT' >>^ map snocPathToPath
+  where
+    pathsToT' :: Translate (SnocPath crumb) m g [SnocPath crumb]
+    pathsToT' =  collectT (acceptR q >>> contextT)
+    {-# INLINE pathsToT' #-}
 {-# INLINE pathsToT #-}
 
+-- | Find the 'Path's to every node that satisfies the predicate, ignoring nodes below successes.
+prunePathsToT :: forall c crumb g m. (Walker (SnocPath crumb) g, MonadCatch m) => (g -> Bool) -> Translate c m g [Path crumb]
+prunePathsToT q = applySnocPathT prunePathsToT' >>^ map snocPathToPath
+  where
+    prunePathsToT' :: Translate (SnocPath crumb) m g [SnocPath crumb]
+    prunePathsToT' =  collectPruneT (acceptR q >>> contextT)
+    {-# INLINE prunePathsToT' #-}
+{-# INLINE prunePathsToT #-}
+
+
 -- | Find the 'Path' to the first node that satisfies the predicate (in a pre-order traversal).
-onePathToT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g (Path crumb)
-onePathToT q = setFailMsg "No matching nodes found." $
-               onetdT (acceptR q >>> absPathT) >>= abs2pathT
+onePathToT :: forall c crumb g m. (Walker (SnocPath crumb) g, MonadCatch m) => (g -> Bool) -> Translate c m g (Path crumb)
+onePathToT q = applySnocPathT onePathToT' >>^ snocPathToPath
+  where
+    onePathToT' :: (Walker (SnocPath crumb) g, MonadCatch m) => Translate (SnocPath crumb) m g (SnocPath crumb)
+    onePathToT' =  setFailMsg "No matching nodes found." $
+                   onetdT (acceptR q >>> contextT)
+    {-# INLINE onePathToT' #-}
 {-# INLINE onePathToT #-}
 
 -- | Find the 'Path' to the first descendent node that satisfies the predicate (in a pre-order traversal).
-oneNonEmptyPathToT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g (Path crumb)
-oneNonEmptyPathToT q = setFailMsg "No matching nodes found." $
-                       do start <- absPathT
-                          onetdT (acceptR q >>> absPathT >>> acceptR (/= start)) >>= abs2pathT
+oneNonEmptyPathToT :: (Walker (SnocPath crumb) g, MonadCatch m) => (g -> Bool) -> Translate c m g (Path crumb)
+oneNonEmptyPathToT q = applySnocPathT $ oneT (lastCrumbT &&& onePathToT q >>^ uncurry (:))
 {-# INLINE oneNonEmptyPathToT #-}
 
--- | Find the 'Path's to every node that satisfies the predicate, ignoring nodes below successes.
-prunePathsToT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g [Path crumb]
-prunePathsToT q = collectPruneT (acceptR q >>> absPathT) >>= mapM abs2pathT
-{-# INLINE prunePathsToT #-}
 
 -- local function used by uniquePathToT and uniquePrunePathToT
 requireUniquePath :: Monad m => Translate c m [Path crumb] (Path crumb)
@@ -337,12 +340,12 @@ requireUniquePath = contextfreeT $ \ ps -> case ps of
 {-# INLINE requireUniquePath #-}
 
 -- | Find the 'Path' to the node that satisfies the predicate, failing if that does not uniquely identify a node.
-uniquePathToT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g (Path crumb)
+uniquePathToT :: (Walker (SnocPath crumb) g, MonadCatch m) => (g -> Bool) -> Translate c m g (Path crumb)
 uniquePathToT q = pathsToT q >>> requireUniquePath
 {-# INLINE uniquePathToT #-}
 
 -- | Build a 'Path' to the node that satisfies the predicate, failing if that does not uniquely identify a node (ignoring nodes below successes).
-uniquePrunePathToT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => (g -> Bool) -> Translate c m g (Path crumb)
+uniquePrunePathToT :: (Walker (SnocPath crumb) g, MonadCatch m) => (g -> Bool) -> Translate c m g (Path crumb)
 uniquePrunePathToT q = prunePathsToT q >>> requireUniquePath
 {-# INLINE uniquePrunePathToT #-}
 
