@@ -22,17 +22,17 @@ module Language.KURE.Path
 
          -- ** Relative Paths
          Path
-       , rootPathT
          -- ** Snoc Paths
        , SnocPath(..)
+       , ExtendPath(..)
        , snocPathToPath
        , pathToSnocPath
        , lastCrumb
-         -- ** Absolute Paths
+         -- ** Absolute and Local Paths
+       , LocalPath
        , AbsolutePath
-       , lastCrumbT
-       , ExtendPath(..)
        , ReadPath(..)
+       , lastCrumbT
        , absPathT
        )
 where
@@ -96,6 +96,9 @@ class ExtendPath c crumb | c -> crumb where
 -- | A 'SnocPath' from the root.
 type AbsolutePath = SnocPath
 
+-- | A 'SnocPath' from a local origin.
+type LocalPath = SnocPath
+
 -- | A class for contexts that store the current 'AbsolutePath', allowing transformations to depend upon it.
 class ReadPath c crumb | c -> crumb where
   -- | Read the current absolute path.
@@ -105,11 +108,6 @@ class ReadPath c crumb | c -> crumb where
 absPathT :: (ReadPath c crumb, Monad m) => Translate c m a (AbsolutePath crumb)
 absPathT = contextT >>^ absPath
 {-# INLINE absPathT #-}
-
--- | Retrieve the 'Path' from the root to the current node.
-rootPathT :: (ReadPath c crumb, Monad m) => Translate c m a (Path crumb)
-rootPathT = absPathT >>^ snocPathToPath
-{-# INLINE rootPathT #-}
 
 -- | Lifted version of 'lastCrumb'.
 lastCrumbT :: (ReadPath c crumb, Monad m) => Translate c m a crumb

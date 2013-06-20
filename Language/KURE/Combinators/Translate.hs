@@ -14,6 +14,7 @@ module Language.KURE.Combinators.Translate
           idR
         , contextT
         , exposeT
+        , liftContext
         , readerT
         , resultT
         , catchesT
@@ -72,6 +73,11 @@ contextT = translate (\ c _ -> return c)
 exposeT :: Monad m => Translate c m a (c,a)
 exposeT = translate (curry return)
 {-# INLINE exposeT #-}
+
+-- | Apply a 'Translate' in a modified context.
+liftContext :: (c -> c') -> Translate c' m a b -> Translate c m a b
+liftContext f t = translate (apply t . f)
+{-# INLINE liftContext #-}
 
 -- | Map a 'Translate' over a list.
 mapT :: (Traversable t, Monad m) => Translate c m a b -> Translate c m (t a) (t b)

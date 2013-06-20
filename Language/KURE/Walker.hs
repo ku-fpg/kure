@@ -293,7 +293,7 @@ innermostR r = setFailMsg "innermostR failed" $
 
 -- Apply a local Translate, using only a local path as context.
 applySnocPathT :: Translate (SnocPath crumb) m a b -> Translate c m a b
-applySnocPathT t = contextfreeT (apply t mempty)
+applySnocPathT = liftContext (\ _ -> mempty)
 
 
 -- | Find the 'Path's to every node that satisfies the predicate.
