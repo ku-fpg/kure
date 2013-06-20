@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, UndecidableInstances #-}
 
 module Expr.Kure where
 
@@ -30,7 +30,7 @@ instance Injection Cmd Generic where
 
 ---------------------------------------------------------------------------
 
-instance Walker Context Generic where
+instance (ExtendPath c Int, AddDef c) => Walker c Generic where
 -- allR :: MonadCatch m => Rewrite Context m Generic -> Rewrite Context m Generic
    allR r = prefixFailMsg "allR failed: " $
             rewrite $ \ c g -> case g of
@@ -48,18 +48,18 @@ instance Walker Context Generic where
 
 ---------------------------------------------------------------------------
 
-seqT :: Monad m => Translate Context m Cmd a1 -> Translate Context m Cmd a2 -> (a1 -> a2 -> b) -> Translate Context m Cmd b
+seqT :: (ExtendPath c Int, AddDef c, Monad m) => Translate c m Cmd a1 -> Translate c m Cmd a2 -> (a1 -> a2 -> b) -> Translate c m Cmd b
 seqT t1 t2 f = translate $ \ c cm -> case cm of
                                        Seq cm1 cm2 -> f <$> apply t1 (c @@ 0) cm1 <*> apply t2 (updateContextCmd cm1 c @@ 1) cm2
                                        _           -> fail "not a Seq"
 
-seqAllR :: Monad m => Rewrite Context m Cmd -> Rewrite Context m Cmd -> Rewrite Context m Cmd
+seqAllR :: (ExtendPath c Int, AddDef c, Monad m) => Rewrite c m Cmd -> Rewrite c m Cmd -> Rewrite c m Cmd
 seqAllR r1 r2 = seqT r1 r2 Seq
 
-seqAnyR :: MonadCatch m => Rewrite Context m Cmd -> Rewrite Context m Cmd -> Rewrite Context m Cmd
+seqAnyR :: (ExtendPath c Int, AddDef c, MonadCatch m) => Rewrite c m Cmd -> Rewrite c m Cmd -> Rewrite c m Cmd
 seqAnyR r1 r2 = unwrapAnyR $ seqAllR (wrapAnyR r1) (wrapAnyR r2)
 
-seqOneR :: MonadCatch m => Rewrite Context m Cmd -> Rewrite Context m Cmd -> Rewrite Context m Cmd
+seqOneR :: (ExtendPath c Int, AddDef c, MonadCatch m) => Rewrite c m Cmd -> Rewrite c m Cmd -> Rewrite c m Cmd
 seqOneR r1 r2 = unwrapOneR $ seqAllR (wrapOneR r1) (wrapOneR r2)
 
 ---------------------------------------------------------------------------
@@ -104,18 +104,18 @@ addOneR r1 r2 = unwrapOneR $ addAllR (wrapOneR r1) (wrapOneR r2)
 
 ---------------------------------------------------------------------------
 
-eseqT :: Monad m => Translate Context m Cmd a1 -> Translate Context m Expr a2 -> (a1 -> a2 -> b) -> Translate Context m Expr b
+eseqT :: (ExtendPath c Int, AddDef c, Monad m) => Translate c m Cmd a1 -> Translate c m Expr a2 -> (a1 -> a2 -> b) -> Translate c m Expr b
 eseqT t1 t2 f = translate $ \ c e -> case e of
                                        ESeq cm e1 -> f <$> apply t1 (c @@ 0) cm <*> apply t2 (updateContextCmd cm c @@ 1) e1
                                        _          -> fail "not an ESeq"
 
-eseqAllR :: Monad m => Rewrite Context m Cmd -> Rewrite Context m Expr -> Rewrite Context m Expr
+eseqAllR :: (ExtendPath c Int, AddDef c, Monad m) => Rewrite c m Cmd -> Rewrite c m Expr -> Rewrite c m Expr
 eseqAllR r1 r2 = eseqT r1 r2 ESeq
 
-eseqAnyR :: MonadCatch m => Rewrite Context m Cmd -> Rewrite Context m Expr -> Rewrite Context m Expr
+eseqAnyR :: (ExtendPath c Int, AddDef c, MonadCatch m) => Rewrite c m Cmd -> Rewrite c m Expr -> Rewrite c m Expr
 eseqAnyR r1 r2 = unwrapAnyR $ eseqAllR (wrapAnyR r1) (wrapAnyR r2)
 
-eseqOneR :: MonadCatch m => Rewrite Context m Cmd -> Rewrite Context m Expr -> Rewrite Context m Expr
+eseqOneR :: (ExtendPath c Int, AddDef c, MonadCatch m) => Rewrite c m Cmd -> Rewrite c m Expr -> Rewrite c m Expr
 eseqOneR r1 r2 = unwrapOneR $ eseqAllR (wrapOneR r1) (wrapOneR r2)
 
 ---------------------------------------------------------------------------

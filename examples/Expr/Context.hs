@@ -21,12 +21,20 @@ instance ReadPath Context Int where
 -- absPath :: Context -> AbsolutePath
    absPath (Context p _) = p
 
-addDef :: Name -> Expr -> Context -> Context
-addDef v e (Context p defs) = Context p ((v,e):defs)
+class AddDef c where
+  addDef :: Name -> Expr -> c -> c
 
-updateContextCmd :: Cmd -> Context -> Context
+updateContextCmd :: AddDef c => Cmd -> c -> c
 updateContextCmd (Seq c1 c2)  = updateContextCmd c2 . updateContextCmd c1
 updateContextCmd (Assign v e) = (addDef v e)
+
+instance AddDef (SnocPath crumb) where
+-- addDef :: Name -> Expr -> SnocPath crumb -> SnocPath crumb
+   addDef _ _ = id
+
+instance AddDef Context where
+-- addDef :: Name -> Expr -> Context -> Context
+   addDef v e (Context p defs) = Context p ((v,e):defs)
 
 initialContext :: Context
 initialContext = Context mempty []

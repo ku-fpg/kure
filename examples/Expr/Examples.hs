@@ -1,5 +1,7 @@
 module Expr.Examples where
 
+import Data.Monoid (mempty)
+
 import Language.KURE
 
 import Expr.AST
@@ -25,6 +27,14 @@ inlineR = withPatFailMsg "only variables can be inlined." $
 
 inlineGR :: RewriteE Generic
 inlineGR = promoteR inlineR
+
+isAssign :: Generic -> Bool
+isAssign (GCmd Assign{}) = True
+isAssign _               = False
+
+isESeq :: Generic -> Bool
+isESeq (GExpr ESeq{}) = True
+isESeq _              = False
 
 -----------------------------------------------------------------
 
@@ -67,16 +77,39 @@ expr2 = ESeq cmd1
                   (Var "x")
              )
 
-result2 :: Expr
-result2 = ESeq (Seq (Assign "m" (Lit 7))
-                    (Assign "n" (Add (Lit 1) (Lit 2)))
-               )
-               (Add (Lit 7)
-                    (Var "x")
-               )
+result2a :: Expr
+result2a = ESeq (Seq (Assign "m" (Lit 7))
+                     (Assign "n" (Add (Lit 1) (Lit 2)))
+                )
+                (Add (Lit 7)
+                     (Var "x")
+                )
 
-test2 :: Bool
-test2 = applyE (extractR (anytdR inlineGR)) expr2 == Right result2
+test2a :: Bool
+test2a = applyE (extractR (anytdR inlineGR)) expr2 == Right result2a
+
+----------------------------------------------------------------
+
+assignMpath :: LocalPath Int
+assignMpath = mempty @@ 0 @@ 0
+
+assignNpath :: LocalPath Int
+assignNpath = mempty @@ 0 @@ 1
+
+test2b :: Bool
+test2b = applyE (extractT $ pathsToT isAssign) expr2 == Right [assignMpath,assignNpath]
+
+test2c :: Bool
+test2c = applyE (extractT $ onePathToT isAssign) expr2 == Right assignMpath
+
+test2d :: Bool
+test2d = applyE (extractT $ oneNonEmptyPathToT isAssign) expr2 == Right assignMpath
+
+test2e :: Bool
+test2e = applyE (extractT $ onePathToT isESeq) expr2 == Right mempty
+
+test2f :: Bool
+test2f = applyE (extractT $ oneNonEmptyPathToT isESeq) expr2 == Left "No matching nodes found."
 
 -----------------------------------------------------------------
 
@@ -144,7 +177,7 @@ test4c = applyE (extractR $ allLargestR isExpr incrLitGR) cmd4 == Left "allLarge
 
 checkTests :: Bool
 checkTests = and [ test1a, test1b, test1c
-                 , test2
+                 , test2a, test2b, test2c, test2d, test2e, test2f
                  , test3a, test3b, test3c
                  , test4a, test4b, test4c
                  ]

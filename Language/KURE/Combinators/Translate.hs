@@ -74,7 +74,7 @@ exposeT :: Monad m => Translate c m a (c,a)
 exposeT = translate (curry return)
 {-# INLINE exposeT #-}
 
--- | Apply a 'Translate' in a modified context.
+-- | Lift a 'Translate' to operate on a derived context.
 liftContext :: (c -> c') -> Translate c' m a b -> Translate c m a b
 liftContext f t = translate (apply t . f)
 {-# INLINE liftContext #-}
