@@ -69,13 +69,15 @@ module Language.KURE.Walker
 
         -- ** Building Lenses from Paths
         , pathL
+        , localPathL
         , exhaustPathL
         , repeatPathL
-        , rootL
 
         -- ** Applying transformations at the end of Paths
         , pathR
         , pathT
+        , localPathR
+        , localPathT
 
         -- ** Testing Paths
         , testPathT
@@ -360,6 +362,11 @@ pathL :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb ->
 pathL = serialise . map childL
 {-# INLINE pathL #-}
 
+-- | Build a 'Lens' from the root to a point specified by a 'LocalPath'.
+localPathL :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => LocalPath crumb -> Lens c m g g
+localPathL = pathL . snocPathToPath
+{-# INLINE localPathL #-}
+
 -- | Construct a 'Lens' that points to the last node at which the 'Path' can be followed.
 exhaustPathL :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Lens c m g g
 exhaustPathL = foldr (\ n l -> tryL (childL n >>> l)) id
@@ -370,11 +377,6 @@ repeatPathL :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path cr
 repeatPathL p = let go = tryL (pathL p >>> go)
                  in go
 {-# INLINE repeatPathL #-}
-
--- | Build a 'Lens' from the root to a point specified by an 'AbsolutePath'.
-rootL :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => AbsolutePath crumb -> Lens c m g g
-rootL = pathL . snocPathToPath
-{-# INLINE rootL #-}
 
 -------------------------------------------------------------------------------
 
@@ -387,6 +389,16 @@ pathR = focusR . pathL
 pathT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Translate c m g b -> Translate c m g b
 pathT = focusT . pathL
 {-# INLINE pathT #-}
+
+-- | Apply a 'Rewrite' at a point specified by a 'LocalPath'.
+localPathR :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => LocalPath crumb -> Rewrite c m g -> Rewrite c m g
+localPathR = focusR . localPathL
+{-# INLINE localPathR #-}
+
+-- | Apply a 'Translate' at a point specified by a 'LocalPath'.
+localPathT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => LocalPath crumb -> Translate c m g b -> Translate c m g b
+localPathT = focusT . localPathL
+{-# INLINE localPathT #-}
 
 -------------------------------------------------------------------------------
 
