@@ -10,8 +10,8 @@
 -- Portability: ghc
 --
 -- This module provides a utility data type for extending an existing context with extra information.
--- The idea is that, after defining class isntances for any user-specific contextual operations, it can be used for any ad-hoc context extensions.
--- See the treatment of 'ReadPath' and 'ExtendPath' as examples.
+-- The idea is that, after defining class instances for any user-specific contextual operations, it can be used for any ad-hoc context extensions.
+-- See the treatment of 'ExtendPath' as an example.
 
 module Language.KURE.ExtendableContext
         (
@@ -38,14 +38,9 @@ data ExtendContext c e = ExtendContext
 extendContext :: e -> c -> ExtendContext c e
 extendContext e c = ExtendContext c e
 
--- | Both components of the context are updated with the path crumbs.
+-- | Both components of the context are updated with the crumb.
 instance (ExtendPath c crumb, ExtendPath e crumb) => ExtendPath (ExtendContext c e) crumb where
 -- (@@) :: ExtendContext c e -> crumb -> ExtendContext c e
    (ExtendContext c e) @@ cr = ExtendContext (c @@ cr) (e @@ cr)
-
--- | The 'AbsolutePath' is read from the base context.
-instance ReadPath c crumb => ReadPath (ExtendContext c e) crumb where
--- absPath :: ExtendContext c e -> AbsolutePath crumb
-   absPath = absPath . baseContext
 
 ------------------------------------------------------------------------------------------------

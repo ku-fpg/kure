@@ -5,6 +5,7 @@ module Expr.Context where
 import Data.Monoid (mempty)
 
 import Language.KURE
+import Language.KURE.ExtendableContext
 
 import Expr.AST
 
@@ -35,6 +36,13 @@ instance AddDef (SnocPath crumb) where
 instance AddDef Context where
 -- addDef :: Name -> Expr -> Context -> Context
    addDef v e (Context p defs) = Context p ((v,e):defs)
+
+instance (AddDef c, AddDef e) => AddDef (ExtendContext c e) where
+-- addDef :: Name -> Expr -> ExtendPath c e -> ExtendPath c e
+   addDef v e c = c
+                   { baseContext  = addDef v e (baseContext c)
+                   , extraContext = addDef v e (extraContext c)
+                   }
 
 initialContext :: Context
 initialContext = Context mempty []

@@ -1,8 +1,10 @@
 module Expr.Examples where
 
 import Data.Monoid (mempty)
+import Control.Arrow (arr)
 
 import Language.KURE
+import Language.KURE.Pathfinder
 
 import Expr.AST
 import Expr.Context
@@ -97,19 +99,19 @@ assignNpath :: LocalPath Int
 assignNpath = mempty @@ 0 @@ 1
 
 test2b :: Bool
-test2b = applyE (extractT $ pathsToT isAssign) expr2 == Right [assignMpath,assignNpath]
+test2b = applyE (extractT $ pathsToT $ arr isAssign) expr2 == Right [assignMpath,assignNpath]
 
 test2c :: Bool
-test2c = applyE (extractT $ onePathToT isAssign) expr2 == Right assignMpath
+test2c = applyE (extractT $ onePathToT $ arr isAssign) expr2 == Right assignMpath
 
 test2d :: Bool
-test2d = applyE (extractT $ oneNonEmptyPathToT isAssign) expr2 == Right assignMpath
+test2d = applyE (extractT $ oneNonEmptyPathToT $ arr isAssign) expr2 == Right assignMpath
 
 test2e :: Bool
-test2e = applyE (extractT $ onePathToT isESeq) expr2 == Right mempty
+test2e = applyE (extractT $ onePathToT $ arr isESeq) expr2 == Right mempty
 
 test2f :: Bool
-test2f = applyE (extractT $ oneNonEmptyPathToT isESeq) expr2 == Left "No matching nodes found."
+test2f = applyE (extractT $ oneNonEmptyPathToT $ arr isESeq) expr2 == Left "No matching nodes found."
 
 -----------------------------------------------------------------
 
