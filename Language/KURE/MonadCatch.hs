@@ -16,6 +16,7 @@ module Language.KURE.MonadCatch
            , KureM
            , runKureM
            , fromKureM
+           , liftKureM
              -- ** Combinators
            , (<+)
            , catchesM
@@ -73,6 +74,11 @@ runKureM s _ (Success a)   = s a
 fromKureM :: (String -> a) -> KureM a -> a
 fromKureM = runKureM id
 {-# INLINE fromKureM #-}
+
+-- | Lift a 'KureM' computation to any other monad.
+liftKureM :: Monad m => KureM a -> m a
+liftKureM = runKureM return fail
+{-# INLINE liftKureM #-}
 
 instance Monad KureM where
 -- return :: a -> KureM a

@@ -539,7 +539,7 @@ wrapSetChild cr g = do cr' <- lastCrumbT
 {-# INLINE wrapSetChild #-}
 
 unwrapSetChild :: Monad m => Rewrite c SetChild g -> Rewrite c m g
-unwrapSetChild = resultT (runKureM return fail)
+unwrapSetChild = resultT liftKureM
 {-# INLINE unwrapSetChild #-}
 
 setChild :: (ReadPath c crumb, Eq crumb, Walker c g, Monad m) => crumb -> g -> Rewrite c m g
