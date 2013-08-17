@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE InstanceSigs, MultiParamTypeClasses #-}
 module Lam.Context where
 
 import Data.Monoid (mempty)
@@ -22,15 +22,15 @@ class AddBoundVar c where
   addBoundVar :: Name -> c -> c
 
 instance AddBoundVar LamC where
--- addBoundVar :: Name -> LamC -> LamC
+   addBoundVar :: Name -> LamC -> LamC
    addBoundVar v (LamC p vs) = LamC p (v:vs)
 
 instance ExtendPath LamC Crumb where
--- (@@) :: LamC -> Crumb -> LamC
+   (@@) :: LamC -> Crumb -> LamC
    (LamC p vs) @@ cr = LamC (p @@ cr) vs
 
 instance ReadPath LamC Crumb where
--- absPath :: LamC -> AbsolutePath Crumb
+   absPath :: LamC -> AbsolutePath Crumb
    absPath (LamC p _) = p
 
 initialLamC :: LamC

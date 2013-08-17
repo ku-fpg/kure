@@ -1,5 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
-
+{-# LANGUAGE InstanceSigs, MultiParamTypeClasses, FlexibleInstances #-}
 -- |
 -- Module: Language.KURE.Injection
 -- Copyright: (c) 2012--2013 The University of Kansas
@@ -49,16 +48,22 @@ class Injection a b where
 
 -- | There is an identity injection for all types.
 instance Injection a a where
+  inject :: a -> a
+  inject = id
   {-# INLINE inject #-}
-  inject  = id
-  {-# INLINE project #-}
+
+  project :: a -> Maybe a
   project = Just
+  {-# INLINE project #-}
 
 instance Injection a (Maybe a) where
-  {-# INLINE inject #-}
+  inject :: a -> Maybe a
   inject  = Just
-  {-# INLINE project #-}
+  {-# INLINE inject #-}
+
+  project :: Maybe a -> Maybe a
   project = id
+  {-# INLINE project #-}
 
 -------------------------------------------------------------------------------
 

@@ -1,3 +1,4 @@
+{-# Language InstanceSigs #-}
 -- |
 -- Module: Language.KURE.Combinators.Translate
 -- Copyright: (c) 2012--2013 The University of Kansas
@@ -188,22 +189,22 @@ unAnyR (AnyR mba) = mba
 {-# INLINE unAnyR #-}
 
 instance Monad m => Monad (AnyR m) where
--- return :: a -> AnyR m a
+   return :: a -> AnyR m a
    return = AnyR . return . PBool False
    {-# INLINE return #-}
 
--- fail :: String -> AnyR m a
+   fail :: String -> AnyR m a
    fail = AnyR . fail
    {-# INLINE fail #-}
 
--- (>>=) :: AnyR m a -> (a -> AnyR m d) -> AnyR m d
+   (>>=) :: AnyR m a -> (a -> AnyR m d) -> AnyR m d
    ma >>= f = AnyR $ do PBool b1 a <- unAnyR ma
                         PBool b2 d <- unAnyR (f a)
                         return (PBool (b1 || b2) d)
    {-# INLINE (>>=) #-}
 
 instance MonadCatch m => MonadCatch (AnyR m) where
--- catchM :: AnyR m a -> (String -> AnyR m a) -> AnyR m a
+   catchM :: AnyR m a -> (String -> AnyR m a) -> AnyR m a
    catchM ma f = AnyR (unAnyR ma `catchM` (unAnyR . f))
    {-# INLINE catchM #-}
 
@@ -233,21 +234,21 @@ unOneR (OneR mba) = mba
 {-# INLINE unOneR #-}
 
 instance Monad m => Monad (OneR m) where
--- return :: a -> OneR m a
+   return :: a -> OneR m a
    return a = OneR (\ b -> return (PBool b a))
    {-# INLINE return #-}
 
--- fail :: String -> OneR m a
+   fail :: String -> OneR m a
    fail msg = OneR (\ _ -> fail msg)
    {-# INLINE fail #-}
 
--- (>>=) :: OneR m a -> (a -> OneR m d) -> OneR m d
+   (>>=) :: OneR m a -> (a -> OneR m d) -> OneR m d
    ma >>= f = OneR $ \ b1 -> do PBool b2 a <- unOneR ma b1
                                 unOneR (f a) b2
    {-# INLINE (>>=) #-}
 
 instance MonadCatch m => MonadCatch (OneR m) where
--- catchM :: OneR m a -> (String -> OneR m a) -> OneR m a
+   catchM :: OneR m a -> (String -> OneR m a) -> OneR m a
    catchM (OneR g) f = OneR (\ b -> g b `catchM` (($ b) . unOneR . f))
    {-# INLINE catchM #-}
 

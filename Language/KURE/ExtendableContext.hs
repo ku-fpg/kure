@@ -1,5 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, UndecidableInstances #-}
-
+{-# LANGUAGE InstanceSigs, MultiParamTypeClasses, FlexibleInstances, UndecidableInstances #-}
 -- |
 -- Module: Language.KURE.ExtendableContext
 -- Copyright: (c) 2012--2013 The University of Kansas
@@ -40,7 +39,7 @@ extendContext e c = ExtendContext c e
 
 -- | Both components of the context are updated with the crumb.
 instance (ExtendPath c crumb, ExtendPath e crumb) => ExtendPath (ExtendContext c e) crumb where
--- (@@) :: ExtendContext c e -> crumb -> ExtendContext c e
+   (@@) :: ExtendContext c e -> crumb -> ExtendContext c e
    (ExtendContext c e) @@ cr = ExtendContext (c @@ cr) (e @@ cr)
 
 ------------------------------------------------------------------------------------------------

@@ -1,5 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts #-}
-
+{-# LANGUAGE InstanceSigs, MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts #-}
 -- |
 -- Module: Language.KURE.Walker
 -- Copyright: (c) 2012--2013 The University of Kansas
@@ -155,14 +154,14 @@ childR n = focusR (childL n)
 -- | Fold a tree in a top-down manner, using a single 'Translate' for each node.
 foldtdT :: (Walker c g, MonadCatch m, Monoid b) => Translate c m g b -> Translate c m g b
 foldtdT t = prefixFailMsg "foldtdT failed: " $
-            let go = t `mappend` allT go
+            let go = t <> allT go
              in go
 {-# INLINE foldtdT #-}
 
 -- | Fold a tree in a bottom-up manner, using a single 'Translate' for each node.
 foldbuT :: (Walker c g, MonadCatch m, Monoid b) => Translate c m g b -> Translate c m g b
 foldbuT t = prefixFailMsg "foldbuT failed: " $
-            let go = allT go `mappend` t
+            let go = allT go <> t
              in go
 {-# INLINE foldbuT #-}
 
@@ -404,22 +403,22 @@ unAllT (AllT mw) = mw
 {-# INLINE unAllT #-}
 
 instance (Monoid w, Monad m) => Monad (AllT w m) where
--- return :: a -> AllT w m a
+   return :: a -> AllT w m a
    return a = AllT $ return (P a mempty)
    {-# INLINE return #-}
 
--- fail :: String -> AllT w m a
+   fail :: String -> AllT w m a
    fail = AllT . fail
    {-# INLINE fail #-}
 
--- (>>=) :: AllT w m a -> (a -> AllT w m d) -> AllT w m d
+   (>>=) :: AllT w m a -> (a -> AllT w m d) -> AllT w m d
    ma >>= f = AllT $ do P a w1 <- unAllT ma
                         P d w2 <- unAllT (f a)
                         return (P d (w1 <> w2))
    {-# INLINE (>>=) #-}
 
 instance (Monoid w, MonadCatch m) => MonadCatch (AllT w m) where
--- catchM :: AllT w m a -> (String -> AllT w m a) -> AllT w m a
+   catchM :: AllT w m a -> (String -> AllT w m a) -> AllT w m a
    catchM (AllT ma) f = AllT $ ma `catchM` (unAllT . f)
    {-# INLINE catchM #-}
 
@@ -448,21 +447,21 @@ unOneT (OneT f) = f
 {-# INLINE unOneT #-}
 
 instance Monad m => Monad (OneT w m) where
--- return :: a -> OneT w m a
+   return :: a -> OneT w m a
    return a = OneT $ \ mw -> return (P a mw)
    {-# INLINE return #-}
 
--- fail :: String -> OneT w m a
+   fail :: String -> OneT w m a
    fail msg = OneT (\ _ -> fail msg)
    {-# INLINE fail #-}
 
--- (>>=) :: OneT w m a -> (a -> OneT w m d) -> OneT w m d
+   (>>=) :: OneT w m a -> (a -> OneT w m d) -> OneT w m d
    ma >>= f = OneT $ do \ mw1 -> do P a mw2 <- unOneT ma mw1
                                     unOneT (f a) mw2
    {-# INLINE (>>=) #-}
 
 instance MonadCatch m => MonadCatch (OneT w m) where
--- catchM :: OneT w m a -> (String -> OneT w m a) -> OneT w m a
+   catchM :: OneT w m a -> (String -> OneT w m a) -> OneT w m a
    catchM (OneT g) f = OneT $ \ mw -> g mw `catchM` (($ mw) . unOneT . f)
    {-# INLINE catchM #-}
 
@@ -494,22 +493,22 @@ getChildSecond f (GetChild ka mcg) = GetChild ka (f mcg)
 {-# INLINE getChildSecond #-}
 
 instance Monad (GetChild c g) where
--- return :: a -> GetChild c g a
+   return :: a -> GetChild c g a
    return a = GetChild (return a) Nothing
    {-# INLINE return #-}
 
--- fail :: String -> GetChild c g a
+   fail :: String -> GetChild c g a
    fail msg = GetChild (fail msg) Nothing
    {-# INLINE fail #-}
 
--- (>>=) :: GetChild c g a -> (a -> GetChild c g b) -> GetChild c g b
+   (>>=) :: GetChild c g a -> (a -> GetChild c g b) -> GetChild c g b
    (GetChild kma mcg) >>= k = runKureM (\ a   -> getChildSecond (mplus mcg) (k a))
                                        (\ msg -> GetChild (fail msg) mcg)
                                        kma
    {-# INLINE (>>=) #-}
 
 instance MonadCatch (GetChild c g) where
--- catchM :: GetChild c g a -> (String -> GetChild c g a) -> GetChild c g a
+   catchM :: GetChild c g a -> (String -> GetChild c g a) -> GetChild c g a
    gc@(GetChild kma mcg) `catchM` k = runKureM (\ _   -> gc)
                                                (\ msg -> getChildSecond (mplus mcg) (k msg))
                                                kma

@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, UndecidableInstances #-}
+{-# LANGUAGE InstanceSigs, LambdaCase, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, UndecidableInstances #-}
 
 module Fib.Kure (Crumb(..)) where
 
@@ -15,14 +15,13 @@ import Control.Monad(liftM, ap)
 data Crumb = LeftChild | RightChild | OnlyChild deriving (Eq,Show)
 
 instance ExtendPath c Crumb => Walker c Arith where
--- allR :: (ExtendPath c Crumb, MonadCatch m) => Rewrite c m Arith -> Rewrite c m Arith
+   allR :: MonadCatch m => Rewrite c m Arith -> Rewrite c m Arith
    allR r = prefixFailMsg "allR failed: " $
-     rewrite $ \ c e ->
-         case e of
-           Lit n      ->  Lit <$> return n
-           Add e0 e1  ->  Add <$> apply r (c @@ LeftChild) e0 <*> apply r (c @@ RightChild) e1
-           Sub e0 e1  ->  Sub <$> apply r (c @@ LeftChild) e0 <*> apply r (c @@ RightChild) e1
-           Fib e0     ->  Fib <$> apply r (c @@ OnlyChild) e0
+     rewrite $ \ c -> \case
+                         Lit n      ->  Lit <$> return n
+                         Add e0 e1  ->  Add <$> apply r (c @@ LeftChild) e0 <*> apply r (c @@ RightChild) e1
+                         Sub e0 e1  ->  Sub <$> apply r (c @@ LeftChild) e0 <*> apply r (c @@ RightChild) e1
+                         Fib e0     ->  Fib <$> apply r (c @@ OnlyChild) e0
 
 --------------------------------------------------------------------------------------
 

@@ -1,3 +1,4 @@
+{-# Language InstanceSigs #-}
 -- |
 -- Module: Language.KURE.BiTranslate
 -- Copyright: (c) 2012--2013 The University of Kansas
@@ -55,11 +56,11 @@ invertBiT (BiTranslate t1 t2) = BiTranslate t2 t1
 {-# INLINE invertBiT #-}
 
 instance Monad m => Category (BiTranslate c m) where
--- id :: BiTranslate c m a a
+   id :: BiTranslate c m a a
    id = bidirectional id id
    {-# INLINE id #-}
 
--- (.) :: BiTranslate c m b d -> BiTranslate c m a b -> BiTranslate c m a d
+   (.) :: BiTranslate c m b d -> BiTranslate c m a b -> BiTranslate c m a d
    (BiTranslate f1 b1) . (BiTranslate f2 b2) = BiTranslate (f1 . f2) (b2 . b1)
    {-# INLINE (.) #-}
 

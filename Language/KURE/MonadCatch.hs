@@ -1,3 +1,4 @@
+{-# Language InstanceSigs #-}
 -- |
 -- Module: Language.KURE.MonadCatch
 -- Copyright: (c) 2012--2013 The University of Kansas
@@ -81,36 +82,36 @@ liftKureM = runKureM return fail
 {-# INLINE liftKureM #-}
 
 instance Monad KureM where
--- return :: a -> KureM a
+   return :: a -> KureM a
    return = Success
    {-# INLINE return #-}
 
--- (>>=) :: KureM a -> (a -> KureM b) -> KureM b
+   (>>=) :: KureM a -> (a -> KureM b) -> KureM b
    (Success a)   >>= f = f a
    (Failure msg) >>= _ = Failure msg
    {-# INLINE (>>=) #-}
 
--- fail :: String -> KureM a
+   fail :: String -> KureM a
    fail = Failure
    {-# INLINE fail #-}
 
 instance MonadCatch KureM where
--- catchM :: KureM a -> (String -> KureM a) -> KureM a
+   catchM :: KureM a -> (String -> KureM a) -> KureM a
    (Success a)   `catchM` _ = Success a
    (Failure msg) `catchM` f = f msg
    {-# INLINE catchM #-}
 
 instance Functor KureM where
--- fmap :: (a -> b) -> KureM a -> KureM b
+   fmap :: (a -> b) -> KureM a -> KureM b
    fmap = liftM
    {-# INLINE fmap #-}
 
 instance Applicative KureM where
--- pure :: a -> KureM a
+   pure :: a -> KureM a
    pure = return
    {-# INLINE pure #-}
 
--- (<*>) :: KureM (a -> b) -> KureM a -> KureM b
+   (<*>) :: KureM (a -> b) -> KureM a -> KureM b
    (<*>) = ap
    {-# INLINE (<*>) #-}
 

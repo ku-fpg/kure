@@ -1,3 +1,4 @@
+{-# Language InstanceSigs #-}
 module Expr.AST where
 
 -----------------------------------------------------------------
@@ -11,10 +12,12 @@ data Expr = Var Name | Lit Int | Add Expr Expr | ESeq Cmd Expr
             deriving Eq
 
 instance Show Cmd where
+  show :: Cmd -> String
   show (Seq c1 c2) = show c1 ++ " ; " ++ show c2
   show (Assign n e) = n ++ " := " ++ show e
 
 instance Show Expr where
+  show :: Expr -> String
   show (Var n)     = n
   show (Lit n)     = show n
   show (Add e1 e2) = "(" ++ show e1 ++ " + " ++ show e2 ++ ")"

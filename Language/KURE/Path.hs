@@ -1,5 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
-
+{-# LANGUAGE InstanceSigs, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 -- |
 -- Module: Language.KURE.Path
 -- Copyright: (c) 2012--2013 The University of Kansas
@@ -57,10 +56,10 @@ type Path crumb = [crumb]
 newtype SnocPath crumb = SnocPath [crumb] deriving Eq
 
 instance Monoid (SnocPath crumb) where
--- mempty :: SnocPath crumb
+   mempty :: SnocPath crumb
    mempty = SnocPath []
 
--- mappend :: SnocPath crumb -> SnocPath crumb -> SnocPath crumb
+   mappend :: SnocPath crumb -> SnocPath crumb -> SnocPath crumb
    mappend (SnocPath p1) (SnocPath p2) = SnocPath (p2 ++ p1)
 
 -- | Convert a 'Path' to a 'SnocPath'.  O(n).
@@ -74,7 +73,7 @@ snocPathToPath (SnocPath p) = reverse p
 {-# INLINE snocPathToPath #-}
 
 instance Show crumb => Show (SnocPath crumb) where
--- show :: SnocPath crumb -> String
+   show :: SnocPath crumb -> String
    show = show . snocPathToPath
    {-# INLINE show #-}
 
@@ -118,13 +117,13 @@ lastCrumbT = contextonlyT (projectWithFailMsgM (fail "lastCrumbT failed: at the 
 
 -- | Any 'SnocPath' can be extended.
 instance ExtendPath (SnocPath crumb) crumb where
--- (@@) :: SnocPath crumb -> crumb -> SnocPath crumb
+   (@@) :: SnocPath crumb -> crumb -> SnocPath crumb
    (SnocPath crs) @@ cr = SnocPath (cr:crs)
    {-# INLINE (@@) #-}
 
 -- | The simplest instance of 'ReadPath' is 'AbsolutePath' itself.
 instance ReadPath (AbsolutePath crumb) crumb where
--- absPath :: AbsolutePath crumb -> AbsolutePath crumb
+   absPath :: AbsolutePath crumb -> AbsolutePath crumb
    absPath = id
    {-# INLINE absPath #-}
 
