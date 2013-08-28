@@ -31,6 +31,7 @@ module Language.KURE.Combinators.Translate
         , acceptR
         , accepterR
         , changedR
+        , changedByR
         , sideEffectR
           -- * Monad Transformers
           -- ** anyR Support
@@ -135,9 +136,16 @@ tryR :: MonadCatch m => Rewrite c m a -> Rewrite c m a
 tryR r = r <+ id
 {-# INLINE tryR #-}
 
+-- | Makes an 'Rewrite' fail if the result value and the argument value satisfy the equality predicate.
+--   This is a generalisation of 'changedR'.
+--   @changedR = changedByR (==)@
+changedByR :: MonadCatch m => (a -> a -> Bool) -> Rewrite c m a -> Rewrite c m a
+changedByR p r = readerT (\ a -> r >>> acceptWithFailMsgR (not . p a) "changedByR: value is unchanged")
+{-# INLINE changedByR #-}
+
 -- | Makes an 'Rewrite' fail if the result value equals the argument value.
 changedR :: (MonadCatch m, Eq a) => Rewrite c m a -> Rewrite c m a
-changedR r = readerT (\ a -> r >>> acceptWithFailMsgR (/= a) "changedR: value is unchanged")
+changedR = changedByR (==)
 {-# INLINE changedR #-}
 
 -- | Repeat a 'Rewrite' until it fails, then return the result before the failure.
