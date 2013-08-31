@@ -29,6 +29,7 @@ module Language.KURE.Combinators.Translate
         , (>+>)
         , repeatR
         , acceptR
+        , acceptWithFailMsgR
         , accepterR
         , changedR
         , changedByR
