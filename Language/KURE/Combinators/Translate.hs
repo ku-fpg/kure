@@ -13,6 +13,7 @@
 module Language.KURE.Combinators.Translate
         ( -- * Translate Combinators
           idR
+        , successT
         , contextT
         , exposeT
         , liftContext
@@ -66,6 +67,11 @@ import Language.KURE.Translate
 idR :: Monad m => Rewrite c m a
 idR = id
 {-# INLINE idR #-}
+
+-- | An always successful 'Translate'.
+successT :: Monad m => Translate c m a ()
+successT = return ()
+{-# INLINE successT #-}
 
 -- | Extract the current context.
 contextT :: Monad m => Translate c m a c
