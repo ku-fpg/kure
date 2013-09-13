@@ -8,7 +8,7 @@
 -- Portability: ghc
 --
 -- This module provides various monadic and arrow combinators that are useful when
--- working with 'Translate's and 'Rewrite's.
+-- working with 'Language.KURE.Translate.Translate's and 'Language.KURE.Translate.Rewrite's.
 
 module Language.KURE.Combinators
            (

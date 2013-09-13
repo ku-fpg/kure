@@ -8,7 +8,7 @@
 -- Stability: beta
 -- Portability: ghc
 --
--- This module defines the main KURE types: 'Translate' and 'Rewrite'.
+-- This module defines 'Translate' and 'Rewrite', the main KURE types.
 -- 'Rewrite' is just a special case of 'Translate', and so any function that operates on 'Translate' is also
 -- applicable to 'Rewrite'.
 --

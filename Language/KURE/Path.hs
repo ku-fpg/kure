@@ -87,7 +87,7 @@ lastCrumb (SnocPath p) = safehead p
 -- | A class of things that can be extended by crumbs.
 --   Typically, @c@ is a context type.
 --   The typical use is to extend an 'AbsolutePath' stored in the context (during tree traversal).
---   Note however, that if an 'AbsolutePath' is not stored in the context, an instance can still be declared with @(\@\@ cr)@ as an identity operation.
+--   Note however, that if an 'AbsolutePath' is not stored in the context, an instance can still be declared with @('@@' crumb)@ as an identity operation.
 class ExtendPath c crumb | c -> crumb where
   -- | Extend the current 'AbsolutePath' by one crumb.
   (@@) :: c -> crumb -> c

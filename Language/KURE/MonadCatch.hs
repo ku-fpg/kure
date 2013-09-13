@@ -60,8 +60,7 @@ class Monad m => MonadCatch m where
 
 -- | 'KureM' is the minimal structure that can be an instance of 'MonadCatch'.
 --   The KURE user is free to either use 'KureM' or provide their own monad.
---   'KureM' is essentially the same as ('Either' 'String' @a@), except that the 'fail' method produces an error in the monad,
---   rather than invoking 'error'.
+--   'KureM' is essentially the same as 'Either' 'String', except that it supports a 'MonadCatch' instance which 'Either' 'String' does not (because its 'fail' method calls 'error')
 --   A major advantage of this is that monadic pattern match failures are caught safely.
 data KureM a = Failure String | Success a deriving (Eq, Show)
 
@@ -147,7 +146,7 @@ testM :: MonadCatch m => m a -> m Bool
 testM ma = liftM (const True) ma <+ return False
 {-# INLINE testM #-}
 
--- | Fail if the 'Monad' succeeds; succeed with @()@ if it fails.
+-- | Fail if the monadic computation succeeds; succeed with @()@ if it fails.
 notM :: MonadCatch m => m a -> m ()
 notM ma = ifM (testM ma) (fail "notM of success") (return ())
 {-# INLINE notM #-}

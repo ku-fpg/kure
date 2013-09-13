@@ -128,7 +128,7 @@ acceptWithFailMsgR :: Monad m => (a -> Bool) -> String -> Rewrite c m a
 acceptWithFailMsgR p msg = readerT $ \ a -> if p a then id else fail msg
 {-# INLINE acceptWithFailMsgR #-}
 
--- | Look at the argument to an 'Rewrite', and choose to be either the identity rewrite or a failure.
+-- | Look at the argument to a 'Rewrite', and choose to be either 'idR' or a failure.
 acceptR :: Monad m => (a -> Bool) -> Rewrite c m a
 acceptR p = acceptWithFailMsgR p "acceptR: predicate failed"
 {-# INLINE acceptR #-}
@@ -138,14 +138,14 @@ accepterR :: Monad m => Translate c m a Bool -> Rewrite c m a
 accepterR t = ifM t idR (fail "accepterR: predicate failed")
 {-# INLINE accepterR #-}
 
--- | Catch a failing 'Category', making it into an identity.
+-- | Catch a failing 'Rewrite', making it into an identity.
 tryR :: MonadCatch m => Rewrite c m a -> Rewrite c m a
 tryR r = r <+ id
 {-# INLINE tryR #-}
 
--- | Makes an 'Rewrite' fail if the result value and the argument value satisfy the equality predicate.
+-- | Makes a 'Rewrite' fail if the result value and the argument value satisfy the equality predicate.
 --   This is a generalisation of 'changedR'.
---   @changedR = changedByR (==)@
+--   @changedR = changedByR ('==')@
 changedByR :: MonadCatch m => (a -> a -> Bool) -> Rewrite c m a -> Rewrite c m a
 changedByR p r = readerT (\ a -> r >>> acceptWithFailMsgR (not . p a) "changedByR: value is unchanged")
 {-# INLINE changedByR #-}
@@ -167,7 +167,7 @@ catchesT :: MonadCatch m => [Translate c m a b] -> Translate c m a b
 catchesT = foldr (<+) (fail "catchesT failed")
 {-# INLINE catchesT #-}
 
--- | An identity translation that resembles a monadic 'join'.
+-- | An identity translation that resembles a monadic 'Control.Monad.join'.
 joinT :: Translate c m (m a) a
 joinT = contextfreeT id
 {-# INLINE joinT #-}
