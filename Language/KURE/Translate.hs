@@ -33,6 +33,7 @@ import Prelude hiding (id, (.))
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.IO.Class
 import Control.Category
 import Control.Arrow
 
@@ -141,6 +142,13 @@ instance MonadPlus m => MonadPlus (Translate c m a) where
    mplus :: Translate c m a b -> Translate c m a b -> Translate c m a b
    mplus t1 t2 = translate $ \ c a -> apply t1 c a `mplus` apply t2 c a
    {-# INLINE mplus #-}
+
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
+instance MonadIO m => MonadIO (Translate c m a) where
+
+   liftIO :: IO b -> Translate c m a b
+   liftIO = constT . liftIO
+   {-# INLINE liftIO #-}
 
 ------------------------------------------------------------------------------------------
 
