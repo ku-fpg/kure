@@ -15,7 +15,7 @@ module Language.KURE.BiTranslate
           BiTranslate
         , BiRewrite
         , bidirectional
-        , forewardT
+        , forwardT
         , backwardT
         , whicheverR
         , invertBiT
@@ -32,7 +32,7 @@ import Language.KURE.Translate
 ------------------------------------------------------------------------------------------
 
 -- | An undirected 'Translate'.
-data BiTranslate c m a b = BiTranslate {forewardT :: Translate c m a b, -- ^ Extract the foreward 'Translate' from a 'BiTranslate'.
+data BiTranslate c m a b = BiTranslate {forwardT :: Translate c m a b, -- ^ Extract the forward 'Translate' from a 'BiTranslate'.
                                         backwardT :: Translate c m b a  -- ^ Extract the backward 'Translate' from a 'BiTranslate'.
                                        }
 
@@ -44,13 +44,13 @@ bidirectional :: Translate c m a b -> Translate c m b a -> BiTranslate c m a b
 bidirectional = BiTranslate
 {-# INLINE bidirectional #-}
 
--- | Try the 'BiRewrite' forewards, then backwards if that fails.
+-- | Try the 'BiRewrite' forwards, then backwards if that fails.
 --   Useful when you know which rule you want to apply, but not which direction to apply it in.
 whicheverR :: MonadCatch m => BiRewrite c m a -> Rewrite c m a
-whicheverR r = forewardT r <+ backwardT r
+whicheverR r = forwardT r <+ backwardT r
 {-# INLINE whicheverR #-}
 
--- | Invert the forewards and backwards directions of a 'BiTranslate'.
+-- | Invert the forwards and backwards directions of a 'BiTranslate'.
 invertBiT :: BiTranslate c m a b -> BiTranslate c m b a
 invertBiT (BiTranslate t1 t2) = BiTranslate t2 t1
 {-# INLINE invertBiT #-}
@@ -67,7 +67,7 @@ instance Monad m => Category (BiTranslate c m) where
 
 -- | Perform the argument translation before /either/ direction of the bidirectional rewrite.
 beforeBiR :: Monad m => Translate c m a b -> (b -> BiRewrite c m a) -> BiRewrite c m a
-beforeBiR t f = bidirectional (t >>= (forewardT . f)) (t >>= (backwardT . f))
+beforeBiR t f = bidirectional (t >>= (forwardT . f)) (t >>= (backwardT . f))
 {-# INLINE beforeBiR #-}
 
 ------------------------------------------------------------------------------------------

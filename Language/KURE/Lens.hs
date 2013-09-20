@@ -96,7 +96,7 @@ l1 `catchL` l2 = lens (attemptM (focusR l1 idR) >>= either (lensT . l2) (const (
 -- | Construct a 'Lens' from a 'BiTranslate'.
 bidirectionalL :: Monad m => BiTranslate c m a b -> Lens c m a b
 bidirectionalL bt = lens $ do c <- contextT
-                              b <- forewardT bt
+                              b <- forwardT bt
                               return ((c,b), apply (backwardT bt) c)
 {-# INLINE bidirectionalL #-}
 
