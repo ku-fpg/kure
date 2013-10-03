@@ -52,9 +52,10 @@ infixl 3 <+
 ------------------------------------------------------------------------------------------
 
 -- | 'Monad's with a catch for 'fail'.
---   The following law is expected to hold:
+--   The following laws are expected to hold:
 --
 -- > fail msg `catchM` f == f msg
+-- > return a `catchM` f == return a
 
 class Monad m => MonadCatch m where
   -- | Catch a failing monadic computation.
