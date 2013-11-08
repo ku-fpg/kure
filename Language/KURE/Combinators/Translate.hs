@@ -51,7 +51,8 @@ module Language.KURE.Combinators.Translate
 import Prelude hiding (id, map, foldr, mapM)
 
 import Control.Category ((>>>),id)
-import Control.Monad (liftM)
+import Control.Applicative
+import Control.Monad (liftM,ap)
 
 import Data.Foldable
 import Data.Traversable
@@ -181,6 +182,10 @@ guardT = contextfreeT guardM
 
 data PBool a = PBool !Bool a
 
+instance Functor PBool where
+  fmap :: (a -> b) -> PBool a -> PBool b
+  fmap f (PBool b a) = PBool b (f a)
+
 checkSuccessPBool :: Monad m => String -> m (PBool a) -> m a
 checkSuccessPBool msg m = do PBool b a <- m
                              if b
@@ -202,6 +207,20 @@ newtype AnyR m a = AnyR (m (PBool a))
 unAnyR :: AnyR m a -> m (PBool a)
 unAnyR (AnyR mba) = mba
 {-# INLINE unAnyR #-}
+
+instance Monad m => Functor (AnyR m) where
+   fmap :: (a -> b) -> AnyR m a -> AnyR m b
+   fmap = liftM
+   {-# INLINE fmap #-}
+
+instance Monad m => Applicative (AnyR m) where
+   pure :: a -> AnyR m a
+   pure = return
+   {-# INLINE pure #-}
+
+   (<*>) :: AnyR m (a -> b) -> AnyR m a -> AnyR m b
+   (<*>) = ap
+   {-# INLINE (<*>) #-}
 
 instance Monad m => Monad (AnyR m) where
    return :: a -> AnyR m a
@@ -247,6 +266,20 @@ newtype OneR m a = OneR (Bool -> m (PBool a))
 unOneR :: OneR m a -> Bool -> m (PBool a)
 unOneR (OneR mba) = mba
 {-# INLINE unOneR #-}
+
+instance Monad m => Functor (OneR m) where
+   fmap :: (a -> b) -> OneR m a -> OneR m b
+   fmap = liftM
+   {-# INLINE fmap #-}
+
+instance Monad m => Applicative (OneR m) where
+   pure :: a -> OneR m a
+   pure = return
+   {-# INLINE pure #-}
+
+   (<*>) :: OneR m (a -> b) -> OneR m a -> OneR m b
+   (<*>) = ap
+   {-# INLINE (<*>) #-}
 
 instance Monad m => Monad (OneR m) where
    return :: a -> OneR m a

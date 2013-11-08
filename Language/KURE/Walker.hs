@@ -79,6 +79,7 @@ import Data.Monoid
 import Data.DList (singleton, toList)
 
 import Control.Monad
+import Control.Applicative
 import Control.Arrow
 import Control.Category hiding ((.))
 
@@ -402,6 +403,20 @@ unAllT :: AllT w m a -> m (P a w)
 unAllT (AllT mw) = mw
 {-# INLINE unAllT #-}
 
+instance (Monoid w, Monad m) => Functor (AllT w m) where
+   fmap :: (a -> b) -> AllT w m a -> AllT w m b
+   fmap = liftM
+   {-# INLINE fmap #-}
+
+instance (Monoid w, Monad m) => Applicative (AllT w m) where
+   pure :: a -> AllT w m a
+   pure = return
+   {-# INLINE pure #-}
+
+   (<*>) :: AllT w m (a -> b) -> AllT w m a -> AllT w m b
+   (<*>) = ap
+   {-# INLINE (<*>) #-}
+
 instance (Monoid w, Monad m) => Monad (AllT w m) where
    return :: a -> AllT w m a
    return a = AllT $ return (P a mempty)
@@ -445,6 +460,20 @@ newtype OneT w m a = OneT (Maybe w -> m (P a (Maybe w)))
 unOneT :: OneT w m a -> Maybe w -> m (P a (Maybe w))
 unOneT (OneT f) = f
 {-# INLINE unOneT #-}
+
+instance (Monoid w, Monad m) => Functor (OneT w m) where
+   fmap :: (a -> b) -> OneT w m a -> OneT w m b
+   fmap = liftM
+   {-# INLINE fmap #-}
+
+instance (Monoid w, Monad m) => Applicative (OneT w m) where
+   pure :: a -> OneT w m a
+   pure = return
+   {-# INLINE pure #-}
+
+   (<*>) :: OneT w m (a -> b) -> OneT w m a -> OneT w m b
+   (<*>) = ap
+   {-# INLINE (<*>) #-}
 
 instance Monad m => Monad (OneT w m) where
    return :: a -> OneT w m a
@@ -491,6 +520,20 @@ data GetChild c g a = GetChild (KureM a) (Maybe (c,g))
 getChildSecond :: (Maybe (c,g) -> Maybe (c,g)) -> GetChild c g a -> GetChild c g a
 getChildSecond f (GetChild ka mcg) = GetChild ka (f mcg)
 {-# INLINE getChildSecond #-}
+
+instance Functor (GetChild c g) where
+   fmap :: (a -> b) -> GetChild c g a -> GetChild c g b
+   fmap = liftM
+   {-# INLINE fmap #-}
+
+instance Applicative (GetChild c g) where
+   pure :: a -> GetChild c g a
+   pure = return
+   {-# INLINE pure #-}
+
+   (<*>) :: GetChild c g (a -> b) -> GetChild c g a -> GetChild c g b
+   (<*>) = ap
+   {-# INLINE (<*>) #-}
 
 instance Monad (GetChild c g) where
    return :: a -> GetChild c g a
