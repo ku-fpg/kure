@@ -26,6 +26,7 @@ module Language.KURE.Path
        , ExtendPath(..)
        , snocPathToPath
        , pathToSnocPath
+       , singletonSnocPath
        , lastCrumb
          -- ** Absolute and Local Paths
        , LocalPath
@@ -58,9 +59,16 @@ newtype SnocPath crumb = SnocPath [crumb] deriving Eq
 instance Monoid (SnocPath crumb) where
    mempty :: SnocPath crumb
    mempty = SnocPath []
+   {-# INLINE mempty #-}
 
    mappend :: SnocPath crumb -> SnocPath crumb -> SnocPath crumb
    mappend (SnocPath p1) (SnocPath p2) = SnocPath (p2 ++ p1)
+   {-# INLINE mappend #-}
+
+instance Functor SnocPath where
+   fmap :: (a -> b) -> SnocPath a -> SnocPath b
+   fmap f (SnocPath p) = SnocPath (map f p)
+   {-# INLINE fmap #-}
 
 -- | Convert a 'Path' to a 'SnocPath'.  O(n).
 pathToSnocPath :: Path crumb -> SnocPath crumb
@@ -76,6 +84,10 @@ instance Show crumb => Show (SnocPath crumb) where
    show :: SnocPath crumb -> String
    show = show . snocPathToPath
    {-# INLINE show #-}
+
+singletonSnocPath :: crumb -> SnocPath crumb
+singletonSnocPath cr = SnocPath [cr]
+{-# INLINE singletonSnocPath #-}
 
 -- | Get the last crumb from a 'SnocPath'.  O(1).
 lastCrumb :: SnocPath crumb -> Maybe crumb
