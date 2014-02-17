@@ -11,7 +11,7 @@ Description:	     The Kansas University Rewrite Engine (KURE) is a domain-specif
                      .
                      You can read about KURE in the following article:
                      .
-                     The Kansas University Rewrite Engine: A Haskell-Embedded Strategic Programming Language with Custom Closed Universes.  Neil Sculthorpe, Nicolas Frisby and Andy Gill.  2013.
+                     The Kansas University Rewrite Engine: A Haskell-Embedded Strategic Programming Language with Custom Closed Universes.  Neil Sculthorpe, Nicolas Frisby and Andy Gill.  2014.
                      <http://www.ittc.ku.edu/~neil/papers_and_talks/kure.pdf>
 
 Category:            Language
@@ -19,11 +19,11 @@ License:             BSD3
 License-file:        LICENSE
 Author:              Neil Sculthorpe and Andy Gill
 Maintainer:          Neil Sculthorpe <neil@ittc.ku.edu>
-Copyright:           (c) 2006--2013 The University of Kansas
+Copyright:           (c) 2006--2014 The University of Kansas
 Homepage:            http://www.ittc.ku.edu/csdl/fpg/software/kure.html
 Stability:	     beta
 build-type: 	     Simple
-Cabal-Version:       >= 1.6
+Cabal-Version:       >= 1.10
 Extra-Source-Files:
     examples/Examples.hs
     examples/Fib/AST.hs
@@ -40,10 +40,12 @@ Extra-Source-Files:
     examples/Expr/Examples.hs
 
 Library
-  Build-Depends: base         >= 4.5 && < 5,
-                 dlist        >= 0.2 && < 1,
-                 ghc          >= 7.6,
-                 transformers >= 0.2 && < 1
+  Build-Depends:
+       base         >= 4.5 && < 5,
+       dlist        >= 0.2 && < 1,
+       ghc          >= 7.6,
+       transformers >= 0.2 && < 1
+  default-language: Haskell2010
   Ghc-Options: -Wall
   Exposed-modules:
        Language.KURE
@@ -62,7 +64,6 @@ Library
        Language.KURE.Translate
        Language.KURE.Walker
 
-
-
-
-
+source-repository head
+  type:             git
+  location:         git://github.com/ku-fpg/kure
