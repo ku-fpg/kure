@@ -1,7 +1,7 @@
 {-# LANGUAGE InstanceSigs, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 -- |
 -- Module: Language.KURE.Path
--- Copyright: (c) 2012--2013 The University of Kansas
+-- Copyright: (c) 2012--2014 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
@@ -41,8 +41,8 @@ import Data.Monoid
 
 import Control.Arrow ((>>^))
 
-import Language.KURE.Translate
-import Language.KURE.Combinators.Translate
+import Language.KURE.Transform
+import Language.KURE.Combinators.Transform
 import Language.KURE.Injection
 
 -------------------------------------------------------------------------------
@@ -116,12 +116,12 @@ class ReadPath c crumb | c -> crumb where
   absPath :: c -> AbsolutePath crumb
 
 -- | Lifted version of 'absPath'.
-absPathT :: (ReadPath c crumb, Monad m) => Translate c m a (AbsolutePath crumb)
+absPathT :: (ReadPath c crumb, Monad m) => Transform c m a (AbsolutePath crumb)
 absPathT = contextT >>^ absPath
 {-# INLINE absPathT #-}
 
 -- | Lifted version of 'lastCrumb'.
-lastCrumbT :: (ReadPath c crumb, Monad m) => Translate c m a crumb
+lastCrumbT :: (ReadPath c crumb, Monad m) => Transform c m a crumb
 lastCrumbT = contextonlyT (projectWithFailMsgM (fail "lastCrumbT failed: at the root, no crumbs yet.") . lastCrumb . absPath)
 {-# INLINE lastCrumbT #-}
 

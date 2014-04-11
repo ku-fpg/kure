@@ -13,12 +13,12 @@ import Expr.Kure
 -----------------------------------------------------------------
 
 type RewriteE a     = Rewrite Context KureM a
-type TranslateE a b = Translate Context KureM a b
+type TransformE a b = Transform Context KureM a b
 
 -----------------------------------------------------------------
 
-applyE :: TranslateE a b -> a -> Either String b
-applyE t = runKureM Right Left . apply t initialContext
+applyE :: TransformE a b -> a -> Either String b
+applyE t = runKureM Right Left . applyT t initialContext
 
 -----------------------------------------------------------------
 
@@ -151,7 +151,7 @@ incrLitR = litT (Lit . succ)
 incrLitGR :: RewriteE Generic
 incrLitGR = promoteR incrLitR
 
-isExpr :: TranslateE Generic Bool
+isExpr :: TransformE Generic Bool
 isExpr = summandIsTypeT (undefined :: Expr)
 
 result4a :: Cmd

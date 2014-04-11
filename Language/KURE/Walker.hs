@@ -1,7 +1,7 @@
 {-# LANGUAGE InstanceSigs, MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts #-}
 -- |
 -- Module: Language.KURE.Walker
--- Copyright: (c) 2012--2013 The University of Kansas
+-- Copyright: (c) 2012--2014 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
@@ -25,7 +25,7 @@ module Language.KURE.Walker
 
         -- * Deep Traversals
 
-        -- ** Rewrite Traversals
+        -- ** Traversals for Rewrites
         , alltdR
         , allbuR
         , allduR
@@ -40,7 +40,7 @@ module Language.KURE.Walker
         , anyLargestR
         , oneLargestR
 
-        -- ** Translate Traversals
+        -- ** Traversals for Transformations
         , foldtdT
         , foldbuT
         , onetdT
@@ -53,7 +53,7 @@ module Language.KURE.Walker
         , allLargestT
         , oneLargestT
 
-        -- * Utilitity Translations
+        -- * Utilitity Transformations
         , childrenT
         , summandIsTypeT
 
@@ -84,7 +84,7 @@ import Control.Arrow
 import Control.Category hiding ((.))
 
 import Language.KURE.MonadCatch
-import Language.KURE.Translate
+import Language.KURE.Transform
 import Language.KURE.Lens
 import Language.KURE.Injection
 import Language.KURE.Combinators
@@ -102,26 +102,26 @@ import Language.KURE.Path
 
 class Walker c g where
 
-  -- | Apply a 'Rewrite' to all immediate children, succeeding if they all succeed.
+  -- | Apply a rewrite to all immediate children, succeeding if they all succeed.
   allR :: MonadCatch m => Rewrite c m g -> Rewrite c m g
 
-  -- | Apply a 'Translate' to all immediate children, succeeding if they all succeed.
+  -- | Apply a transformation to all immediate children, succeeding if they all succeed.
   --   The results are combined in a 'Monoid'.
-  allT :: (MonadCatch m, Monoid b) => Translate c m g b -> Translate c m g b
+  allT :: (MonadCatch m, Monoid b) => Transform c m g b -> Transform c m g b
   allT = unwrapAllT . allR . wrapAllT
   {-# INLINE allT #-}
 
-  -- | Apply a 'Translate' to the first immediate child for which it can succeed.
-  oneT :: MonadCatch m => Translate c m g b -> Translate c m g b
+  -- | Apply a transformation to the first immediate child for which it can succeed.
+  oneT :: MonadCatch m => Transform c m g b -> Transform c m g b
   oneT = unwrapOneT . allR . wrapOneT
   {-# INLINE oneT #-}
 
-  -- | Apply a 'Rewrite' to all immediate children, suceeding if any succeed.
+  -- | Apply a rewrite to all immediate children, suceeding if any succeed.
   anyR :: MonadCatch m => Rewrite c m g -> Rewrite c m g
   anyR = unwrapAnyR . allR . wrapAnyR
   {-# INLINE anyR #-}
 
-  -- | Apply a 'Rewrite' to the first immediate child for which it can succeed.
+  -- | Apply a rewrite to the first immediate child for which it can succeed.
   oneR :: MonadCatch m => Rewrite c m g -> Rewrite c m g
   oneR = unwrapOneR . allR . wrapOneR
   {-# INLINE oneR #-}
@@ -134,96 +134,96 @@ class Walker c g where
 ------------------------------------------------------------------------------------------
 
 -- | List the children of the current node.
-childrenT :: (ReadPath c crumb, Walker c g, MonadCatch m) => Translate c m g [crumb]
+childrenT :: (ReadPath c crumb, Walker c g, MonadCatch m) => Transform c m g [crumb]
 childrenT = allT (lastCrumbT >>^ return)
 {-# INLINE childrenT #-}
 
 -------------------------------------------------------------------------------
 
--- | Apply a 'Translate' to a specified child.
-childT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => crumb -> Translate c m g b -> Translate c m g b
+-- | Apply a transformation to a specified child.
+childT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => crumb -> Transform c m g b -> Transform c m g b
 childT n = focusT (childL n)
 {-# INLINE childT #-}
 
--- | Apply a 'Rewrite' to a specified child.
+-- | Apply a rewrite to a specified child.
 childR :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => crumb -> Rewrite c m g -> Rewrite c m g
 childR n = focusR (childL n)
 {-# INLINE childR #-}
 
 -------------------------------------------------------------------------------
 
--- | Fold a tree in a top-down manner, using a single 'Translate' for each node.
-foldtdT :: (Walker c g, MonadCatch m, Monoid b) => Translate c m g b -> Translate c m g b
+-- | Fold a tree in a top-down manner, using a single 'Transform' for each node.
+foldtdT :: (Walker c g, MonadCatch m, Monoid b) => Transform c m g b -> Transform c m g b
 foldtdT t = prefixFailMsg "foldtdT failed: " $
             let go = t <> allT go
              in go
 {-# INLINE foldtdT #-}
 
--- | Fold a tree in a bottom-up manner, using a single 'Translate' for each node.
-foldbuT :: (Walker c g, MonadCatch m, Monoid b) => Translate c m g b -> Translate c m g b
+-- | Fold a tree in a bottom-up manner, using a single 'Transform' for each node.
+foldbuT :: (Walker c g, MonadCatch m, Monoid b) => Transform c m g b -> Transform c m g b
 foldbuT t = prefixFailMsg "foldbuT failed: " $
             let go = allT go <> t
              in go
 {-# INLINE foldbuT #-}
 
--- | Apply a 'Translate' to the first node for which it can succeed, in a top-down traversal.
-onetdT :: (Walker c g, MonadCatch m) => Translate c m g b -> Translate c m g b
+-- | Apply a transformation to the first node for which it can succeed, in a top-down traversal.
+onetdT :: (Walker c g, MonadCatch m) => Transform c m g b -> Transform c m g b
 onetdT t = setFailMsg "onetdT failed" $
            let go = t <+ oneT go
             in go
 {-# INLINE onetdT #-}
 
--- | Apply a 'Translate' to the first node for which it can succeed, in a bottom-up traversal.
-onebuT :: (Walker c g, MonadCatch m) => Translate c m g b -> Translate c m g b
+-- | Apply a transformation to the first node for which it can succeed, in a bottom-up traversal.
+onebuT :: (Walker c g, MonadCatch m) => Transform c m g b -> Transform c m g b
 onebuT t = setFailMsg "onebuT failed" $
            let go = oneT go <+ t
             in go
 {-# INLINE onebuT #-}
 
--- | Attempt to apply a 'Translate' in a top-down manner, pruning at successes.
-prunetdT :: (Walker c g, MonadCatch m, Monoid b) => Translate c m g b -> Translate c m g b
+-- | Attempt to apply a 'Transform' in a top-down manner, pruning at successes.
+prunetdT :: (Walker c g, MonadCatch m, Monoid b) => Transform c m g b -> Transform c m g b
 prunetdT t = setFailMsg "prunetdT failed" $
              let go = t <+ allT go
               in go
 {-# INLINE prunetdT #-}
 
 -- | An always successful top-down fold, replacing failures with 'mempty'.
-crushtdT :: (Walker c g, MonadCatch m, Monoid b) => Translate c m g b -> Translate c m g b
+crushtdT :: (Walker c g, MonadCatch m, Monoid b) => Transform c m g b -> Transform c m g b
 crushtdT t = foldtdT (mtryM t)
 {-# INLINE crushtdT #-}
 
 -- | An always successful bottom-up fold, replacing failures with 'mempty'.
-crushbuT :: (Walker c g, MonadCatch m, Monoid b) => Translate c m g b -> Translate c m g b
+crushbuT :: (Walker c g, MonadCatch m, Monoid b) => Transform c m g b -> Transform c m g b
 crushbuT t = foldbuT (mtryM t)
 {-# INLINE crushbuT #-}
 
--- | An always successful traversal that collects the results of all successful applications of a 'Translate' in a list.
-collectT :: (Walker c g, MonadCatch m) => Translate c m g b -> Translate c m g [b]
+-- | An always successful traversal that collects the results of all successful applications of a 'Transform' in a list.
+collectT :: (Walker c g, MonadCatch m) => Transform c m g b -> Transform c m g [b]
 collectT t = crushtdT (t >>^ singleton) >>^ toList
 {-# INLINE collectT #-}
 
 -- | Like 'collectT', but does not traverse below successes.
-collectPruneT :: (Walker c g, MonadCatch m) => Translate c m g b -> Translate c m g [b]
+collectPruneT :: (Walker c g, MonadCatch m) => Transform c m g b -> Transform c m g [b]
 collectPruneT t = prunetdT (t >>^ singleton) >>^ toList
 {-# INLINE collectPruneT #-}
 
 -------------------------------------------------------------------------------
 
--- | Apply a 'Rewrite' in a top-down manner, succeeding if they all succeed.
+-- | Apply a rewrite in a top-down manner, succeeding if they all succeed.
 alltdR :: (Walker c g, MonadCatch m) => Rewrite c m g -> Rewrite c m g
 alltdR r = prefixFailMsg "alltdR failed: " $
            let go = r >>> allR go
             in go
 {-# INLINE alltdR #-}
 
--- | Apply a 'Rewrite' in a bottom-up manner, succeeding if they all succeed.
+-- | Apply a rewrite in a bottom-up manner, succeeding if they all succeed.
 allbuR :: (Walker c g, MonadCatch m) => Rewrite c m g -> Rewrite c m g
 allbuR r = prefixFailMsg "allbuR failed: " $
            let go = allR go >>> r
             in go
 {-# INLINE allbuR #-}
 
--- | Apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal,
+-- | Apply a rewrite twice, in a top-down and bottom-up way, using one single tree traversal,
 --   succeeding if they all succeed.
 allduR :: (Walker c g, MonadCatch m) => Rewrite c m g -> Rewrite c m g
 allduR r = prefixFailMsg "allduR failed: " $
@@ -231,21 +231,21 @@ allduR r = prefixFailMsg "allduR failed: " $
             in go
 {-# INLINE allduR #-}
 
--- | Apply a 'Rewrite' in a top-down manner, succeeding if any succeed.
+-- | Apply a rewrite in a top-down manner, succeeding if any succeed.
 anytdR :: (Walker c g, MonadCatch m) => Rewrite c m g -> Rewrite c m g
 anytdR r = setFailMsg "anytdR failed" $
            let go = r >+> anyR go
             in go
 {-# INLINE anytdR #-}
 
--- | Apply a 'Rewrite' in a bottom-up manner, succeeding if any succeed.
+-- | Apply a rewrite in a bottom-up manner, succeeding if any succeed.
 anybuR :: (Walker c g, MonadCatch m) => Rewrite c m g -> Rewrite c m g
 anybuR r = setFailMsg "anybuR failed" $
            let go = anyR go >+> r
             in go
 {-# INLINE anybuR #-}
 
--- | Apply a 'Rewrite' twice, in a top-down and bottom-up way, using one single tree traversal,
+-- | Apply a rewrite twice, in a top-down and bottom-up way, using one single tree traversal,
 --   succeeding if any succeed.
 anyduR :: (Walker c g, MonadCatch m) => Rewrite c m g -> Rewrite c m g
 anyduR r = setFailMsg "anyduR failed" $
@@ -253,14 +253,14 @@ anyduR r = setFailMsg "anyduR failed" $
             in go
 {-# INLINE anyduR #-}
 
--- | Apply a 'Rewrite' to the first node for which it can succeed, in a top-down traversal.
+-- | Apply a rewrite to the first node for which it can succeed, in a top-down traversal.
 onetdR :: (Walker c g, MonadCatch m) => Rewrite c m g -> Rewrite c m g
 onetdR r = setFailMsg "onetdR failed" $
            let go = r <+ oneR go
             in go
 {-# INLINE onetdR #-}
 
--- | Apply a 'Rewrite' to the first node for which it can succeed, in a bottom-up traversal.
+-- | Apply a rewrite to the first node for which it can succeed, in a bottom-up traversal.
 onebuR :: (Walker c g, MonadCatch m) => Rewrite c m g -> Rewrite c m g
 onebuR r = setFailMsg "onebuR failed" $
            let go = oneR go <+ r
@@ -310,65 +310,65 @@ repeatPathL p = let go = tryL (pathL p >>> go)
 
 -------------------------------------------------------------------------------
 
--- | Apply a 'Rewrite' at a point specified by a 'Path'.
+-- | Apply a rewrite at a point specified by a 'Path'.
 pathR :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Rewrite c m g -> Rewrite c m g
 pathR = focusR . pathL
 {-# INLINE pathR #-}
 
--- | Apply a 'Translate' at a point specified by a 'Path'.
-pathT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Translate c m g b -> Translate c m g b
+-- | Apply a transformation at a point specified by a 'Path'.
+pathT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Transform c m g b -> Transform c m g b
 pathT = focusT . pathL
 {-# INLINE pathT #-}
 
--- | Apply a 'Rewrite' at a point specified by a 'LocalPath'.
+-- | Apply a rewrite at a point specified by a 'LocalPath'.
 localPathR :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => LocalPath crumb -> Rewrite c m g -> Rewrite c m g
 localPathR = focusR . localPathL
 {-# INLINE localPathR #-}
 
--- | Apply a 'Translate' at a point specified by a 'LocalPath'.
-localPathT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => LocalPath crumb -> Translate c m g b -> Translate c m g b
+-- | Apply a transformation at a point specified by a 'LocalPath'.
+localPathT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => LocalPath crumb -> Transform c m g b -> Transform c m g b
 localPathT = focusT . localPathL
 {-# INLINE localPathT #-}
 
 -------------------------------------------------------------------------------
 
 -- | Check if it is possible to construct a 'Lens' along this path from the current node.
-testPathT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Translate c m g Bool
+testPathT :: (ReadPath c crumb, Eq crumb, Walker c g, MonadCatch m) => Path crumb -> Transform c m g Bool
 testPathT = testLensT . pathL
 {-# INLINE testPathT #-}
 
 -------------------------------------------------------------------------------
 
--- | Apply a 'Rewrite' to the largest node(s) that satisfy the predicate, requiring all to succeed.
-allLargestR :: (Walker c g, MonadCatch m) => Translate c m g Bool -> Rewrite c m g -> Rewrite c m g
+-- | Apply a rewrite to the largest node(s) that satisfy the predicate, requiring all to succeed.
+allLargestR :: (Walker c g, MonadCatch m) => Transform c m g Bool -> Rewrite c m g -> Rewrite c m g
 allLargestR p r = prefixFailMsg "allLargestR failed: " $
                   let go = ifM p r (allR go)
                    in go
 {-# INLINE allLargestR #-}
 
--- | Apply a 'Rewrite' to the largest node(s) that satisfy the predicate, succeeding if any succeed.
-anyLargestR :: (Walker c g, MonadCatch m) => Translate c m g Bool -> Rewrite c m g -> Rewrite c m g
+-- | Apply a rewrite to the largest node(s) that satisfy the predicate, succeeding if any succeed.
+anyLargestR :: (Walker c g, MonadCatch m) => Transform c m g Bool -> Rewrite c m g -> Rewrite c m g
 anyLargestR p r = setFailMsg "anyLargestR failed" $
                   let go = ifM p r (anyR go)
                    in go
 {-# INLINE anyLargestR #-}
 
--- | Apply a 'Rewrite' to the first node for which it can succeed among the largest node(s) that satisfy the predicate.
-oneLargestR :: (Walker c g, MonadCatch m) => Translate c m g Bool -> Rewrite c m g -> Rewrite c m g
+-- | Apply a rewrite to the first node for which it can succeed among the largest node(s) that satisfy the predicate.
+oneLargestR :: (Walker c g, MonadCatch m) => Transform c m g Bool -> Rewrite c m g -> Rewrite c m g
 oneLargestR p r = setFailMsg "oneLargestR failed" $
                   let go = ifM p r (oneR go)
                    in go
 {-# INLINE oneLargestR #-}
 
--- | Apply a 'Translate' to the largest node(s) that satisfy the predicate, combining the results in a monoid.
-allLargestT :: (Walker c g, MonadCatch m, Monoid b) => Translate c m g Bool -> Translate c m g b -> Translate c m g b
+-- | Apply a transformation to the largest node(s) that satisfy the predicate, combining the results in a monoid.
+allLargestT :: (Walker c g, MonadCatch m, Monoid b) => Transform c m g Bool -> Transform c m g b -> Transform c m g b
 allLargestT p t = prefixFailMsg "allLargestT failed: " $
                   let go = ifM p t (allT go)
                    in go
 {-# INLINE allLargestT #-}
 
--- | Apply a 'Translate' to the first node for which it can succeed among the largest node(s) that satisfy the predicate.
-oneLargestT :: (Walker c g, MonadCatch m) => Translate c m g Bool -> Translate c m g b -> Translate c m g b
+-- | Apply a transformation to the first node for which it can succeed among the largest node(s) that satisfy the predicate.
+oneLargestT :: (Walker c g, MonadCatch m) => Transform c m g Bool -> Transform c m g b -> Transform c m g b
 oneLargestT p t = setFailMsg "oneLargestT failed" $
                   let go = ifM p t (oneT go)
                    in go
@@ -376,7 +376,7 @@ oneLargestT p t = setFailMsg "oneLargestT failed" $
 
 -- | Test if the type of the current node summand matches the type of the argument.
 --   Note that the argument /value/ is never inspected, it is merely a proxy for a type argument.
-summandIsTypeT :: forall c m a g. (MonadCatch m, Injection a g) => a -> Translate c m g Bool
+summandIsTypeT :: forall c m a g. (MonadCatch m, Injection a g) => a -> Transform c m g Bool
 summandIsTypeT _ = arr (isJust . (project :: (g -> Maybe a)))
 {-# INLINE summandIsTypeT #-}
 
@@ -438,13 +438,13 @@ instance (Monoid w, MonadCatch m) => MonadCatch (AllT w m) where
    {-# INLINE catchM #-}
 
 
--- | Wrap a 'Translate' using the 'AllT' monad transformer.
-wrapAllT :: Monad m => Translate c m g b -> Rewrite c (AllT b m) g
+-- | Wrap a 'Transform' using the 'AllT' monad transformer.
+wrapAllT :: Monad m => Transform c m g b -> Rewrite c (AllT b m) g
 wrapAllT t = readerT $ \ a -> resultT (AllT . liftM (P a)) t
 {-# INLINE wrapAllT #-}
 
--- | Unwrap a 'Translate' from the 'AllT' monad transformer.
-unwrapAllT :: MonadCatch m => Rewrite c (AllT b m) g -> Translate c m g b
+-- | Unwrap a 'Transform' from the 'AllT' monad transformer.
+unwrapAllT :: MonadCatch m => Rewrite c (AllT b m) g -> Transform c m g b
 unwrapAllT = prefixFailMsg "allT failed:" . resultT (liftM pSnd . unAllT)
 {-# INLINE unwrapAllT #-}
 
@@ -495,15 +495,15 @@ instance MonadCatch m => MonadCatch (OneT w m) where
    {-# INLINE catchM #-}
 
 
--- | Wrap a 'Translate' using the 'OneT' monad transformer.
-wrapOneT :: MonadCatch m => Translate c m g b -> Rewrite c (OneT b m) g
+-- | Wrap a 'Transform' using the 'OneT' monad transformer.
+wrapOneT :: MonadCatch m => Transform c m g b -> Rewrite c (OneT b m) g
 wrapOneT t = rewrite $ \ c a -> OneT $ \ mw -> case mw of
                                                  Just w  -> return (P a (Just w))
-                                                 Nothing -> ((P a . Just) `liftM` apply t c a) <+ return (P a mw)
+                                                 Nothing -> ((P a . Just) `liftM` applyT t c a) <+ return (P a mw)
 {-# INLINE wrapOneT #-}
 
--- | Unwrap a 'Translate' from the 'OneT' monad transformer.
-unwrapOneT :: Monad m => Rewrite c (OneT b m) g -> Translate c m g b
+-- | Unwrap a 'Transform' from the 'OneT' monad transformer.
+unwrapOneT :: Monad m => Rewrite c (OneT b m) g -> Transform c m g b
 unwrapOneT = resultT (checkSuccessPMaybe "oneT failed" . liftM pSnd . ($ Nothing) . unOneT)
 {-# INLINE unwrapOneT #-}
 
@@ -563,11 +563,11 @@ wrapGetChild cr = do cr' <- lastCrumbT
                      rewrite $ \ c a -> GetChild (return a) (if cr == cr' then Just (c, a) else Nothing)
 {-# INLINE wrapGetChild #-}
 
-unwrapGetChild :: Rewrite c (GetChild c g) g -> Translate c Maybe g (c,g)
+unwrapGetChild :: Rewrite c (GetChild c g) g -> Transform c Maybe g (c,g)
 unwrapGetChild = resultT (\ (GetChild _ mcg) -> mcg)
 {-# INLINE unwrapGetChild #-}
 
-getChild :: (ReadPath c crumb, Eq crumb, Walker c g) => crumb -> Translate c Maybe g (c, g)
+getChild :: (ReadPath c crumb, Eq crumb, Walker c g) => crumb -> Transform c Maybe g (c, g)
 getChild = unwrapGetChild . allR . wrapGetChild
 {-# INLINE getChild #-}
 
@@ -595,12 +595,12 @@ childL_default cr = lens $ do cg <- getter
                               k  <- setter
                               return (cg, k)
   where
-    getter :: Translate c m g (c,g)
+    getter :: Transform c m g (c,g)
     getter = resultT (projectWithFailMsgM "there is no child matching the crumb.") (getChild cr)
     {-# INLINE getter #-}
 
-    setter :: Translate c m g (g -> m g)
-    setter = translate $ \ c a -> return (\ b -> apply (setChild cr b) c a)
+    setter :: Transform c m g (g -> m g)
+    setter = transform $ \ c a -> return (\ b -> applyR (setChild cr b) c a)
     {-# INLINE setter #-}
 {-# INLINE childL_default #-}
 

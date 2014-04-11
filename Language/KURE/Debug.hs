@@ -1,6 +1,6 @@
 -- |
--- Module: Language.KURE.Combinators.Translate
--- Copyright: (c) 2012--2013 The University of Kansas
+-- Module: Language.KURE.Debug
+-- Copyright: (c) 2012--2014 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
@@ -15,10 +15,10 @@ module Language.KURE.Debug (
 
 import Debug.Trace
 
-import Language.KURE.Combinators.Translate
-import Language.KURE.Translate
+import Language.KURE.Combinators.Transform
+import Language.KURE.Transform
 
 
--- | trace output of the value being rewritten; use for debugging only.
+-- | Trace output of the value being rewritten; use for debugging only.
 debugR :: (Monad m, Show a) => Int -> String -> Rewrite c m a
 debugR n msg = acceptR (\ a -> trace (msg ++ " : " ++ take n (show a)) True)

@@ -19,9 +19,9 @@ instance ExtendPath c Crumb => Walker c Arith where
    allR r = prefixFailMsg "allR failed: " $
      rewrite $ \ c -> \case
                          Lit n      ->  Lit <$> return n
-                         Add e0 e1  ->  Add <$> apply r (c @@ LeftChild) e0 <*> apply r (c @@ RightChild) e1
-                         Sub e0 e1  ->  Sub <$> apply r (c @@ LeftChild) e0 <*> apply r (c @@ RightChild) e1
-                         Fib e0     ->  Fib <$> apply r (c @@ OnlyChild) e0
+                         Add e0 e1  ->  Add <$> applyR r (c @@ LeftChild) e0 <*> applyR r (c @@ RightChild) e1
+                         Sub e0 e1  ->  Sub <$> applyR r (c @@ LeftChild) e0 <*> applyR r (c @@ RightChild) e1
+                         Fib e0     ->  Fib <$> applyR r (c @@ OnlyChild) e0
 
 --------------------------------------------------------------------------------------
 

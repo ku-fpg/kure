@@ -1,17 +1,17 @@
 {-# Language InstanceSigs #-}
 -- |
--- Module: Language.KURE.Combinators.Translate
--- Copyright: (c) 2012--2013 The University of Kansas
+-- Module: Language.KURE.Combinators.Transform
+-- Copyright: (c) 2012--2014 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
 -- Stability: beta
 -- Portability: ghc
 --
--- This module provides a variety of combinators over 'Translate' and 'Rewrite'.
+-- This module provides a variety of combinators over 'Transform' and 'Rewrite'.
 
-module Language.KURE.Combinators.Translate
-        ( -- * Translate Combinators
+module Language.KURE.Combinators.Transform
+        ( -- * Transformation Combinators
           idR
         , successT
         , contextT
@@ -60,53 +60,53 @@ import Data.Traversable
 import Language.KURE.Combinators.Arrow
 import Language.KURE.Combinators.Monad
 import Language.KURE.MonadCatch
-import Language.KURE.Translate
+import Language.KURE.Transform
 
 ------------------------------------------------------------------------------------------
 
--- | The identity 'Rewrite'.
+-- | The identity rewrite.
 idR :: Monad m => Rewrite c m a
 idR = id
 {-# INLINE idR #-}
 
--- | An always successful 'Translate'.
-successT :: Monad m => Translate c m a ()
+-- | An always successful transformation.
+successT :: Monad m => Transform c m a ()
 successT = return ()
 {-# INLINE successT #-}
 
 -- | Extract the current context.
-contextT :: Monad m => Translate c m a c
-contextT = translate (\ c _ -> return c)
+contextT :: Monad m => Transform c m a c
+contextT = transform (\ c _ -> return c)
 {-# INLINE contextT #-}
 
 -- | Expose the current context and value.
-exposeT :: Monad m => Translate c m a (c,a)
-exposeT = translate (curry return)
+exposeT :: Monad m => Transform c m a (c,a)
+exposeT = transform (curry return)
 {-# INLINE exposeT #-}
 
--- | Lift a 'Translate' to operate on a derived context.
-liftContext :: (c -> c') -> Translate c' m a b -> Translate c m a b
-liftContext f t = translate (apply t . f)
+-- | Lift a transformation to operate on a derived context.
+liftContext :: (c -> c') -> Transform c' m a b -> Transform c m a b
+liftContext f t = transform (applyT t . f)
 {-# INLINE liftContext #-}
 
--- | Map a 'Translate' over a list.
-mapT :: (Traversable t, Monad m) => Translate c m a b -> Translate c m (t a) (t b)
-mapT t = translate (mapM . apply t)
+-- | Map a transformation over a list.
+mapT :: (Traversable t, Monad m) => Transform c m a b -> Transform c m (t a) (t b)
+mapT t = transform (mapM . applyT t)
 {-# INLINE mapT #-}
 
--- | An identity 'Rewrite' with side-effects.
+-- | An identity rewrite with side-effects.
 sideEffectR :: Monad m => (c -> a -> m ()) -> Rewrite c m a
-sideEffectR f = translate f >> id
+sideEffectR f = transform f >> id
 {-# INLINE sideEffectR #-}
 
--- | Look at the argument to the 'Translate' before choosing which 'Translate' to use.
-readerT :: (a -> Translate c m a b) -> Translate c m a b
-readerT f = translate (\ c a -> apply (f a) c a)
+-- | Look at the argument to the transformation before choosing which 'Transform' to use.
+readerT :: (a -> Transform c m a b) -> Transform c m a b
+readerT f = transform (\ c a -> applyT (f a) c a)
 {-# INLINE readerT #-}
 
--- | Convert the monadic result of a 'Translate' into a result in another monad.
-resultT :: (m b -> n d) -> Translate c m a b -> Translate c n a d
-resultT f t = translate (\ c -> f . apply t c)
+-- | Convert the monadic result of a transformation into a result in another monad.
+resultT :: (m b -> n d) -> Transform c m a b -> Transform c n a d
+resultT f t = transform (\ c -> f . applyT t c)
 {-# INLINE resultT #-}
 
 -- | Perform a collection of rewrites in sequence, requiring all to succeed.
@@ -129,52 +129,52 @@ acceptWithFailMsgR :: Monad m => (a -> Bool) -> String -> Rewrite c m a
 acceptWithFailMsgR p msg = readerT $ \ a -> if p a then id else fail msg
 {-# INLINE acceptWithFailMsgR #-}
 
--- | Look at the argument to a 'Rewrite', and choose to be either 'idR' or a failure.
+-- | Look at the argument to a rewrite, and choose to be either 'idR' or a failure.
 acceptR :: Monad m => (a -> Bool) -> Rewrite c m a
 acceptR p = acceptWithFailMsgR p "acceptR: predicate failed"
 {-# INLINE acceptR #-}
 
--- | A generalisation of 'acceptR' where the predicate is a 'Translate'.
-accepterR :: Monad m => Translate c m a Bool -> Rewrite c m a
+-- | A generalisation of 'acceptR' where the predicate is a 'Transform'.
+accepterR :: Monad m => Transform c m a Bool -> Rewrite c m a
 accepterR t = ifM t idR (fail "accepterR: predicate failed")
 {-# INLINE accepterR #-}
 
--- | Catch a failing 'Rewrite', making it into an identity.
+-- | Catch a failing rewrite, making it into an identity.
 tryR :: MonadCatch m => Rewrite c m a -> Rewrite c m a
 tryR r = r <+ id
 {-# INLINE tryR #-}
 
--- | Makes a 'Rewrite' fail if the result value and the argument value satisfy the equality predicate.
+-- | Makes a rewrite fail if the result value and the argument value satisfy the equality predicate.
 --   This is a generalisation of 'changedR'.
 --   @changedR = changedByR ('==')@
 changedByR :: MonadCatch m => (a -> a -> Bool) -> Rewrite c m a -> Rewrite c m a
 changedByR p r = readerT (\ a -> r >>> acceptWithFailMsgR (not . p a) "changedByR: value is unchanged")
 {-# INLINE changedByR #-}
 
--- | Makes an 'Rewrite' fail if the result value equals the argument value.
+-- | Makes an rewrite fail if the result value equals the argument value.
 changedR :: (MonadCatch m, Eq a) => Rewrite c m a -> Rewrite c m a
 changedR = changedByR (==)
 {-# INLINE changedR #-}
 
--- | Repeat a 'Rewrite' until it fails, then return the result before the failure.
+-- | Repeat a rewrite until it fails, then return the result before the failure.
 --   Requires at least the first attempt to succeed.
 repeatR :: MonadCatch m => Rewrite c m a -> Rewrite c m a
 repeatR r = let go = r >>> tryR go
              in go
 {-# INLINE repeatR #-}
 
--- | Attempt each 'Translate' until one succeeds, then return that result and discard the rest of the 'Translate's.
-catchesT :: MonadCatch m => [Translate c m a b] -> Translate c m a b
+-- | Attempt each trransformation until one succeeds, then return that result and discard the rest of the transformations.
+catchesT :: MonadCatch m => [Transform c m a b] -> Transform c m a b
 catchesT = foldr (<+) (fail "catchesT failed")
 {-# INLINE catchesT #-}
 
--- | An identity translation that resembles a monadic 'Control.Monad.join'.
-joinT :: Translate c m (m a) a
+-- | An identity transformation that resembles a monadic 'Control.Monad.join'.
+joinT :: Transform c m (m a) a
 joinT = contextfreeT id
 {-# INLINE joinT #-}
 
 -- | Fail if the Boolean is False, succeed if the Boolean is True.
-guardT :: Monad m => Translate c m Bool ()
+guardT :: Monad m => Transform c m Bool ()
 guardT = contextfreeT guardM
 {-# INLINE guardT #-}
 
@@ -244,7 +244,7 @@ instance MonadCatch m => MonadCatch (AnyR m) where
 
 -- | Wrap a 'Rewrite' using the 'AnyR' monad transformer.
 wrapAnyR :: MonadCatch m => Rewrite c m a -> Rewrite c (AnyR m) a
-wrapAnyR r = rewrite $ \ c a -> AnyR $ (PBool True `liftM` apply r c a) <+ return (PBool False a)
+wrapAnyR r = rewrite $ \ c a -> AnyR $ (PBool True `liftM` applyR r c a) <+ return (PBool False a)
 {-# INLINE wrapAnyR #-}
 
 -- | Unwrap a 'Rewrite' from the 'AnyR' monad transformer.
@@ -304,7 +304,7 @@ instance MonadCatch m => MonadCatch (OneR m) where
 wrapOneR :: MonadCatch m => Rewrite c m g -> Rewrite c (OneR m) g
 wrapOneR r = rewrite $ \ c a -> OneR $ \ b -> if b
                                                 then return (PBool True a)
-                                                else (PBool True `liftM` apply r c a) <+ return (PBool False a)
+                                                else (PBool True `liftM` applyR r c a) <+ return (PBool False a)
 {-# INLINE wrapOneR #-}
 
 -- | Unwrap a 'Rewrite' from the 'OneR' monad transformer.

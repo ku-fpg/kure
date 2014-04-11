@@ -24,16 +24,16 @@ instance (ExtendPath c Crumb, AddBoundVar c) => Walker c Exp where
 -- | Congruence combinators.
 --   Using these ensures that the context is updated consistantly.
 
-varT :: Monad m => (Name -> b) -> Translate c m Exp b
+varT :: Monad m => (Name -> b) -> Transform c m Exp b
 varT f = contextfreeT $ \case
                            Var n -> return (f n)
                            _     -> fail "no match for Var"
 
 -------------------------------------------------------------------------------
 
-lamT :: (ExtendPath c Crumb, AddBoundVar c, Monad m) => Translate c m Exp a -> (Name -> a -> b) -> Translate c m Exp b
-lamT t f = translate $ \ c -> \case
-                                 Lam v e -> f v <$> apply t (addBoundVar v c @@ Lam_Body) e
+lamT :: (ExtendPath c Crumb, AddBoundVar c, Monad m) => Transform c m Exp a -> (Name -> a -> b) -> Transform c m Exp b
+lamT t f = transform $ \ c -> \case
+                                 Lam v e -> f v <$> applyT t (addBoundVar v c @@ Lam_Body) e
                                  _       -> fail "no match for Lam"
 
 lamR :: (ExtendPath c Crumb, AddBoundVar c, Monad m) => Rewrite c m Exp -> Rewrite c m Exp
@@ -41,9 +41,9 @@ lamR r = lamT r Lam
 
 -------------------------------------------------------------------------------
 
-appT :: (ExtendPath c Crumb, Monad m) => Translate c m Exp a1 -> Translate c m Exp a2 -> (a1 -> a2 -> b) -> Translate c m Exp b
-appT t1 t2 f = translate $ \ c -> \case
-                                     App e1 e2 -> f <$> apply t1 (c @@ App_Fun) e1 <*> apply t2 (c @@ App_Arg) e2
+appT :: (ExtendPath c Crumb, Monad m) => Transform c m Exp a1 -> Transform c m Exp a2 -> (a1 -> a2 -> b) -> Transform c m Exp b
+appT t1 t2 f = transform $ \ c -> \case
+                                     App e1 e2 -> f <$> applyT t1 (c @@ App_Fun) e1 <*> applyT t2 (c @@ App_Arg) e2
                                      _         -> fail "no match for App"
 
 appAllR :: (ExtendPath c Crumb, Monad m) => Rewrite c m Exp -> Rewrite c m Exp -> Rewrite c m Exp

@@ -24,17 +24,17 @@ freshName vs = do v <- suggestName
 
 -------------------------------------------------------------------------------
 
-type TranslateE b = Translate LamC LamM Exp b
-type RewriteE     = TranslateE Exp
+type TransformE b = Transform LamC LamM Exp b
+type RewriteE     = TransformE Exp
 
 -------------------------------------------------------------------------------
 
-applyExp :: TranslateE b -> Exp -> Either String b
-applyExp f = runLamM . apply f initialLamC
+applyExp :: TransformE b -> Exp -> Either String b
+applyExp t = runLamM . applyT t initialLamC
 
 ------------------------------------------------------------------------
 
-freeVarsT :: TranslateE [Name]
+freeVarsT :: TransformE [Name]
 freeVarsT = fmap nub $ crushbuT $ do (c, Var v) <- exposeT
                                      guardM (v `freeIn` c)
                                      return [v]

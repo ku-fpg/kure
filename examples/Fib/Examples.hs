@@ -9,14 +9,14 @@ import Fib.Kure
 
 -----------------------------------------------------------------------
 
--- | For this simple example, the context is just an 'AbsolutePath', and 'Translate' always operates on 'Arith'.
-type TranslateA b = Translate (AbsolutePath Crumb) KureM Arith b
-type RewriteA = TranslateA Arith
+-- | For this simple example, the context is just an 'AbsolutePath', and transformations always operates on 'Arith'.
+type TransformA b = Transform (AbsolutePath Crumb) KureM Arith b
+type RewriteA = TransformA Arith
 
 -----------------------------------------------------------------------
 
-applyFib :: TranslateA b -> Arith -> Either String b
-applyFib r = runKureM Right Left . apply r mempty
+applyFib :: TransformA b -> Arith -> Either String b
+applyFib t = runKureM Right Left . applyT t mempty
 
 -----------------------------------------------------------------------
 
