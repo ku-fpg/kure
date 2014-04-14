@@ -60,6 +60,7 @@ transform = Transform
 translate :: (c -> a -> m b) -> Translate c m a b
 translate = transform
 {-# INLINE translate #-}
+{-# DEPRECATED translate "Please use 'transform' instead." #-}
 
 -- | A transformation that shares the same source and target type.
 type Rewrite c m a = Transform c m a a
