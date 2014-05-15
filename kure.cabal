@@ -4,7 +4,7 @@ Synopsis:            Combinators for Strategic Programming
 Description:	     The Kansas University Rewrite Engine (KURE) is a domain-specific language for strategic rewriting.
 	 	     KURE was inspired by Stratego and StrategyLib, and has similarities with Scrap Your Boilerplate and Uniplate.
                      .
-                     The basic transformation functionality can be found in "Language.KURE.Translate",
+                     The basic transformation functionality can be found in "Language.KURE.Transform",
                      and the traversal functionality can be found in "Language.KURE.Walker".
                      Several basic examples of using KURE are provided in the source-code bundle.
                      For larger examples, see the HERMIT or HTML-KURE packages.
