@@ -20,6 +20,7 @@ module Language.KURE.BiTransform
         , whicheverR
         , invertBiT
         , beforeBiR
+        , afterBiR
 ) where
 
 import Prelude hiding (id, (.))
@@ -67,10 +68,16 @@ instance Monad m => Category (BiTransform c m) where
    (BiTransform f1 b1) . (BiTransform f2 b2) = BiTransform (f1 . f2) (b2 . b1)
    {-# INLINE (.) #-}
 
+------------------------------------------------------------------------------------------
 
 -- | Perform the argument transformation before /either/ direction of the bidirectional rewrite.
 beforeBiR :: Monad m => Transform c m a b -> (b -> BiRewrite c m a) -> BiRewrite c m a
 beforeBiR t f = bidirectional (t >>= (forwardT . f)) (t >>= (backwardT . f))
 {-# INLINE beforeBiR #-}
+
+-- | Apply the argument rewrite to the result of /either/ direction of the bidirectional rewrite.
+afterBiR :: Monad m => BiRewrite c m a -> Rewrite c m a -> BiRewrite c m a
+afterBiR b rr = bidirectional (forwardT b >>> rr) (backwardT b >>> rr)
+{-# INLINE afterBiR #-}
 
 ------------------------------------------------------------------------------------------
