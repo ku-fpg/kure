@@ -1,4 +1,4 @@
-{-# LANGUAGE InstanceSigs, LambdaCase, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE CPP, InstanceSigs, LambdaCase, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, UndecidableInstances #-}
 
 module Expr.Kure where
 
@@ -11,18 +11,18 @@ import Expr.Context
 
 ---------------------------------------------------------------------------
 
-data Generic = GExpr Expr
-             | GCmd Cmd
+data Universe = GExpr Expr
+              | GCmd Cmd
 
 ---------------------------------------------------------------------------
 
-instance Injection Expr Generic where
+instance Injection Expr Universe where
   inject = GExpr
 
   project (GExpr e) = Just e
   project _         = Nothing
 
-instance Injection Cmd Generic where
+instance Injection Cmd Universe where
   inject = GCmd
 
   project (GCmd c) = Just c
@@ -30,8 +30,8 @@ instance Injection Cmd Generic where
 
 ---------------------------------------------------------------------------
 
-instance (ExtendPath c Int, AddDef c) => Walker c Generic where
-   allR :: MonadCatch m => Rewrite c m Generic -> Rewrite c m Generic
+instance (ExtendPath c Int, AddDef c) => Walker c Universe where
+   allR :: MonadCatch m => Rewrite c m Universe -> Rewrite c m Universe
    allR r = prefixFailMsg "allR failed: " $
             rewrite $ \ c -> \case
               GExpr e  -> inject <$> applyR allRexpr c e
@@ -120,13 +120,14 @@ eseqOneR r1 r2 = unwrapOneR $ eseqAllR (wrapOneR r1) (wrapOneR r2)
 
 ---------------------------------------------------------------------------
 
--- I find it annoying that Applicative is not a superclass of Monad.
 (<$>) :: Monad m => (a -> b) -> m a -> m b
 (<$>) = liftM
 {-# INLINE (<$>) #-}
 
+#if __GLASGOW_HASKELL__ <= 708
 (<*>) :: Monad m => m (a -> b) -> m a -> m b
 (<*>) = ap
 {-# INLINE (<*>) #-}
+#endif
 
 ---------------------------------------------------------------------------

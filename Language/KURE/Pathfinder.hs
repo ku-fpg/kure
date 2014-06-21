@@ -59,30 +59,30 @@ exposeLocalPathT = contextT >>^ extraContext
 {-# INLINE exposeLocalPathT #-}
 
 -- | Return the current 'LocalPath' if the predicate transformation succeeds.
-acceptLocalPathT :: Monad m => Transform c m g Bool -> Transform (WithLocalPath c crumb) m g (LocalPath crumb)
+acceptLocalPathT :: Monad m => Transform c m u Bool -> Transform (WithLocalPath c crumb) m u (LocalPath crumb)
 acceptLocalPathT q = accepterR (liftContext baseContext q) >>> exposeLocalPathT
 {-# INLINE acceptLocalPathT #-}
 
 -------------------------------------------------------------------------------
 
 -- | Find the 'LocalPath's to every node that satisfies the predicate.
-pathsToT :: (Walker (WithLocalPath c crumb) g, MonadCatch m) => Transform c m g Bool -> Transform c m g [LocalPath crumb]
+pathsToT :: (Walker (WithLocalPath c crumb) u, MonadCatch m) => Transform c m u Bool -> Transform c m u [LocalPath crumb]
 pathsToT q = withLocalPathT (collectT $ acceptLocalPathT q)
 {-# INLINE pathsToT #-}
 
 -- | Find the 'LocalPath's to every node that satisfies the predicate, ignoring nodes below successes.
-prunePathsToT :: (Walker (WithLocalPath c crumb) g, MonadCatch m) => Transform c m g Bool -> Transform c m g [LocalPath crumb]
+prunePathsToT :: (Walker (WithLocalPath c crumb) u, MonadCatch m) => Transform c m u Bool -> Transform c m u [LocalPath crumb]
 prunePathsToT q = withLocalPathT (collectPruneT $ acceptLocalPathT q)
 {-# INLINE prunePathsToT #-}
 
 -- | Find the 'LocalPath' to the first node that satisfies the predicate (in a pre-order traversal).
-onePathToT :: forall c crumb g m. (Walker (WithLocalPath c crumb) g, MonadCatch m) => Transform c m g Bool -> Transform c m g (LocalPath crumb)
+onePathToT :: forall c crumb u m. (Walker (WithLocalPath c crumb) u, MonadCatch m) => Transform c m u Bool -> Transform c m u (LocalPath crumb)
 onePathToT q = setFailMsg "No matching nodes found." $
                withLocalPathT (onetdT $ acceptLocalPathT q)
 {-# INLINE onePathToT #-}
 
 -- | Find the 'LocalPath' to the first descendent node that satisfies the predicate (in a pre-order traversal).
-oneNonEmptyPathToT :: (Walker (WithLocalPath c crumb) g, MonadCatch m) => Transform c m g Bool -> Transform c m g (LocalPath crumb)
+oneNonEmptyPathToT :: (Walker (WithLocalPath c crumb) u, MonadCatch m) => Transform c m u Bool -> Transform c m u (LocalPath crumb)
 oneNonEmptyPathToT q = setFailMsg "No matching nodes found." $
                        withLocalPathT (oneT $ onetdT $ acceptLocalPathT q)
 {-# INLINE oneNonEmptyPathToT #-}
@@ -97,12 +97,12 @@ requireUniquePath = contextfreeT $ \ ps -> case ps of
 {-# INLINE requireUniquePath #-}
 
 -- | Find the 'LocalPath' to the node that satisfies the predicate, failing if that does not uniquely identify a node.
-uniquePathToT :: (Walker (WithLocalPath c crumb) g, MonadCatch m) => Transform c m g Bool -> Transform c m g (LocalPath crumb)
+uniquePathToT :: (Walker (WithLocalPath c crumb) u, MonadCatch m) => Transform c m u Bool -> Transform c m u (LocalPath crumb)
 uniquePathToT q = pathsToT q >>> requireUniquePath
 {-# INLINE uniquePathToT #-}
 
 -- | Build a 'LocalPath' to the node that satisfies the predicate, failing if that does not uniquely identify a node (ignoring nodes below successes).
-uniquePrunePathToT :: (Walker (WithLocalPath c crumb) g, MonadCatch m) => Transform c m g Bool -> Transform c m g (LocalPath crumb)
+uniquePrunePathToT :: (Walker (WithLocalPath c crumb) u, MonadCatch m) => Transform c m u Bool -> Transform c m u (LocalPath crumb)
 uniquePrunePathToT q = prunePathsToT q >>> requireUniquePath
 {-# INLINE uniquePrunePathToT #-}
 

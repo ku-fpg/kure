@@ -27,6 +27,7 @@ module Language.KURE.Transform
         , contextfreeT
         , contextonlyT
         , constT
+        , effectfreeT
 ) where
 
 import Prelude hiding (id, (.))
@@ -79,6 +80,7 @@ applyR = applyT
 apply :: Transform c m a b -> c -> a -> m b
 apply = applyT
 {-# INLINE apply #-}
+{-# DEPRECATED apply "Please use 'applyT' instead." #-}
 
 ------------------------------------------------------------------------------------------
 
@@ -96,6 +98,11 @@ contextonlyT f = transform (\ c _ -> f c)
 constT :: m b -> Transform c m a b
 constT = contextfreeT . const
 {-# INLINE constT #-}
+
+-- | Build a 'Transform' that doesn't perform any monadic effects.
+effectfreeT :: Monad m => (c -> a -> b) -> Transform c m a b
+effectfreeT f = transform ( \ c a -> return (f c a))
+{-# INLINE effectfreeT #-}
 
 ------------------------------------------------------------------------------------------
 

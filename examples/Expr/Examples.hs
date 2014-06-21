@@ -27,14 +27,14 @@ inlineR = withPatFailMsg "only variables can be inlined." $
           do (c, Var v) <- exposeT
              constT (lookupDef v c)
 
-inlineGR :: RewriteE Generic
+inlineGR :: RewriteE Universe
 inlineGR = promoteR inlineR
 
-isAssign :: Generic -> Bool
+isAssign :: Universe -> Bool
 isAssign (GCmd Assign{}) = True
 isAssign _               = False
 
-isESeq :: Generic -> Bool
+isESeq :: Universe -> Bool
 isESeq (GExpr ESeq{}) = True
 isESeq _              = False
 
@@ -148,10 +148,10 @@ cmd4 = Seq cmd4a (Seq cmd4b cmd4c)
 incrLitR :: RewriteE Expr
 incrLitR = litT (Lit . succ)
 
-incrLitGR :: RewriteE Generic
+incrLitGR :: RewriteE Universe
 incrLitGR = promoteR incrLitR
 
-isExpr :: TransformE Generic Bool
+isExpr :: TransformE Universe Bool
 isExpr = summandIsTypeT (undefined :: Expr)
 
 result4a :: Cmd

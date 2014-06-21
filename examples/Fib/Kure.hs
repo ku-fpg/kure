@@ -1,4 +1,4 @@
-{-# LANGUAGE InstanceSigs, LambdaCase, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, UndecidableInstances #-}
+{-# LANGUAGE CPP, InstanceSigs, LambdaCase, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, UndecidableInstances #-}
 
 module Fib.Kure (Crumb(..)) where
 
@@ -25,13 +25,14 @@ instance ExtendPath c Crumb => Walker c Arith where
 
 --------------------------------------------------------------------------------------
 
--- I find it annoying that Applicative is not a superclass of Monad.
 (<$>) :: Monad m => (a -> b) -> m a -> m b
 (<$>) = liftM
 {-# INLINE (<$>) #-}
 
+#if __GLASGOW_HASKELL__ <= 708
 (<*>) :: Monad m => m (a -> b) -> m a -> m b
 (<*>) = ap
 {-# INLINE (<*>) #-}
+#endif
 
 --------------------------------------------------------------------------------------
