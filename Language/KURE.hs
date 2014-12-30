@@ -12,8 +12,8 @@
 -- and the traversal functionality can be found in "Language.KURE.Walker".
 --
 module Language.KURE
-	( module Language.KURE.Transform
-	, module Language.KURE.Walker
+        ( module Language.KURE.Transform
+        , module Language.KURE.Walker
         , module Language.KURE.Combinators
         , module Language.KURE.MonadCatch
         , module Language.KURE.Injection

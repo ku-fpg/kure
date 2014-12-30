@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -- |
 -- Module: Language.KURE.Combinators.Arrow
 -- Copyright: (c) 2012--2014 The University of Kansas
@@ -31,7 +32,9 @@ import Prelude hiding (id, foldr)
 import Control.Category hiding ((.))
 import Control.Arrow
 
+#if !(MIN_VERSION_base(4,8,0))
 import Data.Monoid
+#endif
 import Data.Foldable
 
 ------------------------------------------------------------------------------------------

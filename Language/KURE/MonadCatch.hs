@@ -1,4 +1,4 @@
-{-# Language InstanceSigs #-}
+{-# Language CPP, InstanceSigs #-}
 -- |
 -- Module: Language.KURE.MonadCatch
 -- Copyright: (c) 2012--2014 The University of Kansas
@@ -36,16 +36,19 @@ module Language.KURE.MonadCatch
 
 import Prelude hiding (foldr)
 
-import Control.Applicative
 import Control.Exception (catch, SomeException)
 import Control.Monad
 import Control.Monad.IO.Class
 
 import Data.Foldable
 import Data.List (isPrefixOf)
-import Data.Monoid
 
 import Language.KURE.Combinators.Monad
+
+#if !(MIN_VERSION_base(4,8,0))
+import Control.Applicative
+import Data.Monoid
+#endif
 
 infixl 3 <+
 

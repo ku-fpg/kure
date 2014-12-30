@@ -1,4 +1,4 @@
-{-# LANGUAGE InstanceSigs, MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE CPP, InstanceSigs, MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts #-}
 -- |
 -- Module: Language.KURE.Walker
 -- Copyright: (c) 2012--2014 The University of Kansas
@@ -78,10 +78,12 @@ import Data.Maybe (isJust)
 import Data.Monoid
 import Data.DList (singleton, toList)
 
-import Control.Monad
+#if !(MIN_VERSION_base(4,8,0))
 import Control.Applicative
+#endif
 import Control.Arrow
 import Control.Category hiding ((.))
+import Control.Monad
 
 import Language.KURE.MonadCatch
 import Language.KURE.Transform
@@ -112,7 +114,7 @@ class Walker c u where
   {-# INLINE allT #-}
 
   -- | Apply a transformation to the first immediate child for which it can succeed.
-  oneT :: MonadCatch m => Transform c m u b -> Transform c m u b
+  oneT :: (MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
   oneT = unwrapOneT . allR . wrapOneT
   {-# INLINE oneT #-}
 
@@ -167,14 +169,14 @@ foldbuT t = prefixFailMsg "foldbuT failed: " $
 {-# INLINE foldbuT #-}
 
 -- | Apply a transformation to the first node for which it can succeed, in a top-down traversal.
-onetdT :: (Walker c u, MonadCatch m) => Transform c m u b -> Transform c m u b
+onetdT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
 onetdT t = setFailMsg "onetdT failed" $
            let go = t <+ oneT go
             in go
 {-# INLINE onetdT #-}
 
 -- | Apply a transformation to the first node for which it can succeed, in a bottom-up traversal.
-onebuT :: (Walker c u, MonadCatch m) => Transform c m u b -> Transform c m u b
+onebuT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
 onebuT t = setFailMsg "onebuT failed" $
            let go = oneT go <+ t
             in go
@@ -368,7 +370,7 @@ allLargestT p t = prefixFailMsg "allLargestT failed: " $
 {-# INLINE allLargestT #-}
 
 -- | Apply a transformation to the first node for which it can succeed among the largest node(s) that satisfy the predicate.
-oneLargestT :: (Walker c u, MonadCatch m) => Transform c m u Bool -> Transform c m u b -> Transform c m u b
+oneLargestT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u Bool -> Transform c m u b -> Transform c m u b
 oneLargestT p t = setFailMsg "oneLargestT failed" $
                   let go = ifM p t (oneT go)
                    in go
@@ -475,7 +477,7 @@ instance (Monoid w, Monad m) => Applicative (OneT w m) where
    (<*>) = ap
    {-# INLINE (<*>) #-}
 
-instance Monad m => Monad (OneT w m) where
+instance (Monoid w, Monad m) => Monad (OneT w m) where
    return :: a -> OneT w m a
    return a = OneT $ \ mw -> return (P a mw)
    {-# INLINE return #-}
@@ -489,7 +491,7 @@ instance Monad m => Monad (OneT w m) where
                                     unOneT (f a) mw2
    {-# INLINE (>>=) #-}
 
-instance MonadCatch m => MonadCatch (OneT w m) where
+instance (Monoid w, MonadCatch m) => MonadCatch (OneT w m) where
    catchM :: OneT w m a -> (String -> OneT w m a) -> OneT w m a
    catchM (OneT g) f = OneT $ \ mw -> g mw `catchM` (($ mw) . unOneT . f)
    {-# INLINE catchM #-}

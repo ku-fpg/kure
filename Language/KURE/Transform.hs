@@ -1,4 +1,4 @@
-{-# Language InstanceSigs #-}
+{-# Language CPP, InstanceSigs #-}
 -- |
 -- Module: Language.KURE.Transform
 -- Copyright: (c) 2012--2014 The University of Kansas
@@ -38,7 +38,9 @@ import Control.Monad.IO.Class
 import Control.Category
 import Control.Arrow
 
+#if !(MIN_VERSION_base(4,8,0))
 import Data.Monoid
+#endif
 
 import Language.KURE.MonadCatch
 

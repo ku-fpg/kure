@@ -1,4 +1,4 @@
-{-# Language InstanceSigs #-}
+{-# Language CPP, InstanceSigs #-}
 -- |
 -- Module: Language.KURE.Combinators.Transform
 -- Copyright: (c) 2012--2014 The University of Kansas
@@ -50,8 +50,10 @@ module Language.KURE.Combinators.Transform
 
 import Prelude hiding (id, map, foldr, mapM)
 
-import Control.Category ((>>>),id)
+#if !(MIN_VERSION_base(4,8,0))
 import Control.Applicative
+#endif
+import Control.Category ((>>>),id)
 import Control.Monad (liftM,ap)
 
 import Data.Foldable
