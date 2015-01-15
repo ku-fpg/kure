@@ -1,4 +1,4 @@
-{-# LANGUAGE InstanceSigs, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
+{-# LANGUAGE CPP, InstanceSigs, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 -- |
 -- Module: Language.KURE.Path
 -- Copyright: (c) 2012--2014 The University of Kansas
@@ -37,7 +37,9 @@ module Language.KURE.Path
        )
 where
 
+#if !(MIN_VERSION_base(4,8,0))
 import Data.Monoid
+#endif
 
 import Control.Arrow ((>>^))
 
