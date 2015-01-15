@@ -114,7 +114,7 @@ class Walker c u where
   {-# INLINE allT #-}
 
   -- | Apply a transformation to the first immediate child for which it can succeed.
-  oneT :: (MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
+  oneT :: MonadCatch m => Transform c m u b -> Transform c m u b
   oneT = unwrapOneT . allR . wrapOneT
   {-# INLINE oneT #-}
 
@@ -169,14 +169,14 @@ foldbuT t = prefixFailMsg "foldbuT failed: " $
 {-# INLINE foldbuT #-}
 
 -- | Apply a transformation to the first node for which it can succeed, in a top-down traversal.
-onetdT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
+onetdT :: (Walker c u, MonadCatch m) => Transform c m u b -> Transform c m u b
 onetdT t = setFailMsg "onetdT failed" $
            let go = t <+ oneT go
             in go
 {-# INLINE onetdT #-}
 
 -- | Apply a transformation to the first node for which it can succeed, in a bottom-up traversal.
-onebuT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
+onebuT :: (Walker c u, MonadCatch m) => Transform c m u b -> Transform c m u b
 onebuT t = setFailMsg "onebuT failed" $
            let go = oneT go <+ t
             in go
@@ -370,7 +370,7 @@ allLargestT p t = prefixFailMsg "allLargestT failed: " $
 {-# INLINE allLargestT #-}
 
 -- | Apply a transformation to the first node for which it can succeed among the largest node(s) that satisfy the predicate.
-oneLargestT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u Bool -> Transform c m u b -> Transform c m u b
+oneLargestT :: (Walker c u, MonadCatch m) => Transform c m u Bool -> Transform c m u b -> Transform c m u b
 oneLargestT p t = setFailMsg "oneLargestT failed" $
                   let go = ifM p t (oneT go)
                    in go
@@ -463,12 +463,12 @@ unOneT :: OneT w m a -> Maybe w -> m (P a (Maybe w))
 unOneT (OneT f) = f
 {-# INLINE unOneT #-}
 
-instance (Monoid w, Monad m) => Functor (OneT w m) where
+instance Monad m => Functor (OneT w m) where
    fmap :: (a -> b) -> OneT w m a -> OneT w m b
    fmap = liftM
    {-# INLINE fmap #-}
 
-instance (Monoid w, Monad m) => Applicative (OneT w m) where
+instance Monad m => Applicative (OneT w m) where
    pure :: a -> OneT w m a
    pure = return
    {-# INLINE pure #-}
@@ -477,7 +477,7 @@ instance (Monoid w, Monad m) => Applicative (OneT w m) where
    (<*>) = ap
    {-# INLINE (<*>) #-}
 
-instance (Monoid w, Monad m) => Monad (OneT w m) where
+instance Monad m => Monad (OneT w m) where
    return :: a -> OneT w m a
    return a = OneT $ \ mw -> return (P a mw)
    {-# INLINE return #-}
@@ -491,7 +491,7 @@ instance (Monoid w, Monad m) => Monad (OneT w m) where
                                     unOneT (f a) mw2
    {-# INLINE (>>=) #-}
 
-instance (Monoid w, MonadCatch m) => MonadCatch (OneT w m) where
+instance MonadCatch m => MonadCatch (OneT w m) where
    catchM :: OneT w m a -> (String -> OneT w m a) -> OneT w m a
    catchM (OneT g) f = OneT $ \ mw -> g mw `catchM` (($ mw) . unOneT . f)
    {-# INLINE catchM #-}
