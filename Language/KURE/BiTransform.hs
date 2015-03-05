@@ -21,6 +21,15 @@ module Language.KURE.BiTransform
         , invertBiT
         , beforeBiR
         , afterBiR
+          -- * Bi-directional Injections
+        , extractBiT
+        , promoteBiT
+        , extractBiR
+        , promoteBiR
+        , extractWithFailMsgBiT
+        , promoteWithFailMsgBiT
+        , extractWithFailMsgBiR
+        , promoteWithFailMsgBiR
 ) where
 
 import Prelude hiding (id, (.))
@@ -29,6 +38,7 @@ import Control.Category
 
 import Language.KURE.MonadCatch
 import Language.KURE.Transform
+import Language.KURE.Injection
 
 ------------------------------------------------------------------------------------------
 
@@ -79,5 +89,55 @@ beforeBiR t f = bidirectional (t >>= (forwardT . f)) (t >>= (backwardT . f))
 afterBiR :: Monad m => BiRewrite c m a -> Rewrite c m a -> BiRewrite c m a
 afterBiR b rr = bidirectional (forwardT b >>> rr) (backwardT b >>> rr)
 {-# INLINE afterBiR #-}
+
+------------------------------------------------------------------------------------------
+
+-- | As 'extractBiT', but takes a custom error message to use if extraction fails.
+extractWithFailMsgBiT :: (Monad m, Injection a u, Injection b u) => String -> BiTransform c m u u -> BiTransform c m a b
+extractWithFailMsgBiT msg (BiTransform t1 t2) = BiTransform (extractT t1 >>> projectWithFailMsgT msg)
+                                                            (extractT t2 >>> projectWithFailMsgT msg)
+{-# INLINE extractWithFailMsgBiT #-}
+
+-- | Convert a bidirectional transformation over an injected value into a bidirectional transformation over non-injected values,
+--   (failing if an injected value cannot be projected).
+extractBiT :: (Monad m, Injection a u, Injection b u) => BiTransform c m u u -> BiTransform c m a b
+extractBiT = extractWithFailMsgBiT "extractBiT failed"
+{-# INLINE extractBiT #-}
+
+-- | As 'promoteBiT', but takes a custom error message to use if promotion fails.
+promoteWithFailMsgBiT  :: (Monad m, Injection a u, Injection b u) => String -> BiTransform c m a b -> BiTransform c m u u
+promoteWithFailMsgBiT msg (BiTransform t1 t2) = BiTransform (projectWithFailMsgT msg >>> t1 >>> injectT)
+                                                            (projectWithFailMsgT msg >>> t2 >>> injectT)
+{-# INLINE promoteWithFailMsgBiT #-}
+
+-- | Promote a bidirectional transformation from value to value into a transformation over an injection of those values,
+--   (failing if an injected value cannot be projected).
+promoteBiT  :: (Monad m, Injection a u, Injection b u) => BiTransform c m a b -> BiTransform c m u u
+promoteBiT = promoteWithFailMsgBiT "promoteBiT failed"
+{-# INLINE promoteBiT #-}
+
+-- | As 'extractBiR', but takes a custom error message to use if extraction fails.
+extractWithFailMsgBiR :: (Monad m, Injection a u) => String -> BiRewrite c m u -> BiRewrite c m a
+extractWithFailMsgBiR msg (BiTransform r1 r2) = BiTransform (extractWithFailMsgR msg r1)
+                                                            (extractWithFailMsgR msg r2)
+{-# INLINE extractWithFailMsgBiR #-}
+
+-- | Convert a bidirectional rewrite over an injected value into a bidirectional rewrite over a projection of that value,
+--   (failing if an injected value cannot be projected).
+extractBiR :: (Monad m, Injection a u) => BiRewrite c m u -> BiRewrite c m a
+extractBiR = extractWithFailMsgBiR "extractBiR failed"
+{-# INLINE extractBiR #-}
+
+-- | As 'promoteBiR', but takes a custom error message to use if promotion fails.
+promoteWithFailMsgBiR :: (Monad m, Injection a u) => String -> BiRewrite c m a -> BiRewrite c m u
+promoteWithFailMsgBiR msg (BiTransform r1 r2) = BiTransform (promoteWithFailMsgR msg r1)
+                                                            (promoteWithFailMsgR msg r2)
+{-# INLINE promoteWithFailMsgBiR #-}
+
+-- | Promote a bidirectional rewrite over a value into a bidirectional rewrite over an injection of that value,
+--   (failing if an injected value cannot be projected).
+promoteBiR :: (Monad m, Injection a u) => BiRewrite c m a -> BiRewrite c m u
+promoteBiR = promoteWithFailMsgBiR "promoteBiR failed"
+{-# INLINE promoteBiR #-}
 
 ------------------------------------------------------------------------------------------
