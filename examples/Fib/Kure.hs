@@ -25,11 +25,11 @@ instance ExtendPath c Crumb => Walker c Arith where
 
 --------------------------------------------------------------------------------------
 
+#if __GLASGOW_HASKELL__ <= 708
 (<$>) :: Monad m => (a -> b) -> m a -> m b
 (<$>) = liftM
 {-# INLINE (<$>) #-}
 
-#if __GLASGOW_HASKELL__ <= 708
 (<*>) :: Monad m => m (a -> b) -> m a -> m b
 (<*>) = ap
 {-# INLINE (<*>) #-}

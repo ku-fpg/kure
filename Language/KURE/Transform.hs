@@ -38,7 +38,7 @@ import Control.Monad.IO.Class
 import Control.Category
 import Control.Arrow
 
-#if !(MIN_VERSION_base(4,8,0))
+#if __GLASGOW_HASKELL__ <= 708
 import Data.Monoid
 #endif
 

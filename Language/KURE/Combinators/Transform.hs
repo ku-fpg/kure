@@ -50,7 +50,7 @@ module Language.KURE.Combinators.Transform
 
 import Prelude hiding (id, map, foldr, mapM)
 
-#if !(MIN_VERSION_base(4,8,0))
+#if __GLASGOW_HASKELL__ <= 708
 import Control.Applicative
 #endif
 import Control.Category ((>>>),id)

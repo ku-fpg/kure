@@ -45,7 +45,7 @@ import Data.List (isPrefixOf)
 
 import Language.KURE.Combinators.Monad
 
-#if !(MIN_VERSION_base(4,8,0))
+#if __GLASGOW_HASKELL__ <= 708
 import Control.Applicative
 import Data.Monoid
 #endif

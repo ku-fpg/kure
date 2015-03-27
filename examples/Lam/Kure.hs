@@ -57,11 +57,11 @@ appOneR r1 r2 = unwrapOneR $ appAllR (wrapOneR r1) (wrapOneR r2)
 
 -------------------------------------------------------------------------------
 
+#if __GLASGOW_HASKELL__ <= 708
 (<$>) :: Monad m => (a -> b) -> m a -> m b
 (<$>) = liftM
 {-# INLINE (<$>) #-}
 
-#if __GLASGOW_HASKELL__ <= 708
 (<*>) :: Monad m => m (a -> b) -> m a -> m b
 (<*>) = ap
 {-# INLINE (<*>) #-}

@@ -32,7 +32,7 @@ import Prelude hiding (id, foldr)
 import Control.Category hiding ((.))
 import Control.Arrow
 
-#if !(MIN_VERSION_base(4,8,0))
+#if __GLASGOW_HASKELL__ <= 708
 import Data.Monoid
 #endif
 import Data.Foldable
