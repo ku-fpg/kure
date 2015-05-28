@@ -25,8 +25,7 @@ install:
 script:
  - if [ -f configure.ac ]; then autoreconf -i; fi
  - cabal configure -v2
- - cabal build
- - cabal install
+ - cabal install -j1
  - ( cd examples ; runhaskell Examples.hs )
  - cabal check
  - cabal sdist
