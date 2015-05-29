@@ -1,4 +1,7 @@
-{-# Language CPP, InstanceSigs #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE PolyKinds #-}
 -- |
 -- Module: Language.KURE.Transform
 -- Copyright: (c) 2012--2014 The University of Kansas
@@ -41,6 +44,9 @@ import Control.Arrow
 #if __GLASGOW_HASKELL__ <= 708
 import Data.Monoid
 #endif
+#if __GLASGOW_HASKELL__ >= 708
+import Data.Typeable
+#endif
 
 import Language.KURE.MonadCatch
 
@@ -50,6 +56,9 @@ import Language.KURE.MonadCatch
 --   The 'Transform' type is the basis of the entire KURE library.
 newtype Transform c m a b = Transform { -- | Apply a transformation to a value and its context.
                                         applyT :: c -> a -> m b}
+#if __GLASGOW_HASKELL__ >= 708
+  deriving Typeable
+#endif
 
 -- | A deprecated synonym for 'Transform'.
 type Translate c m a b = Transform c m a b

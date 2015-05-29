@@ -1,4 +1,10 @@
-{-# LANGUAGE CPP, InstanceSigs, MultiParamTypeClasses, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 -- |
 -- Module: Language.KURE.Walker
 -- Copyright: (c) 2012--2014 The University of Kansas
@@ -77,6 +83,9 @@ import Prelude hiding (id)
 import Data.Maybe (isJust)
 import Data.Monoid
 import Data.DList (singleton, toList)
+#if __GLASGOW_HASKELL__ >= 708
+import Data.Typeable
+#endif
 
 #if __GLASGOW_HASKELL__ <= 708
 import Control.Applicative
@@ -132,6 +141,10 @@ class Walker c u where
   childL :: (ReadPath c crumb, Eq crumb, MonadCatch m) => crumb -> Lens c m u u
   childL = childL_default
   {-# INLINE childL #-}
+
+#if __GLASGOW_HASKELL__ >= 708
+deriving instance Typeable Walker
+#endif
 
 ------------------------------------------------------------------------------------------
 

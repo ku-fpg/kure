@@ -1,4 +1,6 @@
-{-# LANGUAGE CPP, ScopedTypeVariables, FlexibleContexts #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- |
 -- Module: Language.KURE.Pathfinder
