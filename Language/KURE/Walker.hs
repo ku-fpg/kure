@@ -606,7 +606,8 @@ setChild cr = unwrapSetChild . allR . wrapSetChild cr
 -------------------------------------------------------------------------------
 
 childL_default :: forall c crumb m u. (ReadPath c crumb, Eq crumb) => (Walker c u, MonadCatch m) => crumb -> Lens c m u u
-childL_default cr = lens $ do cu <- getter
+childL_default cr = lens $ prefixFailMsg "childL failed: " $
+                           do cu <- getter
                               k  <- setter
                               return (cu, k)
   where
