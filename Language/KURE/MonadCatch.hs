@@ -133,12 +133,8 @@ instance Applicative KureM where
 -------------------------------------------------------------------------------
 
 -- | A monadic catch that ignores the error message.
--- If both arguments fail, the resulting error messages are concatenated:
--- @
--- "(message1 <+ message2)"
--- @
 (<+) :: MonadCatch m => m a -> m a -> m a
-ma <+ mb = ma `catchM` (\s1 -> mb `catchM` (\s2 -> fail ("(" ++ s1 ++ " <+ " ++ s2 ++ ")")))
+ma <+ mb = ma `catchM` (\_ -> mb)
 {-# INLINE (<+) #-}
 
 -- | Select the first monadic computation that succeeds, discarding any thereafter.

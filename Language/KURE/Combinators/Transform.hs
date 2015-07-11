@@ -170,10 +170,12 @@ repeatR r = let go = r >>> tryR go
              in go
 {-# INLINE repeatR #-}
 
--- | Attempt each trransformation until one succeeds, then return that result and discard the rest of the transformations.
+-- | Attempt each transformation until one succeeds, then return that result and discard the rest of the transformations.
 catchesT :: MonadCatch m => [Transform c m a b] -> Transform c m a b
-catchesT = foldr (<+) (fail "catchesT failed")
+catchesT = catchesM
 {-# INLINE catchesT #-}
+{-# DEPRECATED catchesT "Please use 'catchesM' instead." #-}
+
 
 -- | An identity transformation that resembles a monadic 'Control.Monad.join'.
 joinT :: Transform c m (m a) a
