@@ -1,17 +1,19 @@
-{-# Language InstanceSigs #-}
+{-# LANGUAGE InstanceSigs #-}
 
 module Lam.Monad where
 
 import Language.KURE
 
 import Control.Applicative
+import Control.Exception (PatternMatchFail(..))
 import Control.Monad
+import Control.Monad.Catch
 
 -------------------------------------------------------------------------------
 
-newtype LamM a = LamM {lamM :: Int -> (Int, Either String a)}
+newtype LamM a = LamM {lamM :: Int -> (Int, Either SomeException a)}
 
-runLamM :: LamM a -> Either String a
+runLamM :: LamM a -> Either SomeException a
 runLamM m = snd (lamM m 0)
 
 instance Monad LamM where
@@ -19,19 +21,26 @@ instance Monad LamM where
   return a = LamM (\n -> (n,Right a))
 
   fail :: String -> LamM a
-  fail msg = LamM (\ n -> (n, Left msg))
+  fail msg = LamM (\ n -> (n, Left . SomeException $ PatternMatchFail msg))
 
   (>>=) :: LamM a -> (a -> LamM b) -> LamM b
   (LamM f) >>= gg = LamM $ \ n -> case f n of
-                                    (n', Left msg) -> (n', Left msg)
-                                    (n', Right a)  -> lamM (gg a) n'
+                                    (n', Left e)  -> (n', Left e)
+                                    (n', Right a) -> lamM (gg a) n'
+
+instance MonadThrow LamM where
+  throwM :: Exception e => e -> LamM a
+  throwM e = LamM $ \i -> (i, throwM e)
 
 instance MonadCatch LamM where
-
-  catchM :: LamM a -> (String -> LamM a) -> LamM a
-  (LamM st) `catchM` f = LamM $ \ n -> case st n of
-                                        (n', Left msg) -> lamM (f msg) n'
-                                        (n', Right a)  -> (n', Right a)
+  catch :: Exception e => LamM a -> (e -> LamM a) -> LamM a
+  l@(LamM st) `catch` f = LamM $ \ n ->
+    case st n of
+      (n', Left e)  -> lamM (case fromException e of
+                                  Just ex -> f ex
+                                  Nothing -> l
+                            ) n'
+      (n', Right a) -> (n', Right a)
 
 instance Functor LamM where
   fmap :: (a -> b) -> LamM a -> LamM b

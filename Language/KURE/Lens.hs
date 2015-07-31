@@ -31,6 +31,7 @@ module Language.KURE.Lens
 import Prelude hiding (id, (.))
 
 import Control.Monad
+import Control.Monad.Catch
 import Control.Category
 import Control.Arrow
 
@@ -98,7 +99,7 @@ failL = lens . fail
 --   crucially, if it would fail on the way up for an unmodified value.  However, actual failure on the way up is not caught
 --   (as by then it is too late to use an alternative 'Lens').  This means that, in theory, a use of 'catchL' could cause a succeeding 'Lens' application to fail.
 --   But provided 'lens' is used correctly, this should never happen.
-catchL :: MonadCatch m => Lens c m a b -> (String -> Lens c m a b) -> Lens c m a b
+catchL :: (Exception e, MonadCatch m) => Lens c m a b -> (e -> Lens c m a b) -> Lens c m a b
 l1 `catchL` l2 = lens (attemptM (focusR l1 idR) >>= either (lensT . l2) (const (lensT l1)))
 {-# INLINE catchL #-}
 

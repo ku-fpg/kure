@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
 -- |
 -- Module: Language.KURE.Transform
 -- Copyright: (c) 2012--2014 The University of Kansas
@@ -37,6 +38,7 @@ import Prelude hiding (id, (.))
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Category
 import Control.Arrow
@@ -47,8 +49,6 @@ import Data.Monoid
 #if __GLASGOW_HASKELL__ >= 708
 import Data.Typeable
 #endif
-
-import Language.KURE.MonadCatch
 
 ------------------------------------------------------------------------------------------
 
@@ -163,11 +163,34 @@ instance Monad m => Monad (Transform c m a) where
    {-# INLINE fail #-}
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
+instance MonadThrow m => MonadThrow (Transform c m a) where
+
+    throwM :: Exception e => e -> Transform c m a b
+    throwM = constT . throwM
+    {-# INLINE throwM #-}
+
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadCatch m => MonadCatch (Transform c m a) where
 
-   catchM :: Transform c m a b -> (String -> Transform c m a b) -> Transform c m a b
-   catchM t1 t2 = transform $ \ c a -> applyT t1 c a `catchM` \ msg -> applyT (t2 msg) c a
-   {-# INLINE catchM #-}
+   catch :: Exception e => Transform c m a b -> (e -> Transform c m a b) -> Transform c m a b
+   catch t1 t2 = transform $ \ c a -> applyT t1 c a `catch` \ e -> applyT (t2 e) c a
+   {-# INLINE catch #-}
+
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
+instance MonadMask m => MonadMask (Transform c m a) where
+
+   mask :: ((forall d. Transform c m a d -> Transform c m a d) -> Transform c m a b) -> Transform c m a b
+   mask f = transform $ \c a -> mask $ \u -> applyT (f $ q u) c a
+     where q :: (m b -> m b) -> Transform c m a b -> Transform c m a b
+           q u t = transform $ \c a -> u (applyT t c a)
+   {-# INLINE mask #-}
+
+   uninterruptibleMask :: ((forall d. Transform c m a d -> Transform c m a d) -> Transform c m a b) -> Transform c m a b
+   uninterruptibleMask f = transform $ \c a -> uninterruptibleMask $ \u -> applyT (f $ q u) c a
+     where q :: (m b -> m b) -> Transform c m a b -> Transform c m a b
+           q u t = transform $ \c a -> u (applyT t c a)
+   {-# INLINE uninterruptibleMask #-}
+
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadPlus m => MonadPlus (Transform c m a) where

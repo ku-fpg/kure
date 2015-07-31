@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE RankNTypes #-}
 -- |
 -- Module: Language.KURE.Combinators.Transform
 -- Copyright: (c) 2012--2014 The University of Kansas
@@ -57,6 +58,7 @@ import Control.Applicative
 #endif
 import Control.Category ((>>>),id)
 import Control.Monad (liftM,ap)
+import Control.Monad.Catch
 
 import Data.Foldable
 import Data.Traversable
@@ -249,10 +251,28 @@ instance Monad m => Monad (AnyR m) where
                         return (PBool (b1 || b2) d)
    {-# INLINE (>>=) #-}
 
+instance MonadThrow m => MonadThrow (AnyR m) where
+   throwM :: Exception e => e -> AnyR m a
+   throwM = AnyR . throwM
+   {-# INLINE throwM #-}
+
 instance MonadCatch m => MonadCatch (AnyR m) where
-   catchM :: AnyR m a -> (String -> AnyR m a) -> AnyR m a
-   catchM ma f = AnyR (unAnyR ma `catchM` (unAnyR . f))
-   {-# INLINE catchM #-}
+   catch :: Exception e => AnyR m a -> (e -> AnyR m a) -> AnyR m a
+   catch ma f = AnyR (unAnyR ma `catch` (unAnyR . f))
+   {-# INLINE catch #-}
+
+instance MonadMask m => MonadMask (AnyR m) where
+   mask :: ((forall a. AnyR m a -> AnyR m a) -> AnyR m b) -> AnyR m b
+   mask f = AnyR $ mask $ \u -> unAnyR (f $ q u)
+     where q :: (m (PBool a) -> m (PBool a)) -> AnyR m a -> AnyR m a
+           q u = AnyR . u . unAnyR
+   {-# INLINE mask #-}
+
+   uninterruptibleMask :: ((forall a. AnyR m a -> AnyR m a) -> AnyR m b) -> AnyR m b
+   uninterruptibleMask f = AnyR $ uninterruptibleMask $ \u -> unAnyR (f $ q u)
+     where q :: (m (PBool a) -> m (PBool a)) -> AnyR m a -> AnyR m a
+           q u = AnyR . u . unAnyR
+   {-# INLINE uninterruptibleMask #-}
 
 -- | Wrap a 'Rewrite' using the 'AnyR' monad transformer.
 wrapAnyR :: MonadCatch m => Rewrite c m a -> Rewrite c (AnyR m) a
@@ -310,10 +330,28 @@ instance Monad m => Monad (OneR m) where
                                 unOneR (f a) b2
    {-# INLINE (>>=) #-}
 
+instance MonadThrow m => MonadThrow (OneR m) where
+   throwM :: Exception e => e -> OneR m a
+   throwM e = OneR $ \_ -> throwM e
+   {-# INLINE throwM #-}
+
 instance MonadCatch m => MonadCatch (OneR m) where
-   catchM :: OneR m a -> (String -> OneR m a) -> OneR m a
-   catchM (OneR g) f = OneR (\ b -> g b `catchM` (($ b) . unOneR . f))
-   {-# INLINE catchM #-}
+   catch :: Exception e => OneR m a -> (e -> OneR m a) -> OneR m a
+   catch (OneR g) f = OneR (\ b -> g b `catch` (($ b) . unOneR . f))
+   {-# INLINE catch #-}
+
+instance MonadMask m => MonadMask (OneR m) where
+   mask :: ((forall a. OneR m a -> OneR m a) -> OneR m b) -> OneR m b
+   mask f = OneR $ \b -> mask $ \u -> unOneR (f $ q u) b
+     where q :: (m (PBool a) -> m (PBool a)) -> OneR m a -> OneR m a
+           q u pb = OneR $ u . unOneR pb
+   {-# INLINE mask #-}
+
+   uninterruptibleMask :: ((forall a. OneR m a -> OneR m a) -> OneR m b) -> OneR m b
+   uninterruptibleMask f = OneR $ \b -> uninterruptibleMask $ \u -> unOneR (f $ q u) b
+     where q :: (m (PBool a) -> m (PBool a)) -> OneR m a -> OneR m a
+           q u pb = OneR $ u . unOneR pb
+   {-# INLINE uninterruptibleMask #-}
 
 -- | Wrap a 'Rewrite' using the 'OneR' monad transformer.
 wrapOneR :: MonadCatch m => Rewrite c m g -> Rewrite c (OneR m) g

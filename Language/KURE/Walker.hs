@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 -- |
@@ -93,6 +94,7 @@ import Control.Applicative
 import Control.Arrow
 import Control.Category hiding ((.))
 import Control.Monad
+import Control.Monad.Catch
 
 import Language.KURE.MonadCatch
 import Language.KURE.Transform
@@ -299,7 +301,7 @@ innermostR r = setFailMsg "innermostR failed" $
 -------------------------------------------------------------------------------
 
 tryL :: MonadCatch m => Lens c m u u -> Lens c m u u
-tryL l = l `catchL` (\ _ -> id)
+tryL l = l `catchL` (\(_ :: SomeException) -> id)
 {-# INLINE tryL #-}
 
 -- | Construct a 'Lens' by following a 'Path'.
@@ -447,11 +449,28 @@ instance (Monoid w, Monad m) => Monad (AllT w m) where
                         return (P d (w1 <> w2))
    {-# INLINE (>>=) #-}
 
-instance (Monoid w, MonadCatch m) => MonadCatch (AllT w m) where
-   catchM :: AllT w m a -> (String -> AllT w m a) -> AllT w m a
-   catchM (AllT ma) f = AllT $ ma `catchM` (unAllT . f)
-   {-# INLINE catchM #-}
+instance (Monoid w, MonadThrow m) => MonadThrow (AllT w m) where
+   throwM :: Exception e => e -> AllT w m a
+   throwM = AllT . throwM
+   {-# INLINE throwM #-}
 
+instance (Monoid w, MonadCatch m) => MonadCatch (AllT w m) where
+   catch :: Exception e => AllT w m a -> (e -> AllT w m a) -> AllT w m a
+   catch (AllT ma) f = AllT $ ma `catch` (unAllT . f)
+   {-# INLINE catch #-}
+
+instance (Monoid w, MonadMask m) => MonadMask (AllT w m) where
+   mask :: ((forall a. AllT w m a -> AllT w m a) -> AllT w m b) -> AllT w m b
+   mask f = AllT $ mask $ \u -> unAllT (f $ q u)
+     where q :: (m (P a w) -> m (P a w)) -> AllT w m a -> AllT w m a
+           q u = AllT . u . unAllT
+   {-# INLINE mask #-}
+
+   uninterruptibleMask :: ((forall a. AllT w m a -> AllT w m a) -> AllT w m b) -> AllT w m b
+   uninterruptibleMask f = AllT $ uninterruptibleMask $ \u -> unAllT (f $ q u)
+     where q :: (m (P a w) -> m (P a w)) -> AllT w m a -> AllT w m a
+           q u = AllT . u . unAllT
+   {-# INLINE uninterruptibleMask #-}
 
 -- | Wrap a 'Transform' using the 'AllT' monad transformer.
 wrapAllT :: Monad m => Transform c m u b -> Rewrite c (AllT b m) u
@@ -504,11 +523,28 @@ instance Monad m => Monad (OneT w m) where
                                     unOneT (f a) mw2
    {-# INLINE (>>=) #-}
 
-instance MonadCatch m => MonadCatch (OneT w m) where
-   catchM :: OneT w m a -> (String -> OneT w m a) -> OneT w m a
-   catchM (OneT g) f = OneT $ \ mw -> g mw `catchM` (($ mw) . unOneT . f)
-   {-# INLINE catchM #-}
+instance MonadThrow m => MonadThrow (OneT w m) where
+   throwM :: Exception e => e -> OneT w m a
+   throwM e = OneT $ \_ -> throwM e
+   {-# INLINE throwM #-}
 
+instance MonadCatch m => MonadCatch (OneT w m) where
+   catch :: Exception e => OneT w m a -> (e -> OneT w m a) -> OneT w m a
+   catch (OneT g) f = OneT $ \ mw -> g mw `catch` (($ mw) . unOneT . f)
+   {-# INLINE catch #-}
+
+instance MonadMask m => MonadMask (OneT w m) where
+   mask :: ((forall a. OneT w m a -> OneT w m a) -> OneT w m b) -> OneT w m b
+   mask f = OneT $ \m -> mask $ \u -> unOneT (f $ q u) m
+     where q :: (m (P a (Maybe w)) -> m (P a (Maybe w))) -> OneT w m a -> OneT w m a
+           q u ot = OneT $ u . unOneT ot
+   {-# INLINE mask #-}
+
+   uninterruptibleMask :: ((forall a. OneT w m a -> OneT w m a) -> OneT w m b) -> OneT w m b
+   uninterruptibleMask f = OneT $ \m -> uninterruptibleMask $ \u -> unOneT (f $ q u) m
+     where q :: (m (P a (Maybe w)) -> m (P a (Maybe w))) -> OneT w m a -> OneT w m a
+           q u ot = OneT $ u . unOneT ot
+   {-# INLINE uninterruptibleMask #-}
 
 -- | Wrap a 'Transform' using the 'OneT' monad transformer.
 wrapOneT :: MonadCatch m => Transform c m u b -> Rewrite c (OneT b m) u
@@ -560,18 +596,26 @@ instance Monad (GetChild c u) where
    {-# INLINE fail #-}
 
    (>>=) :: GetChild c u a -> (a -> GetChild c u b) -> GetChild c u b
-   (GetChild kma mcu) >>= k = runKureM (\ a   -> getChildSecond (mplus mcu) (k a))
-                                       (\ msg -> GetChild (fail msg) mcu)
-                                       kma
+   (GetChild kma mcu) >>= k = caseKureM (\ a  -> getChildSecond (mplus mcu) (k a))
+                                        (\ me -> GetChild (throwM me) mcu)
+                                        kma
    {-# INLINE (>>=) #-}
 
-instance MonadCatch (GetChild c u) where
-   catchM :: GetChild c u a -> (String -> GetChild c u a) -> GetChild c u a
-   uc@(GetChild kma mcu) `catchM` k = runKureM (\ _   -> uc)
-                                               (\ msg -> getChildSecond (mplus mcu) (k msg))
-                                               kma
-   {-# INLINE catchM #-}
+instance MonadThrow (GetChild c u) where
+   throwM :: Exception e => e -> GetChild c u a
+   throwM e = GetChild (throwM e) Nothing
+   {-# INLINE throwM #-}
 
+instance MonadCatch (GetChild c u) where
+   catch :: Exception e => GetChild c u a -> (e -> GetChild c u a) -> GetChild c u a
+   uc@(GetChild kma mcu) `catch` k =
+       caseKureM (\ _   -> uc)
+                 (\ me  -> case fromMsgException me of
+                                Just ex -> getChildSecond (mplus mcu) (k ex)
+                                Nothing -> uc
+                 )
+                 kma
+   {-# INLINE catch #-}
 
 wrapGetChild :: (ReadPath c crumb, Eq crumb) => crumb -> Rewrite c (GetChild c g) g
 wrapGetChild cr = do cr' <- lastCrumbT
