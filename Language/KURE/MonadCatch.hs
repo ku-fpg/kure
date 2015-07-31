@@ -168,7 +168,7 @@ catchM = catch
 ma <+ mb = ma `catch` \(_ :: SomeException) -> mb
 {-# INLINE (<+) #-}
 
--- | Catches the a monadic action only if it throws a 'KureException'.
+-- | Catches a monadic action only if it throws a 'KureException'.
 (<+>) :: MonadCatch m => m a -> m a -> m a
 ma <+> mb = ma `catch` \KureException -> mb
 {-# INLINE (<+>) #-}
@@ -259,6 +259,7 @@ instance Exception MsgException where
     toException = snd . runMsgException
     fromException (SomeException se) = Just $ toMsgException se
 
+-- | Modifies the underlying error message of a 'MsgException'.
 modMsgException :: (String -> String) -> MsgException -> MsgException
 modMsgException f (MsgException msg se) = MsgException (f msg) se
 {-# INLINE modMsgException #-}
