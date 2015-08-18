@@ -6,7 +6,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 -- |
 -- Module: Language.KURE.Injection
--- Copyright: (c) 2012--2014 The University of Kansas
+-- Copyright: (c) 2012--2015 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>

@@ -57,6 +57,7 @@ Library
        Language.KURE.Combinators.Monad
        Language.KURE.Combinators.Transform
        Language.KURE.Debug
+       Language.KURE.Exceptions
        Language.KURE.ExtendableContext
        Language.KURE.Injection
        Language.KURE.Lens
