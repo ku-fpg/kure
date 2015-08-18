@@ -96,12 +96,13 @@ import Control.Category hiding ((.))
 import Control.Monad
 import Control.Monad.Catch
 
-import Language.KURE.MonadCatch
-import Language.KURE.Transform
-import Language.KURE.Lens
-import Language.KURE.Injection
 import Language.KURE.Combinators
+import Language.KURE.Exceptions
+import Language.KURE.Injection
+import Language.KURE.Lens
+import Language.KURE.MonadCatch
 import Language.KURE.Path
+import Language.KURE.Transform
 
 -------------------------------------------------------------------------------
 
@@ -171,45 +172,45 @@ childR n = focusR (childL n)
 
 -- | Fold a tree in a top-down manner, using a single 'Transform' for each node.
 foldtdT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
-foldtdT t = prefixFailMsg "foldtdT failed: " $
+foldtdT t = modExc (stackStrategyFailure "foldtdT") $
             let go = t <> allT go
              in go
 {-# INLINE foldtdT #-}
 
 -- | Fold a tree in a bottom-up manner, using a single 'Transform' for each node.
 foldbuT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
-foldbuT t = prefixFailMsg "foldbuT failed: " $
+foldbuT t = modExc (stackStrategyFailure "foldbuT") $
             let go = allT go <> t
              in go
 {-# INLINE foldbuT #-}
 
 -- | Apply a transformation to the first node for which it can succeed, in a top-down traversal.
 onetdT :: (Walker c u, MonadCatch m) => Transform c m u b -> Transform c m u b
-onetdT t = setFailMsg "onetdT failed" $
+onetdT t = setExc (strategyFailure "onetdT") $
            let go = t <+ oneT go
             in go
 {-# INLINE onetdT #-}
 
 -- | Apply a transformation to the first node for which it can succeed, in a bottom-up traversal.
 onebuT :: (Walker c u, MonadCatch m) => Transform c m u b -> Transform c m u b
-onebuT t = setFailMsg "onebuT failed" $
+onebuT t = setExc (strategyFailure "onebuT") $
            let go = oneT go <+ t
             in go
 {-# INLINE onebuT #-}
 
 -- | Attempt to apply a 'Transform' in a top-down manner, pruning at successes.
 prunetdT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
-prunetdT t = setFailMsg "prunetdT failed" $
+prunetdT t = setExc (strategyFailure "prunetdT") $
              let go = t <+ allT go
               in go
 {-# INLINE prunetdT #-}
 
--- | An always successful top-down fold, replacing failures with 'mempty'.
+-- | An always successful top-down fold, replacing exceptions with 'mempty'.
 crushtdT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
 crushtdT t = foldtdT (mtryM t)
 {-# INLINE crushtdT #-}
 
--- | An always successful bottom-up fold, replacing failures with 'mempty'.
+-- | An always successful bottom-up fold, replacing exceptions with 'mempty'.
 crushbuT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
 crushbuT t = foldbuT (mtryM t)
 {-# INLINE crushbuT #-}
@@ -228,14 +229,14 @@ collectPruneT t = prunetdT (t >>^ singleton) >>^ toList
 
 -- | Apply a rewrite in a top-down manner, succeeding if they all succeed.
 alltdR :: (Walker c u, MonadCatch m) => Rewrite c m u -> Rewrite c m u
-alltdR r = prefixFailMsg "alltdR failed: " $
+alltdR r = modExc (stackStrategyFailure "alltdR") $
            let go = r >>> allR go
             in go
 {-# INLINE alltdR #-}
 
 -- | Apply a rewrite in a bottom-up manner, succeeding if they all succeed.
 allbuR :: (Walker c u, MonadCatch m) => Rewrite c m u -> Rewrite c m u
-allbuR r = prefixFailMsg "allbuR failed: " $
+allbuR r = modExc (stackStrategyFailure "allbuR") $
            let go = allR go >>> r
             in go
 {-# INLINE allbuR #-}
@@ -243,21 +244,21 @@ allbuR r = prefixFailMsg "allbuR failed: " $
 -- | Apply a rewrite twice, in a top-down and bottom-up way, using one single tree traversal,
 --   succeeding if they all succeed.
 allduR :: (Walker c u, MonadCatch m) => Rewrite c m u -> Rewrite c m u
-allduR r = prefixFailMsg "allduR failed: " $
+allduR r = modExc (stackStrategyFailure "allduR") $
            let go = r >>> allR go >>> r
             in go
 {-# INLINE allduR #-}
 
 -- | Apply a rewrite in a top-down manner, succeeding if any succeed.
 anytdR :: (Walker c u, MonadCatch m) => Rewrite c m u -> Rewrite c m u
-anytdR r = setFailMsg "anytdR failed" $
+anytdR r = setExc (strategyFailure "anytdR") $
            let go = r >+> anyR go
             in go
 {-# INLINE anytdR #-}
 
 -- | Apply a rewrite in a bottom-up manner, succeeding if any succeed.
 anybuR :: (Walker c u, MonadCatch m) => Rewrite c m u -> Rewrite c m u
-anybuR r = setFailMsg "anybuR failed" $
+anybuR r = setExc (strategyFailure "anybuR") $
            let go = anyR go >+> r
             in go
 {-# INLINE anybuR #-}
@@ -265,35 +266,35 @@ anybuR r = setFailMsg "anybuR failed" $
 -- | Apply a rewrite twice, in a top-down and bottom-up way, using one single tree traversal,
 --   succeeding if any succeed.
 anyduR :: (Walker c u, MonadCatch m) => Rewrite c m u -> Rewrite c m u
-anyduR r = setFailMsg "anyduR failed" $
+anyduR r = setExc (strategyFailure "anyduR") $
            let go = r >+> anyR go >+> r
             in go
 {-# INLINE anyduR #-}
 
 -- | Apply a rewrite to the first node for which it can succeed, in a top-down traversal.
 onetdR :: (Walker c u, MonadCatch m) => Rewrite c m u -> Rewrite c m u
-onetdR r = setFailMsg "onetdR failed" $
+onetdR r = setExc (strategyFailure "onetdR") $
            let go = r <+ oneR go
             in go
 {-# INLINE onetdR #-}
 
 -- | Apply a rewrite to the first node for which it can succeed, in a bottom-up traversal.
 onebuR :: (Walker c u, MonadCatch m) => Rewrite c m u -> Rewrite c m u
-onebuR r = setFailMsg "onebuR failed" $
+onebuR r = setExc (strategyFailure "onebuR") $
            let go = oneR go <+ r
             in go
 {-# INLINE onebuR #-}
 
 -- | Attempt to apply a 'Rewrite' in a top-down manner, pruning at successful rewrites.
 prunetdR :: (Walker c u, MonadCatch m) => Rewrite c m u -> Rewrite c m u
-prunetdR r = setFailMsg "prunetdR failed" $
+prunetdR r = setExc (strategyFailure "prunetdR") $
              let go = r <+ anyR go
               in go
 {-# INLINE prunetdR #-}
 
 -- | A fixed-point traveral, starting with the innermost term.
 innermostR :: (Walker c u, MonadCatch m) => Rewrite c m u -> Rewrite c m u
-innermostR r = setFailMsg "innermostR failed" $
+innermostR r = setExc (strategyFailure "innermostR") $
                let go = anybuR (r >>> tryR go)
                 in go
 {-# INLINE innermostR #-}
@@ -301,7 +302,7 @@ innermostR r = setFailMsg "innermostR failed" $
 -------------------------------------------------------------------------------
 
 tryL :: MonadCatch m => Lens c m u u -> Lens c m u u
-tryL l = l `catchL` (\(_ :: SomeException) -> id)
+tryL l = l `catchL` (\SomeException{} -> id)
 {-# INLINE tryL #-}
 
 -- | Construct a 'Lens' by following a 'Path'.
@@ -358,35 +359,35 @@ testPathT = testLensT . pathL
 
 -- | Apply a rewrite to the largest node(s) that satisfy the predicate, requiring all to succeed.
 allLargestR :: (Walker c u, MonadCatch m) => Transform c m u Bool -> Rewrite c m u -> Rewrite c m u
-allLargestR p r = prefixFailMsg "allLargestR failed: " $
+allLargestR p r = modExc (stackStrategyFailure "allLargestR") $
                   let go = ifM p r (allR go)
                    in go
 {-# INLINE allLargestR #-}
 
 -- | Apply a rewrite to the largest node(s) that satisfy the predicate, succeeding if any succeed.
 anyLargestR :: (Walker c u, MonadCatch m) => Transform c m u Bool -> Rewrite c m u -> Rewrite c m u
-anyLargestR p r = setFailMsg "anyLargestR failed" $
+anyLargestR p r = setExc (strategyFailure "anyLargestR") $
                   let go = ifM p r (anyR go)
                    in go
 {-# INLINE anyLargestR #-}
 
 -- | Apply a rewrite to the first node for which it can succeed among the largest node(s) that satisfy the predicate.
 oneLargestR :: (Walker c u, MonadCatch m) => Transform c m u Bool -> Rewrite c m u -> Rewrite c m u
-oneLargestR p r = setFailMsg "oneLargestR failed" $
+oneLargestR p r = setExc (strategyFailure "oneLargestR") $
                   let go = ifM p r (oneR go)
                    in go
 {-# INLINE oneLargestR #-}
 
 -- | Apply a transformation to the largest node(s) that satisfy the predicate, combining the results in a monoid.
 allLargestT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u Bool -> Transform c m u b -> Transform c m u b
-allLargestT p t = prefixFailMsg "allLargestT failed: " $
+allLargestT p t = modExc (stackStrategyFailure "allLargestT") $
                   let go = ifM p t (allT go)
                    in go
 {-# INLINE allLargestT #-}
 
 -- | Apply a transformation to the first node for which it can succeed among the largest node(s) that satisfy the predicate.
 oneLargestT :: (Walker c u, MonadCatch m) => Transform c m u Bool -> Transform c m u b -> Transform c m u b
-oneLargestT p t = setFailMsg "oneLargestT failed" $
+oneLargestT p t = setExc (strategyFailure "oneLargestT") $
                   let go = ifM p t (oneT go)
                    in go
 {-# INLINE oneLargestT #-}
@@ -405,8 +406,8 @@ pSnd :: P a b -> b
 pSnd (P _ b) = b
 {-# INLINE pSnd #-}
 
-checkSuccessPMaybe :: Monad m => String -> m (Maybe a) -> m a
-checkSuccessPMaybe msg ma = ma >>= projectWithFailMsgM msg
+checkSuccessPMaybe :: (Exception e, MonadThrow m) => e -> m (Maybe a) -> m a
+checkSuccessPMaybe e ma = ma >>= projectWithFailExcM e
 {-# INLINE checkSuccessPMaybe #-}
 
 -------------------------------------------------------------------------------
@@ -479,7 +480,7 @@ wrapAllT t = readerT $ \ a -> resultT (AllT . liftM (P a)) t
 
 -- | Unwrap a 'Transform' from the 'AllT' monad transformer.
 unwrapAllT :: MonadCatch m => Rewrite c (AllT b m) u -> Transform c m u b
-unwrapAllT = prefixFailMsg "allT failed:" . resultT (liftM pSnd . unAllT)
+unwrapAllT = modExc (stackStrategyFailure "allT") . resultT (liftM pSnd . unAllT)
 {-# INLINE unwrapAllT #-}
 
 -------------------------------------------------------------------------------
@@ -554,14 +555,14 @@ wrapOneT t = rewrite $ \ c a -> OneT $ \ mw -> case mw of
 {-# INLINE wrapOneT #-}
 
 -- | Unwrap a 'Transform' from the 'OneT' monad transformer.
-unwrapOneT :: Monad m => Rewrite c (OneT b m) u -> Transform c m u b
-unwrapOneT = resultT (checkSuccessPMaybe "oneT failed" . liftM pSnd . ($ Nothing) . unOneT)
+unwrapOneT :: MonadThrow m => Rewrite c (OneT b m) u -> Transform c m u b
+unwrapOneT = resultT (checkSuccessPMaybe (strategyFailure "oneT") . liftM pSnd . ($ Nothing) . unOneT)
 {-# INLINE unwrapOneT #-}
 
 -------------------------------------------------------------------------------
 
 -- If allR just used Monad (rather than MonadCatch), this (and other things) would be simpler.
--- And currently, the only use of MonadCatch is that it allows the error message to be modified.
+-- And currently, the only use of MonadCatch is that it allows the exception to be modified.
 
 -- Failure should not occur, so it doesn't really matter where the KureM monad sits in the GetChild stack.
 -- I've arbitrarily made it a local failure.
@@ -596,9 +597,9 @@ instance Monad (GetChild c u) where
    {-# INLINE fail #-}
 
    (>>=) :: GetChild c u a -> (a -> GetChild c u b) -> GetChild c u b
-   (GetChild kma mcu) >>= k = caseKureM (\ a  -> getChildSecond (mplus mcu) (k a))
-                                        (\ me -> GetChild (throwM me) mcu)
-                                        kma
+   (GetChild kma mcu) >>= k = runKureM (\ a -> getChildSecond (mplus mcu) (k a))
+                                       (\ e -> GetChild (throwM e) mcu)
+                                       kma
    {-# INLINE (>>=) #-}
 
 instance MonadThrow (GetChild c u) where
@@ -609,12 +610,12 @@ instance MonadThrow (GetChild c u) where
 instance MonadCatch (GetChild c u) where
    catch :: Exception e => GetChild c u a -> (e -> GetChild c u a) -> GetChild c u a
    uc@(GetChild kma mcu) `catch` k =
-       caseKureM (\ _   -> uc)
-                 (\ me  -> case fromMsgException me of
-                                Just ex -> getChildSecond (mplus mcu) (k ex)
-                                Nothing -> uc
-                 )
-                 kma
+       runKureM (\ _ -> uc)
+                (\ e -> case fromException e of
+                             Just ex -> getChildSecond (mplus mcu) (k ex)
+                             Nothing -> uc
+                )
+                kma
    {-# INLINE catch #-}
 
 wrapGetChild :: (ReadPath c crumb, Eq crumb) => crumb -> Rewrite c (GetChild c g) g
@@ -650,13 +651,13 @@ setChild cr = unwrapSetChild . allR . wrapSetChild cr
 -------------------------------------------------------------------------------
 
 childL_default :: forall c crumb m u. (ReadPath c crumb, Eq crumb) => (Walker c u, MonadCatch m) => crumb -> Lens c m u u
-childL_default cr = lens $ prefixFailMsg "childL failed: " $
+childL_default cr = lens $ modExc (stackStrategyFailure "childL") $
                            do cu <- getter
                               k  <- setter
                               return (cu, k)
   where
     getter :: Transform c m u (c,u)
-    getter = resultT (projectWithFailMsgM "there is no child matching the crumb.") (getChild cr)
+    getter = resultT (projectWithFailExcM $ nodeMismatch "there is no child matching the crumb.") (getChild cr)
     {-# INLINE getter #-}
 
     setter :: Transform c m u (u -> m u)

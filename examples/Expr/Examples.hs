@@ -1,7 +1,8 @@
 module Expr.Examples where
 
-import Data.Monoid (mempty)
 import Control.Arrow (arr)
+
+import Data.Monoid (mempty)
 
 import Language.KURE
 import Language.KURE.Pathfinder
@@ -18,12 +19,12 @@ type TransformE a b = Transform Context KureM a b
 -----------------------------------------------------------------
 
 applyE :: TransformE a b -> a -> Either String b
-applyE t = runKureM Right Left . applyT t initialContext
+applyE t = runKureM Right (Left . showKureExc) . applyT t initialContext
 
 -----------------------------------------------------------------
 
 inlineR :: RewriteE Expr
-inlineR = withPatFailMsg "only variables can be inlined." $
+inlineR = withPatFailExc (nodeMismatch "only variables can be inlined.") $
           do (c, Var v) <- exposeT
              constT (lookupDef v c)
 
@@ -111,7 +112,8 @@ test2e :: Bool
 test2e = applyE (extractT $ onePathToT $ arr isESeq) expr2 == Right mempty
 
 test2f :: Bool
-test2f = applyE (extractT $ oneNonEmptyPathToT $ arr isESeq) expr2 == Left "No matching nodes found."
+test2f = applyE (extractT $ oneNonEmptyPathToT $ arr isESeq) expr2
+    == Left "node mismatch, no matching nodes found."
 
 -----------------------------------------------------------------
 
@@ -123,13 +125,14 @@ expr3 = ESeq (Assign "m" (Lit 7)
              )
 
 test3a :: Bool
-test3a = applyE (extractR (anytdR inlineGR)) expr3 == Left "anytdR failed"
+test3a = applyE (extractR (anytdR inlineGR)) expr3 == Left "anytdR strategy failed."
 
 test3b :: Bool
-test3b = applyE (extractR (onetdR inlineGR)) expr3 == Left "onetdR failed"
+test3b = applyE (extractR (onetdR inlineGR)) expr3 == Left "onetdR strategy failed."
 
 test3c :: Bool
-test3c = applyE (extractR (alltdR inlineGR)) expr3 == Left "alltdR failed: only variables can be inlined."
+test3c = applyE (extractR (alltdR inlineGR)) expr3
+    == Left "alltdR strategy failed, because node mismatch, only variables can be inlined."
 
 -----------------------------------------------------------------
 
@@ -173,7 +176,8 @@ test4b :: Bool
 test4b = applyE (extractR $ oneLargestR isExpr incrLitGR) cmd4 == Right result4b
 
 test4c :: Bool
-test4c = applyE (extractR $ allLargestR isExpr incrLitGR) cmd4 == Left "allLargestR failed: allR failed: allR failed: not a Lit"
+test4c = applyE (extractR $ allLargestR isExpr incrLitGR) cmd4
+    == Left "allLargestR strategy failed, because allR strategy failed, because allR strategy failed, because node mismatch, not a Lit"
 
 -----------------------------------------------------------------
 

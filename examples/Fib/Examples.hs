@@ -16,14 +16,14 @@ type RewriteA = TransformA Arith
 -----------------------------------------------------------------------
 
 applyFib :: TransformA b -> Arith -> Either String b
-applyFib t = runKureM Right Left . applyT t mempty
+applyFib t = runKureM Right (Left . showKureExc) . applyT t mempty
 
 -----------------------------------------------------------------------
 
 -- | Apply the definition of the fibonacci function once.
 --   Requires the argument to Fib to be a Literal.
 fibLitR :: RewriteA
-fibLitR = withPatFailMsg "fibLitR failed: not of form Fib (Lit n)" $
+fibLitR = withPatFailExc (toStrategyFailure "fibLitR" $ nodeMismatch "not of form Fib (Lit n)") $
           do Fib (Lit n) <- idR
              case n of
                0  ->  return (Lit 0)
@@ -34,20 +34,20 @@ fibLitR = withPatFailMsg "fibLitR failed: not of form Fib (Lit n)" $
 
 -- | Compute the addition of two literals.
 addLitR :: RewriteA
-addLitR = withPatFailMsg "addLitR failed" $
+addLitR = withPatFailExc (strategyFailure "addLitR") $
           do Add (Lit m) (Lit n) <- idR
              return (Lit (m + n))
 
 -- | Compute the subtraction of two literals.
 subLitR :: RewriteA
-subLitR = withPatFailMsg "subLitR failed" $
+subLitR = withPatFailExc (strategyFailure "subLitR") $
           do Sub (Lit m) (Lit n) <- idR
              return (Lit (m - n))
 
 -----------------------------------------------------------------------
 
 arithR :: RewriteA
-arithR = setFailMsg "arithR failed" $
+arithR = setExc (strategyFailure "arithR") $
          addLitR >+> subLitR
 
 anyAddR :: RewriteA
@@ -84,7 +84,7 @@ test1a = applyFib (allR addLitR) expr1
 test1b :: Bool
 test1b = applyFib (alltdR addLitR) expr1
          ==
-         Left "alltdR failed: addLitR failed"
+         Left "alltdR strategy failed, because addLitR strategy failed."
 
 test1c :: Bool
 test1c = applyFib anyAddR expr1
@@ -94,7 +94,7 @@ test1c = applyFib anyAddR expr1
 test1d :: Bool
 test1d = applyFib anySubR expr1
          ==
-         Left "anybuR failed"
+         Left "anybuR strategy failed."
 
 test1e :: Bool
 test1e = applyFib anyArithR expr1
@@ -139,7 +139,7 @@ test3c = applyFib evalR expr3
 test3d :: Bool
 test3d = applyFib allArithR expr3
          ==
-         Left "allbuR failed: allR failed: arithR failed"
+         Left "allbuR strategy failed, because allR strategy failed, because arithR strategy failed."
 
 -----------------------------------------------------------------------
 

@@ -22,27 +22,29 @@ module Language.KURE.Injection
        -- * Monad Injections
        , injectM
        , projectM
-       , projectWithFailMsgM
+       , projectWithFailExcM
        -- * Transformation Injections
        , injectT
        , projectT
        , extractT
        , promoteT
-       , projectWithFailMsgT
-       , promoteWithFailMsgT
+       , projectWithFailExcT
+       , promoteWithFailExcT
        -- * Rewrite Injections
        , extractR
        , promoteR
-       , extractWithFailMsgR
-       , promoteWithFailMsgR
+       , extractWithFailExcR
+       , promoteWithFailExcR
 ) where
 
 import Control.Arrow
+import Control.Monad.Catch
 
 #if __GLASGOW_HASKELL__ >= 708
 import Data.Typeable
 #endif
 
+import Language.KURE.Exceptions
 import Language.KURE.Transform
 
 -------------------------------------------------------------------------------
@@ -86,14 +88,14 @@ injectM :: (Monad m, Injection a u) => a -> m u
 injectM = return . inject
 {-# INLINE injectM #-}
 
--- | As 'projectM', but takes a custom error message to use if projection fails.
-projectWithFailMsgM :: (Monad m, Injection a u) => String -> u -> m a
-projectWithFailMsgM msg = maybe (fail msg) return . project
-{-# INLINE projectWithFailMsgM #-}
+-- | As 'projectM', but takes a custom exception to use if projection fails.
+projectWithFailExcM :: (Exception e, MonadThrow m, Injection a u) => e -> u -> m a
+projectWithFailExcM e = maybe (throwM e) return . project
+{-# INLINE projectWithFailExcM #-}
 
 -- | Projects a value and lifts it into a 'Monad', with the possibility of failure.
-projectM :: (Monad m, Injection a u) => u -> m a
-projectM = projectWithFailMsgM "projectM failed"
+projectM :: (MonadThrow m, Injection a u) => u -> m a
+projectM = projectWithFailExcM $ strategyFailure "projectM"
 {-# INLINE projectM #-}
 
 -------------------------------------------------------------------------------
@@ -103,13 +105,13 @@ injectT :: (Monad m, Injection a u) => Transform c m a u
 injectT = arr inject
 {-# INLINE injectT #-}
 
-projectWithFailMsgT :: (Monad m, Injection a u) => String -> Transform c m u a
-projectWithFailMsgT = contextfreeT . projectWithFailMsgM
-{-# INLINE projectWithFailMsgT #-}
+projectWithFailExcT :: (Exception e, MonadThrow m, Injection a u) => e -> Transform c m u a
+projectWithFailExcT = contextfreeT . projectWithFailExcM
+{-# INLINE projectWithFailExcT #-}
 
 -- | Lifted 'project', the transformation fails if the projection fails.
-projectT :: (Monad m, Injection a u) => Transform c m u a
-projectT = projectWithFailMsgT "projectT failed"
+projectT :: (MonadThrow m, Injection a u) => Transform c m u a
+projectT = projectWithFailExcT $ strategyFailure "projectT"
 {-# INLINE projectT #-}
 
 -- | Convert a transformation over an injected value into a transformation over a non-injected value.
@@ -117,37 +119,37 @@ extractT :: (Monad m, Injection a u) => Transform c m u b -> Transform c m a b
 extractT t = injectT >>> t
 {-# INLINE extractT #-}
 
--- | As 'promoteT', but takes a custom error message to use if promotion fails.
-promoteWithFailMsgT  :: (Monad m, Injection a u) => String -> Transform c m a b -> Transform c m u b
-promoteWithFailMsgT msg t = projectWithFailMsgT msg >>> t
-{-# INLINE promoteWithFailMsgT #-}
+-- | As 'promoteT', but takes a custom exception to use if promotion fails.
+promoteWithFailExcT  :: (Exception e, MonadThrow m, Injection a u) => e -> Transform c m a b -> Transform c m u b
+promoteWithFailExcT e t = projectWithFailExcT e >>> t
+{-# INLINE promoteWithFailExcT #-}
 
 -- | Promote a transformation over a value into a transformation over an injection of that value,
---   (failing if that injected value cannot be projected).
-promoteT  :: (Monad m, Injection a u) => Transform c m a b -> Transform c m u b
-promoteT = promoteWithFailMsgT "promoteT failed"
+--   (throwing an exception if that injected value cannot be projected).
+promoteT  :: (MonadThrow m, Injection a u) => Transform c m a b -> Transform c m u b
+promoteT = promoteWithFailExcT $ strategyFailure "promoteT"
 {-# INLINE promoteT #-}
 
--- | As 'extractR', but takes a custom error message to use if extraction fails.
-extractWithFailMsgR :: (Monad m, Injection a u) => String -> Rewrite c m u -> Rewrite c m a
-extractWithFailMsgR msg r = injectT >>> r >>> projectWithFailMsgT msg
-{-# INLINE extractWithFailMsgR #-}
+-- | As 'extractR', but takes a custom exception to use if extraction fails.
+extractWithFailExcR :: (Exception e, MonadThrow m, Injection a u) => e -> Rewrite c m u -> Rewrite c m a
+extractWithFailExcR e r = injectT >>> r >>> projectWithFailExcT e
+{-# INLINE extractWithFailExcR #-}
 
 -- | Convert a rewrite over an injected value into a rewrite over a projection of that value,
---   (failing if that injected value cannot be projected).
-extractR :: (Monad m, Injection a u) => Rewrite c m u -> Rewrite c m a
-extractR = extractWithFailMsgR "extractR failed"
+--   (throwing an exception if that injected value cannot be projected).
+extractR :: (MonadThrow m, Injection a u) => Rewrite c m u -> Rewrite c m a
+extractR = extractWithFailExcR $ strategyFailure "extractR"
 {-# INLINE extractR #-}
 
--- | As 'promoteR', but takes a custom error message to use if promotion fails.
-promoteWithFailMsgR :: (Monad m, Injection a u) => String -> Rewrite c m a -> Rewrite c m u
-promoteWithFailMsgR msg r = projectWithFailMsgT msg >>> r >>> injectT
-{-# INLINE promoteWithFailMsgR #-}
+-- | As 'promoteR', but takes a custom exception to use if promotion fails.
+promoteWithFailExcR :: (Exception e, MonadThrow m, Injection a u) => e -> Rewrite c m a -> Rewrite c m u
+promoteWithFailExcR e r = projectWithFailExcT e >>> r >>> injectT
+{-# INLINE promoteWithFailExcR #-}
 
 -- | Promote a rewrite over a value into a rewrite over an injection of that value,
---   (failing if that injected value cannot be projected).
-promoteR  :: (Monad m, Injection a u) => Rewrite c m a -> Rewrite c m u
-promoteR = promoteWithFailMsgR "promoteR failed"
+--   (throwing an exception if that injected value cannot be projected).
+promoteR  :: (MonadThrow m, Injection a u) => Rewrite c m a -> Rewrite c m u
+promoteR = promoteWithFailExcR $ strategyFailure "promoteR"
 {-# INLINE promoteR #-}
 
 -------------------------------------------------------------------------------

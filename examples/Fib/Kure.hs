@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, InstanceSigs, LambdaCase, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, UndecidableInstances #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Fib.Kure (Crumb(..)) where
 
@@ -16,7 +17,7 @@ data Crumb = LeftChild | RightChild | OnlyChild deriving (Eq,Show)
 
 instance ExtendPath c Crumb => Walker c Arith where
    allR :: MonadCatch m => Rewrite c m Arith -> Rewrite c m Arith
-   allR r = prefixFailMsg "allR failed: " $
+   allR r = modExc (stackStrategyFailure "allR") $
      rewrite $ \ c -> \case
                          Lit n      ->  Lit <$> return n
                          Add e0 e1  ->  Add <$> applyR r (c @@ LeftChild) e0 <*> applyR r (c @@ RightChild) e1

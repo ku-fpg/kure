@@ -67,7 +67,7 @@ substExp v s = rules_var <+ rules_lam <+ rule_app
 ------------------------------------------------------------------------
 
 beta_reduce :: RewriteE
-beta_reduce = withPatFailMsg "Cannot beta-reduce, not app-lambda." $
+beta_reduce = withPatFailExc (nodeMismatch "cannot beta-reduce, not app-lambda.") $
                 do App (Lam v _) e2 <- idR
                    pathT [App_Fun,Lam_Body] (tryR $ substExp v e2)
 
@@ -76,9 +76,10 @@ eta_expand = rewrite $ \ c f -> do v <- freshName (bindings c)
                                    return $ Lam v (App f (Var v))
 
 eta_reduce :: RewriteE
-eta_reduce = withPatFailMsg "Cannot eta-reduce, not lambda-app-var." $
+eta_reduce = withPatFailExc (nodeMismatch "cannot eta-reduce, not lambda-app-var.") $
                do Lam v1 (App f (Var v2)) <- idR
-                  guardMsg (v1 == v2) $ "Cannot eta-reduce, " ++ v1 ++ " /= " ++ v2
+                  guardExc (v1 == v2) . conditionalFailure $
+                    "Cannot eta-reduce, " ++ v1 ++ " /= " ++ v2
                   return f
 
 -- This might not actually be normal order evaluation

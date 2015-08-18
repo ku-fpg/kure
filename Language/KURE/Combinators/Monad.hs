@@ -11,33 +11,36 @@
 
 module Language.KURE.Combinators.Monad
            ( -- * Monadic Conditionals
-             guardMsg
+             guardExc
            , guardM
-           , guardMsgM
+           , guardExcM
            , ifM
            , whenM
            , unlessM
 ) where
 
 import Control.Monad (unless)
+import Control.Monad.Catch (Exception, MonadThrow(..))
+
+import Language.KURE.Exceptions
 
 ------------------------------------------------------------------------------------------
 
--- | Similar to 'guard', but invokes 'fail' rather than 'mzero'.
-guardMsg ::  Monad m => Bool -> String -> m ()
-guardMsg b msg = unless b (fail msg)
-{-# INLINE guardMsg #-}
+-- | Similar to 'guard', but invokes 'throwM' rather than 'mzero'.
+guardExc :: (Exception e, MonadThrow m) => Bool -> e -> m ()
+guardExc b e = unless b (throwM e)
+{-# INLINE guardExc #-}
 
--- | As 'guardMsg', but with a default error message.
-guardM ::  Monad m => Bool -> m ()
-guardM b = guardMsg b "guardM failed"
+-- | As 'guardExc', but with a default exception.
+guardM ::  MonadThrow m => Bool -> m ()
+guardM b = guardExc b $ strategyFailure "guardM"
 {-# INLINE guardM #-}
 
--- | As 'guardMsg', but with an @m Bool@ as argument.
-guardMsgM :: Monad m => m Bool -> String -> m ()
-guardMsgM mb msg = do b <- mb
-                      guardMsg b msg
-{-# INLINE guardMsgM #-}
+-- | As 'guardExc', but with an @m Bool@ as argument.
+guardExcM :: (Exception e, MonadThrow m) => m Bool -> e -> m ()
+guardExcM mb e = do b <- mb
+                    guardExc b e
+{-# INLINE guardExcM #-}
 
 -- | if-then-else lifted over a monadic predicate.
 ifM ::  Monad m => m Bool -> m a -> m a -> m a
@@ -45,14 +48,14 @@ ifM mb m1 m2 = do b <- mb
                   if b then m1 else m2
 {-# INLINE ifM #-}
 
--- | If the monadic predicate holds then perform the monadic action, else fail.
-whenM ::  Monad m => m Bool -> m a -> m a
-whenM mb ma = ifM mb ma (fail "whenM: condition False")
+-- | If the monadic predicate holds then perform the monadic action, else throw an exception.
+whenM ::  MonadThrow m => m Bool -> m a -> m a
+whenM mb ma = ifM mb ma (throwM . toStrategyFailure "whenM" $ conditionalFailure "condition False")
 {-# INLINE whenM #-}
 
--- | If the monadic predicate holds then fail, else perform the monadic action.
-unlessM ::  Monad m => m Bool -> m a -> m a
-unlessM mb ma = ifM mb (fail "unlessM: condition True") ma
+-- | If the monadic predicate holds then throw an exception, else perform the monadic action.
+unlessM ::  MonadThrow m => m Bool -> m a -> m a
+unlessM mb ma = ifM mb (throwM . toStrategyFailure "unlessM" $ conditionalFailure "condition True") ma
 {-# INLINE unlessM #-}
 
 ------------------------------------------------------------------------------------------
