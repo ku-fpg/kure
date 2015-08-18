@@ -117,12 +117,10 @@ showKureExc = displayException
 #else
 showKureExc e =
   case fromException e of
-    Just nm@NodeMismatch{}       -> displayNodeMismatch nm
-    Nothing ->
-  case fromException e of
-    Just sf@StrategyFailure{}    -> displayStrategyFailure sf
-    Nothing ->
-  case fromException e of
-    Just cf@ConditionalFailure{} -> displayConditionalFailure cf
-    Nothing                      -> show e
+    Just nm@NodeMismatch{} -> displayNodeMismatch nm
+    Nothing                -> case fromException e of
+      Just sf@StrategyFailure{} -> displayStrategyFailure sf
+      Nothing                   -> case fromException e of
+        Just cf@ConditionalFailure{} -> displayConditionalFailure cf
+        Nothing                      -> show e
 #endif
