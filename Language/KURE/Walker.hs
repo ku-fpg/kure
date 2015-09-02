@@ -205,12 +205,12 @@ prunetdT t = setExc (strategyFailure "prunetdT") $
               in go
 {-# INLINE prunetdT #-}
 
--- | An always successful top-down fold, replacing exceptions with 'mempty'.
+-- | An always successful top-down fold, replacing failures with 'mempty'.
 crushtdT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
 crushtdT t = foldtdT (mtryM t)
 {-# INLINE crushtdT #-}
 
--- | An always successful bottom-up fold, replacing exceptions with 'mempty'.
+-- | An always successful bottom-up fold, replacing failures with 'mempty'.
 crushbuT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u b -> Transform c m u b
 crushbuT t = foldbuT (mtryM t)
 {-# INLINE crushbuT #-}

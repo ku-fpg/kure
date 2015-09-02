@@ -142,8 +142,7 @@ absPathT = contextT >>^ absPath
 
 -- | Lifted version of 'lastCrumb'.
 lastCrumbT :: (ReadPath c crumb, MonadThrow m) => Transform c m a crumb
-lastCrumbT = contextonlyT (projectWithFailExcM (toStrategyFailure "lastCrumbT"
-    $ nodeMismatch "at the root, no crumbs yet.") . lastCrumb . absPath)
+lastCrumbT = contextonlyT (projectWithFailExcM (strategyFailure "lastCrumbT") . lastCrumb . absPath)
 {-# INLINE lastCrumbT #-}
 
 -------------------------------------------------------------------------------

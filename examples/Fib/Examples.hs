@@ -23,7 +23,7 @@ applyFib t = runKureM Right (Left . showKureExc) . applyT t mempty
 -- | Apply the definition of the fibonacci function once.
 --   Requires the argument to Fib to be a Literal.
 fibLitR :: RewriteA
-fibLitR = withPatFailExc (toStrategyFailure "fibLitR" $ nodeMismatch "not of form Fib (Lit n)") $
+fibLitR = withPatFailExc (strategyFailure "fibLitR") $
           do Fib (Lit n) <- idR
              case n of
                0  ->  return (Lit 0)
@@ -84,7 +84,7 @@ test1a = applyFib (allR addLitR) expr1
 test1b :: Bool
 test1b = applyFib (alltdR addLitR) expr1
          ==
-         Left "alltdR strategy failed, because addLitR strategy failed."
+         Left "the alltdR strategy failed, because the addLitR strategy failed."
 
 test1c :: Bool
 test1c = applyFib anyAddR expr1
@@ -94,7 +94,7 @@ test1c = applyFib anyAddR expr1
 test1d :: Bool
 test1d = applyFib anySubR expr1
          ==
-         Left "anybuR strategy failed."
+         Left "the anybuR strategy failed."
 
 test1e :: Bool
 test1e = applyFib anyArithR expr1
@@ -139,7 +139,7 @@ test3c = applyFib evalR expr3
 test3d :: Bool
 test3d = applyFib allArithR expr3
          ==
-         Left "allbuR strategy failed, because allR strategy failed, because arithR strategy failed."
+         Left "the allbuR strategy failed, because the allR strategy failed, because the arithR strategy failed."
 
 -----------------------------------------------------------------------
 

@@ -15,10 +15,7 @@ import Lam.Context
 instance (ExtendPath c Crumb, AddBoundVar c) => Walker c Exp where
    allR :: MonadCatch m => Rewrite c m Exp -> Rewrite c m Exp
    allR r = modExc (stackStrategyFailure "allR") $
-            readerT $ \case
-                         App _ _ -> appAllR r r
-                         Lam _ _ -> lamR r
-                         _       -> idR
+            appAllR r r <+> lamR r <+> idR
 
 -------------------------------------------------------------------------------
 
@@ -28,14 +25,14 @@ instance (ExtendPath c Crumb, AddBoundVar c) => Walker c Exp where
 varT :: MonadThrow m => (Name -> b) -> Transform c m Exp b
 varT f = contextfreeT $ \case
                            Var n -> return (f n)
-                           _     -> throwM $ nodeMismatch "no match for Var"
+                           _     -> throwM (nodeMismatch "Var")
 
 -------------------------------------------------------------------------------
 
 lamT :: (ExtendPath c Crumb, AddBoundVar c, MonadThrow m) => Transform c m Exp a -> (Name -> a -> b) -> Transform c m Exp b
 lamT t f = transform $ \ c -> \case
                                  Lam v e -> f v <$> applyT t (addBoundVar v c @@ Lam_Body) e
-                                 _       -> throwM $ nodeMismatch "no match for Lam"
+                                 _       -> throwM (nodeMismatch "Lam")
 
 lamR :: (ExtendPath c Crumb, AddBoundVar c, MonadThrow m) => Rewrite c m Exp -> Rewrite c m Exp
 lamR r = lamT r Lam
@@ -45,7 +42,7 @@ lamR r = lamT r Lam
 appT :: (ExtendPath c Crumb, MonadThrow m) => Transform c m Exp a1 -> Transform c m Exp a2 -> (a1 -> a2 -> b) -> Transform c m Exp b
 appT t1 t2 f = transform $ \ c -> \case
                                      App e1 e2 -> f <$> applyT t1 (c @@ App_Fun) e1 <*> applyT t2 (c @@ App_Arg) e2
-                                     _         -> throwM $ nodeMismatch "no match for App"
+                                     _         -> throwM (nodeMismatch "App")
 
 appAllR :: (ExtendPath c Crumb, MonadThrow m) => Rewrite c m Exp -> Rewrite c m Exp -> Rewrite c m Exp
 appAllR r1 r2 = appT r1 r2 App

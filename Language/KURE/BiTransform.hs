@@ -146,7 +146,7 @@ promoteWithFailExcBiR e (BiTransform r1 r2) = BiTransform (promoteWithFailExcR e
 {-# INLINE promoteWithFailExcBiR #-}
 
 -- | Promote a bidirectional rewrite over a value into a bidirectional rewrite over an injection of that value,
---   (throwing an exception if an injected value cannot be projected).
+--   (failing if an injected value cannot be projected).
 promoteBiR :: (MonadThrow m, Injection a u) => BiRewrite c m a -> BiRewrite c m u
 promoteBiR = promoteWithFailExcBiR $ strategyFailure "promoteBiR"
 {-# INLINE promoteBiR #-}

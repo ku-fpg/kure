@@ -17,6 +17,7 @@ module Language.KURE.Combinators.Transform
         ( -- * Transformation Combinators
           idR
         , successT
+        , failT
         , contextT
         , exposeT
         , liftContext
@@ -60,7 +61,6 @@ import Control.Category ((>>>),id)
 import Control.Monad (liftM,ap)
 import Control.Monad.Catch
 
-import Data.Foldable
 import Data.Traversable
 #if __GLASGOW_HASKELL__ >= 708
 import Data.Typeable
@@ -83,6 +83,10 @@ idR = id
 successT :: Monad m => Transform c m a ()
 successT = return ()
 {-# INLINE successT #-}
+
+-- | An always failing tranformation.
+failT :: MonadThrow m => Transform c m a b
+failT = constT (throwM $ strategyFailure "failT")
 
 -- | Extract the current context.
 contextT :: Monad m => Transform c m a c
@@ -139,27 +143,26 @@ acceptWithFailExcR :: (Exception e, MonadThrow m) => (a -> Bool) -> e -> Rewrite
 acceptWithFailExcR p e = readerT $ \ a -> if p a then id else throwM e
 {-# INLINE acceptWithFailExcR #-}
 
--- | Look at the argument to a rewrite, and choose to be either 'idR' or an exception.
+-- | Look at the argument to a rewrite, and choose to be either 'idR' or a failure.
 acceptR :: MonadThrow m => (a -> Bool) -> Rewrite c m a
-acceptR p = acceptWithFailExcR p . toStrategyFailure "acceptR" $ conditionalFailure "predicate failed"
+acceptR p = acceptWithFailExcR p (strategyFailure "acceptR")
 {-# INLINE acceptR #-}
 
 -- | A generalisation of 'acceptR' where the predicate is a 'Transform'.
 accepterR :: MonadThrow m => Transform c m a Bool -> Rewrite c m a
-accepterR t = ifM t idR (throwM . toStrategyFailure "accepterR" $ conditionalFailure "predicate failed")
+accepterR t = ifM t idR (throwM $ strategyFailure "accepterR")
 {-# INLINE accepterR #-}
 
--- | Catch a exception-throwing rewrite, making it into an identity.
+-- | Catch a failing rewrite, making it into an identity.
 tryR :: MonadCatch m => Rewrite c m a -> Rewrite c m a
 tryR r = r <+ id
 {-# INLINE tryR #-}
 
--- | Makes a rewrite throw an exception if the result value and the argument value
+-- | Makes a rewrite fail if the result value and the argument value
 --   satisfy the equality predicate. This is a generalisation of 'changedR'.
 --   @changedR = changedByR ('==')@
 changedByR :: MonadCatch m => (a -> a -> Bool) -> Rewrite c m a -> Rewrite c m a
-changedByR p r = readerT (\ a -> r >>> acceptWithFailExcR (not . p a)
-    (toStrategyFailure "changedByR" $ conditionalFailure "value is unchanged"))
+changedByR p r = readerT (\ a -> r >>> acceptWithFailExcR (not . p a) (strategyFailure "changedByR"))
 {-# INLINE changedByR #-}
 
 -- | Makes an rewrite throw an exception if the result value equals the argument value.
@@ -167,8 +170,8 @@ changedR :: (MonadCatch m, Eq a) => Rewrite c m a -> Rewrite c m a
 changedR = changedByR (==)
 {-# INLINE changedR #-}
 
--- | Repeat a rewrite until it throws an exception, then return the result before
---   the exception. Requires at least the first attempt to succeed.
+-- | Repeat a rewrite until it fails, then return the result before
+--   the failure. Requires at least the first attempt to succeed.
 repeatR :: MonadCatch m => Rewrite c m a -> Rewrite c m a
 repeatR r = let go = r >>> tryR go
              in go
@@ -180,13 +183,12 @@ catchesT = catchesM
 {-# INLINE catchesT #-}
 {-# DEPRECATED catchesT "Please use 'catchesM' instead." #-}
 
-
 -- | An identity transformation that resembles a monadic 'Control.Monad.join'.
 joinT :: Transform c m (m a) a
 joinT = contextfreeT id
 {-# INLINE joinT #-}
 
--- | Throw an exception if the Boolean is False, succeed if the Boolean is True.
+-- | Fail if the Boolean is False, succeed if the Boolean is True.
 guardT :: MonadThrow m => Transform c m Bool ()
 guardT = contextfreeT guardM
 {-# INLINE guardT #-}
@@ -213,7 +215,7 @@ checkSuccessPBool e m = do PBool b a <- m
 -- See the \"Expr\" example, or the HERMIT package.
 
 -- | The 'AnyR' transformer, in combination with 'wrapAnyR' and 'unwrapAnyR',
---   causes a sequence of rewrites to succeed if at least one succeeds, converting exceptions to
+--   causes a sequence of rewrites to succeed if at least one succeeds, converting failures to
 --   identity rewrites.
 newtype AnyR m a = AnyR (m (PBool a))
 #if __GLASGOW_HASKELL__ >= 708
@@ -294,7 +296,7 @@ unwrapAnyR = resultT (checkSuccessPBool (strategyFailure "anyR") . unAnyR)
 -- See the \"Expr\" example, or the HERMIT package.
 
 -- | The 'OneR' transformer, in combination with 'wrapOneR' and 'unwrapOneR',
---   causes a sequence of rewrites to only apply the first success, converting the remainder (and exceptions) to identity rewrites.
+--   causes a sequence of rewrites to only apply the first success, converting the remainder (and failures) to identity rewrites.
 newtype OneR m a = OneR (Bool -> m (PBool a))
 #if __GLASGOW_HASKELL__ >= 708
   deriving Typeable

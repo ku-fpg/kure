@@ -61,13 +61,12 @@ substExp v s = rules_var <+ rules_lam <+ rule_app
                         then alphaLam (freeVars s) >>> rules_lam    -- Rule 5
                         else lamR (substExp v s)                    -- Rule 4b
 
-        rule_app = do App _ _ <- idR
-                      anyR (substExp v s)                           -- Rule 6
+        rule_app = appAnyR (substExp v s) (substExp v s)            -- Rule 6
 
 ------------------------------------------------------------------------
 
 beta_reduce :: RewriteE
-beta_reduce = withPatFailExc (nodeMismatch "cannot beta-reduce, not app-lambda.") $
+beta_reduce = setExc (strategyFailure "beta_reduce") $
                 do App (Lam v _) e2 <- idR
                    pathT [App_Fun,Lam_Body] (tryR $ substExp v e2)
 
@@ -76,10 +75,11 @@ eta_expand = rewrite $ \ c f -> do v <- freshName (bindings c)
                                    return $ Lam v (App f (Var v))
 
 eta_reduce :: RewriteE
-eta_reduce = withPatFailExc (nodeMismatch "cannot eta-reduce, not lambda-app-var.") $
+eta_reduce = modExc (stackStrategyFailure "eta_reduce") $
+             withPatFailExc (conditionalFailure "the node does not have the form \"\\_. _ v)\".") $
                do Lam v1 (App f (Var v2)) <- idR
-                  guardExc (v1 == v2) . conditionalFailure $
-                    "Cannot eta-reduce, " ++ v1 ++ " /= " ++ v2
+                  guardExc (v1 == v2)
+                         $ conditionalFailure (v1 ++ " /= " ++ v2)
                   return f
 
 -- This might not actually be normal order evaluation

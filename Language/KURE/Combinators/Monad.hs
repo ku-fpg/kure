@@ -50,12 +50,12 @@ ifM mb m1 m2 = do b <- mb
 
 -- | If the monadic predicate holds then perform the monadic action, else throw an exception.
 whenM ::  MonadThrow m => m Bool -> m a -> m a
-whenM mb ma = ifM mb ma (throwM . toStrategyFailure "whenM" $ conditionalFailure "condition False")
+whenM mb ma = ifM mb ma (throwM $ strategyFailure "whenM")
 {-# INLINE whenM #-}
 
 -- | If the monadic predicate holds then throw an exception, else perform the monadic action.
 unlessM ::  MonadThrow m => m Bool -> m a -> m a
-unlessM mb ma = ifM mb (throwM . toStrategyFailure "unlessM" $ conditionalFailure "condition True") ma
+unlessM mb ma = ifM mb (throwM $ strategyFailure "unlessM") ma
 {-# INLINE unlessM #-}
 
 ------------------------------------------------------------------------------------------

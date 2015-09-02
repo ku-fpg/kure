@@ -24,7 +24,7 @@ applyE t = runKureM Right (Left . showKureExc) . applyT t initialContext
 -----------------------------------------------------------------
 
 inlineR :: RewriteE Expr
-inlineR = withPatFailExc (nodeMismatch "only variables can be inlined.") $
+inlineR = withPatFailExc (strategyFailure "inlineR") $
           do (c, Var v) <- exposeT
              constT (lookupDef v c)
 
@@ -113,7 +113,7 @@ test2e = applyE (extractT $ onePathToT $ arr isESeq) expr2 == Right mempty
 
 test2f :: Bool
 test2f = applyE (extractT $ oneNonEmptyPathToT $ arr isESeq) expr2
-    == Left "node mismatch, no matching nodes found."
+    == Left "the oneNonEmptyPathToT strategy failed."
 
 -----------------------------------------------------------------
 
@@ -125,14 +125,14 @@ expr3 = ESeq (Assign "m" (Lit 7)
              )
 
 test3a :: Bool
-test3a = applyE (extractR (anytdR inlineGR)) expr3 == Left "anytdR strategy failed."
+test3a = applyE (extractR (anytdR inlineGR)) expr3 == Left "the anytdR strategy failed."
 
 test3b :: Bool
-test3b = applyE (extractR (onetdR inlineGR)) expr3 == Left "onetdR strategy failed."
+test3b = applyE (extractR (onetdR inlineGR)) expr3 == Left "the onetdR strategy failed."
 
 test3c :: Bool
 test3c = applyE (extractR (alltdR inlineGR)) expr3
-    == Left "alltdR strategy failed, because node mismatch, only variables can be inlined."
+    == Left "the alltdR strategy failed, because the inlineR strategy failed."
 
 -----------------------------------------------------------------
 
@@ -177,7 +177,25 @@ test4b = applyE (extractR $ oneLargestR isExpr incrLitGR) cmd4 == Right result4b
 
 test4c :: Bool
 test4c = applyE (extractR $ allLargestR isExpr incrLitGR) cmd4
-    == Left "allLargestR strategy failed, because allR strategy failed, because allR strategy failed, because node mismatch, not a Lit"
+    == Left "the allLargestR strategy failed, because the allR strategy failed, because the allR strategy failed, because the node was not a Lit."
+
+-----------------------------------------------------------------
+
+expr5 :: Expr
+expr5 = Add (Var "n") (Lit 1)
+
+test5a :: Bool
+test5a = applyE (incrLitR <+> constT (throwM $ conditionalFailure "good")) expr5
+    == Left "good"
+
+test5b :: Bool
+test5b = applyE (constT (throwM $ conditionalFailure "good") <+> idR) expr5
+    == Left "good"
+
+test5c :: Bool
+test5c = applyE (constT (throwM $ conditionalFailure "good") <+ idR) expr5
+    == Right expr5
+
 
 -----------------------------------------------------------------
 
@@ -186,6 +204,7 @@ checkTests = and [ test1a, test1b, test1c
                  , test2a, test2b, test2c, test2d, test2e, test2f
                  , test3a, test3b, test3c
                  , test4a, test4b, test4c
+                 , test5a, test5b, test5c
                  ]
 
 -----------------------------------------------------------------

@@ -21,7 +21,6 @@ module Language.KURE.Lens
         , focusT
         , pureL
         , failL
-        , throwL
         , catchL
         , testLensT
         , bidirectionalL
@@ -42,6 +41,7 @@ import Data.Typeable
 
 import Language.KURE.BiTransform
 import Language.KURE.Combinators.Transform
+import Language.KURE.Exceptions
 import Language.KURE.Injection
 import Language.KURE.MonadCatch
 import Language.KURE.Transform
@@ -92,19 +92,14 @@ instance Monad m => Category (Lens c m) where
    {-# INLINE (.) #-}
 
 -- | The failing 'Lens'.
-failL :: Monad m => String -> Lens c m a b
-failL = lens . fail
+failL :: MonadThrow m => Lens c m a b
+failL = lens (constT $ throwM $ strategyFailure "failL")
 {-# INLINE failL #-}
 
--- | The exception-throwing 'Lens'.
-throwL :: (Exception e, MonadThrow m) => e -> Lens c m a b
-throwL = lens . throwM
-{-# INLINE throwL #-}
-
--- | A 'Lens' is deemed to have failed (and thus can be caught) if either it throws an exception on the way down, or,
---   crucially, if it would throw an exception on the way up for an unmodified value.  However, actual failure on the way up is not caught
+-- | A 'Lens' is deemed to have failed (and thus can be caught) if either it fails on the way down, or,
+--   crucially, if it would fail on the way up for an unmodified value.  However, actual failure on the way up is not caught
 --   (as by then it is too late to use an alternative 'Lens').  This means that, in theory, a use of 'catchL' could cause a succeeding 'Lens' application to
---   throw an exception. But provided 'lens' is used correctly, this should never happen.
+--   fail. But provided 'lens' is used correctly, this should never happen.
 catchL :: (Exception e, MonadCatch m) => Lens c m a b -> (e -> Lens c m a b) -> Lens c m a b
 l1 `catchL` l2 = lens (attemptM (focusR l1 idR) >>= either (lensT . l2) (const (lensT l1)))
 {-# INLINE catchL #-}

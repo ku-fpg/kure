@@ -95,7 +95,7 @@ throwKureM :: MonadThrow m => KureM a -> m a
 throwKureM = runKureM return throwM
 {-# INLINE throwKureM #-}
 
--- | Get the value from a 'KureM', providing a function to handle the error case.
+-- | Get the value from a 'KureM', given a function to handle the exception case.
 fromKureM :: (SomeException -> a) -> KureM a -> a
 fromKureM = runKureM id
 {-# INLINE fromKureM #-}
@@ -159,6 +159,7 @@ instance Applicative KureM where
 catchM :: (Exception e, MonadCatch m) => m a -> (e -> m a) -> m a
 catchM = catch
 {-# INLINE catchM #-}
+{-# DEPRECATED catchM "Please use 'catch' instead." #-}
 
 -- | A monadic catch that ignores the error message.
 (<+) :: MonadCatch m => m a -> m a -> m a
@@ -166,6 +167,7 @@ ma <+ mb = ma `catch` \SomeException{} -> mb
 {-# INLINE (<+) #-}
 
 -- | Catches a monadic action only if it throws a 'NodeMismatch'.
+--   Intended for combining mutually exclusive congruence combinators.
 (<+>) :: MonadCatch m => m a -> m a -> m a
 ma <+> mb = ma `catch` \NodeMismatch{} -> mb
 {-# INLINE (<+>) #-}
@@ -175,7 +177,7 @@ catchesM :: (Foldable f, MonadCatch m) => f (m a) -> m a
 catchesM = foldr (<+) (throwM $ strategyFailure "catchesM")
 {-# INLINE catchesM #-}
 
--- | Catch an exception-throwing monadic computation, making it succeed with a constant value.
+-- | Catch a exception-throwing monadic computation, making it succeed with a constant value.
 tryM :: MonadCatch m => a -> m a -> m a
 tryM a ma = ma <+ return a
 {-# INLINE tryM #-}
@@ -198,7 +200,7 @@ testM ma = liftM (const True) ma <+ return False
 -- | Fail if the monadic computation succeeds; succeed with @()@ if it fails.
 notM :: MonadCatch m => m a -> m ()
 notM ma = ifM (testM ma)
-              (throwM . toStrategyFailure "notM" $ conditionalFailure "notM of success")
+              (throwM $ strategyFailure "notM")
               (return ())
 {-# INLINE notM #-}
 
@@ -214,7 +216,7 @@ setExc :: (Exception e, MonadCatch m) => e -> m a -> m a
 setExc e = modExc $ \SomeException{} -> e
 {-# INLINE setExc #-}
 
--- | Use the given exception whenever a monadic pattern match failure occurs.
+-- | Use the given exception whenever a monadic pattern-match failure occurs.
 withPatFailExc :: (Exception e, MonadCatch m) => e -> m a -> m a
 withPatFailExc e = modExc $ \PatternMatchFail{} -> e
 

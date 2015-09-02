@@ -105,6 +105,7 @@ injectT :: (Monad m, Injection a u) => Transform c m a u
 injectT = arr inject
 {-# INLINE injectT #-}
 
+-- | As 'projectT', but takes a custom exception to use if projection fails.
 projectWithFailExcT :: (Exception e, MonadThrow m, Injection a u) => e -> Transform c m u a
 projectWithFailExcT = contextfreeT . projectWithFailExcM
 {-# INLINE projectWithFailExcT #-}
@@ -125,7 +126,7 @@ promoteWithFailExcT e t = projectWithFailExcT e >>> t
 {-# INLINE promoteWithFailExcT #-}
 
 -- | Promote a transformation over a value into a transformation over an injection of that value,
---   (throwing an exception if that injected value cannot be projected).
+--   (failing if that injected value cannot be projected).
 promoteT  :: (MonadThrow m, Injection a u) => Transform c m a b -> Transform c m u b
 promoteT = promoteWithFailExcT $ strategyFailure "promoteT"
 {-# INLINE promoteT #-}
@@ -136,7 +137,7 @@ extractWithFailExcR e r = injectT >>> r >>> projectWithFailExcT e
 {-# INLINE extractWithFailExcR #-}
 
 -- | Convert a rewrite over an injected value into a rewrite over a projection of that value,
---   (throwing an exception if that injected value cannot be projected).
+--   (failing if that injected value cannot be projected).
 extractR :: (MonadThrow m, Injection a u) => Rewrite c m u -> Rewrite c m a
 extractR = extractWithFailExcR $ strategyFailure "extractR"
 {-# INLINE extractR #-}
@@ -147,7 +148,7 @@ promoteWithFailExcR e r = projectWithFailExcT e >>> r >>> injectT
 {-# INLINE promoteWithFailExcR #-}
 
 -- | Promote a rewrite over a value into a rewrite over an injection of that value,
---   (throwing an exception if that injected value cannot be projected).
+--   (failing if that injected value cannot be projected).
 promoteR  :: (MonadThrow m, Injection a u) => Rewrite c m a -> Rewrite c m u
 promoteR = promoteWithFailExcR $ strategyFailure "promoteR"
 {-# INLINE promoteR #-}

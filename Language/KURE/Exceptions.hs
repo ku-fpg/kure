@@ -20,7 +20,6 @@ module Language.KURE.Exceptions
         , StrategyFailure(..)
         , strategyFailure
         , stackStrategyFailure
-        , toStrategyFailure
         , displayStrategyFailure
         , ConditionalFailure(..)
         , conditionalFailure
@@ -48,7 +47,7 @@ nodeMismatch = NodeMismatch
 
 -- | Show a 'NodeMismatch' in a human-friendly way.
 displayNodeMismatch :: NodeMismatch -> String
-displayNodeMismatch (NodeMismatch n) = "node mismatch, " ++ n
+displayNodeMismatch (NodeMismatch n) = "the node was not a " ++ n ++ "."
 {-# INLINE displayNodeMismatch #-}
 
 -- | A strategy failure exception type, containing the name of the failed
@@ -63,30 +62,23 @@ instance Exception StrategyFailure where
 #endif
 
 -- | Construct a 'StrategyFailure' from a strategy name with no explanation
---   as for why it failed.
+--   for why it failed.
 strategyFailure :: String -> StrategyFailure
 strategyFailure s = StrategyFailure s Nothing
 {-# INLINE strategyFailure #-}
 
 -- | Construct a 'StrategyFailure' from a strategy name and an explanation
---   as for why it failed.
+--   for why it failed.
 stackStrategyFailure :: String -> SomeException -> StrategyFailure
 stackStrategyFailure s = StrategyFailure s . Just
 {-# INLINE stackStrategyFailure #-}
 
--- | Construct a 'StrategyFailure' from a strategy name and an explanation
---   as for why it failed. Unlike 'stackStrategyFailure', this accepts
---   any 'Exception' type as an argument.
-toStrategyFailure :: Exception e => String -> e -> StrategyFailure
-toStrategyFailure s = stackStrategyFailure s . toException
-{-# INLINE toStrategyFailure #-}
-
 -- | Show a 'StrategyFailure' in a human-friendly way.
 displayStrategyFailure :: StrategyFailure -> String
 displayStrategyFailure (StrategyFailure s Nothing) =
-    s ++ " strategy failed."
+    "the " ++ s ++ " strategy failed."
 displayStrategyFailure (StrategyFailure s (Just e)) =
-    s ++ " strategy failed, because " ++ showKureExc e
+    "the " ++ s ++ " strategy failed, because " ++ showKureExc e
 
 -- | A conditional test (other than a 'NodeMismatch') failure exception type,
 --   containing an explanation of what failed and why.

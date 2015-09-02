@@ -21,7 +21,7 @@ instance Monad LamM where
   return a = LamM (\n -> (n,Right a))
 
   fail :: String -> LamM a
-  fail msg = LamM (\ n -> (n, Left . SomeException $ PatternMatchFail msg))
+  fail msg = LamM (\ n -> (n, Left (SomeException $ PatternMatchFail msg)))
 
   (>>=) :: LamM a -> (a -> LamM b) -> LamM b
   (LamM f) >>= gg = LamM $ \ n -> case f n of
