@@ -56,6 +56,7 @@ import Prelude hiding (id, map, foldr, mapM)
 
 #if __GLASGOW_HASKELL__ <= 708
 import Control.Applicative
+import Data.Foldable
 #endif
 import Control.Category ((>>>),id)
 import Control.Monad (liftM,ap)
