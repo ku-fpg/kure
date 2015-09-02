@@ -30,7 +30,7 @@ type RewriteE     = TransformE Exp
 -------------------------------------------------------------------------------
 
 applyExp :: TransformE b -> Exp -> Either String b
-applyExp t = either (Left . show) Right . runLamM . applyT t initialLamC
+applyExp t = either (Left . showKureExc) Right . runLamM . applyT t initialLamC
 
 ------------------------------------------------------------------------
 
