@@ -1,4 +1,4 @@
-## next
+## 2.16.12
 * Derive `Typeable` instances
 
 ## 2.16.5
