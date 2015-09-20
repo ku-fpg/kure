@@ -1,7 +1,5 @@
 module Fib.Examples where
 
-import Data.Monoid (mempty)
-
 import Language.KURE
 
 import Fib.AST

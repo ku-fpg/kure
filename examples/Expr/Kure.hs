@@ -1,8 +1,6 @@
-{-# LANGUAGE CPP, InstanceSigs, LambdaCase, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE InstanceSigs, LambdaCase, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, UndecidableInstances #-}
 
 module Expr.Kure where
-
-import Control.Monad
 
 import Language.KURE
 

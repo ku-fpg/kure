@@ -4,7 +4,6 @@ module Lam.Monad where
 
 import Language.KURE
 
-import Control.Applicative
 import Control.Exception (PatternMatchFail(..))
 import Control.Monad
 import Control.Monad.Catch

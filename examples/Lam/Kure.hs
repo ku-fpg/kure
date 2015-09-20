@@ -1,9 +1,7 @@
-{-# LANGUAGE CPP, InstanceSigs, LambdaCase, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, UndecidableInstances #-}
+{-# LANGUAGE InstanceSigs, LambdaCase, FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Lam.Kure where
-
-import Control.Monad
 
 import Language.KURE
 

@@ -2,8 +2,6 @@ module Expr.Examples where
 
 import Control.Arrow (arr)
 
-import Data.Monoid (mempty)
-
 import Language.KURE
 import Language.KURE.Pathfinder
 

@@ -2,8 +2,6 @@
 
 module Expr.Context where
 
-import Data.Monoid (mempty)
-
 import Language.KURE
 import Language.KURE.ExtendableContext
 

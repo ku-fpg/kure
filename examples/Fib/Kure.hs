@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, InstanceSigs, LambdaCase, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, UndecidableInstances #-}
+{-# LANGUAGE InstanceSigs, LambdaCase, MultiParamTypeClasses, FlexibleInstances, FlexibleContexts, UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Fib.Kure (Crumb(..)) where
@@ -8,8 +8,6 @@ import Prelude hiding (Left, Right)
 import Language.KURE
 
 import Fib.AST
-
-import Control.Monad(liftM, ap)
 
 --------------------------------------------------------------------------------------
 
