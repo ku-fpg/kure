@@ -31,7 +31,6 @@ module Language.KURE.MonadCatch
              -- ** Combinators
            , (<+)
            , (<+>)
-           , catchM
            , catchesM
            , tryM
            , mtryM
@@ -56,13 +55,8 @@ import Data.Typeable
 import Language.KURE.Combinators.Monad
 import Language.KURE.Exceptions
 
-#if __GLASGOW_HASKELL__ >= 710
-#else
-import Control.Applicative
-import Data.Monoid
-#endif
-
 infixl 3 <+
+infixl 3 <+>
 
 ------------------------------------------------------------------------------------------
 
@@ -154,12 +148,6 @@ instance Applicative KureM where
    {-# INLINE (<*>) #-}
 
 -------------------------------------------------------------------------------
-
--- | Another name for 'catch'.
-catchM :: (Exception e, MonadCatch m) => m a -> (e -> m a) -> m a
-catchM = catch
-{-# INLINE catchM #-}
-{-# DEPRECATED catchM "Please use 'catch' instead." #-}
 
 -- | A monadic catch that ignores the error message.
 (<+) :: MonadCatch m => m a -> m a -> m a

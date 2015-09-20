@@ -113,15 +113,3 @@ eseqOneR :: (ExtendPath c Int, AddDef c, MonadCatch m) => Rewrite c m Cmd -> Rew
 eseqOneR r1 r2 = unwrapOneR $ eseqAllR (wrapOneR r1) (wrapOneR r2)
 
 ---------------------------------------------------------------------------
-
-#if __GLASGOW_HASKELL__ <= 708
-(<$>) :: Monad m => (a -> b) -> m a -> m b
-(<$>) = liftM
-{-# INLINE (<$>) #-}
-
-(<*>) :: Monad m => m (a -> b) -> m a -> m b
-(<*>) = ap
-{-# INLINE (<*>) #-}
-#endif
-
----------------------------------------------------------------------------

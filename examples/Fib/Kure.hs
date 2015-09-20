@@ -25,15 +25,3 @@ instance ExtendPath c Crumb => Walker c Arith where
                          Fib e0     ->  Fib <$> applyR r (c @@ OnlyChild) e0
 
 --------------------------------------------------------------------------------------
-
-#if __GLASGOW_HASKELL__ <= 708
-(<$>) :: Monad m => (a -> b) -> m a -> m b
-(<$>) = liftM
-{-# INLINE (<$>) #-}
-
-(<*>) :: Monad m => m (a -> b) -> m a -> m b
-(<*>) = ap
-{-# INLINE (<*>) #-}
-#endif
-
---------------------------------------------------------------------------------------

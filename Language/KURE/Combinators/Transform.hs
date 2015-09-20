@@ -23,7 +23,6 @@ module Language.KURE.Combinators.Transform
         , liftContext
         , readerT
         , resultT
-        , catchesT
         , mapT
         , joinT
         , guardT
@@ -54,18 +53,12 @@ module Language.KURE.Combinators.Transform
 
 import Prelude hiding (id, map, foldr, mapM)
 
-#if __GLASGOW_HASKELL__ <= 708
-import Control.Applicative
-import Data.Foldable
-#endif
 import Control.Category ((>>>),id)
 import Control.Monad (liftM,ap)
 import Control.Monad.Catch
 
 import Data.Traversable
-#if __GLASGOW_HASKELL__ >= 708
 import Data.Typeable
-#endif
 
 import Language.KURE.Combinators.Arrow
 import Language.KURE.Combinators.Monad
@@ -178,12 +171,6 @@ repeatR r = let go = r >>> tryR go
              in go
 {-# INLINE repeatR #-}
 
--- | Attempt each transformation until one succeeds, then return that result and discard the rest of the transformations.
-catchesT :: MonadCatch m => [Transform c m a b] -> Transform c m a b
-catchesT = catchesM
-{-# INLINE catchesT #-}
-{-# DEPRECATED catchesT "Please use 'catchesM' instead." #-}
-
 -- | An identity transformation that resembles a monadic 'Control.Monad.join'.
 joinT :: Transform c m (m a) a
 joinT = contextfreeT id
@@ -219,9 +206,7 @@ checkSuccessPBool e m = do PBool b a <- m
 --   causes a sequence of rewrites to succeed if at least one succeeds, converting failures to
 --   identity rewrites.
 newtype AnyR m a = AnyR (m (PBool a))
-#if __GLASGOW_HASKELL__ >= 708
-  deriving Typeable
-#endif
+                   deriving Typeable
 
 unAnyR :: AnyR m a -> m (PBool a)
 unAnyR (AnyR mba) = mba
@@ -299,9 +284,7 @@ unwrapAnyR = resultT (checkSuccessPBool (strategyFailure "anyR") . unAnyR)
 -- | The 'OneR' transformer, in combination with 'wrapOneR' and 'unwrapOneR',
 --   causes a sequence of rewrites to only apply the first success, converting the remainder (and failures) to identity rewrites.
 newtype OneR m a = OneR (Bool -> m (PBool a))
-#if __GLASGOW_HASKELL__ >= 708
-  deriving Typeable
-#endif
+                   deriving Typeable
 
 unOneR :: OneR m a -> Bool -> m (PBool a)
 unOneR (OneR mba) = mba

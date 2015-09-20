@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE InstanceSigs #-}
 
 -- |
 -- Module: Language.KURE.MonadCatch
@@ -35,10 +36,9 @@ newtype NodeMismatch = NodeMismatch String
   deriving (Eq, Show, Typeable)
 
 instance Exception NodeMismatch where
-#if __GLASGOW_HASKELL__ >= 710
-    displayException = displayNodeMismatch
-    {-# INLINE displayException #-}
-#endif
+  displayException :: NodeMismatch -> String
+  displayException = displayNodeMismatch
+  {-# INLINE displayException #-}
 
 -- | Construct a 'NodeMismatch' from a node name.
 nodeMismatch :: String -> NodeMismatch
@@ -56,10 +56,9 @@ data StrategyFailure = StrategyFailure String (Maybe SomeException)
   deriving (Show, Typeable)
 
 instance Exception StrategyFailure where
-#if __GLASGOW_HASKELL__ >= 710
-    displayException = displayStrategyFailure
-    {-# INLINE displayException #-}
-#endif
+  displayException :: StrategyFailure -> String
+  displayException = displayStrategyFailure
+  {-# INLINE displayException #-}
 
 -- | Construct a 'StrategyFailure' from a strategy name with no explanation
 --   for why it failed.
@@ -86,10 +85,9 @@ data ConditionalFailure = ConditionalFailure String
   deriving (Eq, Show, Typeable)
 
 instance Exception ConditionalFailure where
-#if __GLASGOW_HASKELL__ >= 710
-    displayException = displayConditionalFailure
-    {-# INLINE displayException #-}
-#endif
+  displayException :: ConditionalFailure -> String
+  displayException = displayConditionalFailure
+  {-# INLINE displayException #-}
 
 -- | Construct a 'ConditionalFailure' from an explanation as for what failed and why.
 conditionalFailure :: String -> ConditionalFailure
@@ -104,15 +102,4 @@ displayConditionalFailure (ConditionalFailure why) = why
 -- | If 'SomeException' contains a KURE-related 'Exception', show it in
 --   a human-friendly way.
 showKureExc :: SomeException -> String
-#if __GLASGOW_HASKELL__ >= 710
 showKureExc = displayException
-#else
-showKureExc e =
-  case fromException e of
-    Just nm@NodeMismatch{} -> displayNodeMismatch nm
-    Nothing                -> case fromException e of
-      Just sf@StrategyFailure{} -> displayStrategyFailure sf
-      Nothing                   -> case fromException e of
-        Just cf@ConditionalFailure{} -> displayConditionalFailure cf
-        Nothing                      -> show e
-#endif

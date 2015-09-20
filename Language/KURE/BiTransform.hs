@@ -14,7 +14,7 @@
 
 module Language.KURE.BiTransform
        (  -- * Bi-directional Transformations
-          BiTransform, BiTranslate
+          BiTransform
         , BiRewrite
         , bidirectional
         , forwardT
@@ -39,9 +39,7 @@ import Prelude hiding (id, (.))
 import Control.Category
 import Control.Monad.Catch
 
-#if __GLASGOW_HASKELL__ >= 708
 import Data.Typeable
-#endif
 
 import Language.KURE.Exceptions
 import Language.KURE.Injection
@@ -54,12 +52,7 @@ import Language.KURE.Transform
 data BiTransform c m a b = BiTransform {forwardT :: Transform c m a b, -- ^ Extract the forward 'Transform' from a 'BiTransform'.
                                         backwardT :: Transform c m b a  -- ^ Extract the backward 'Transform' from a 'BiTransform'.
                                        }
-#if __GLASGOW_HASKELL__ >= 708
-  deriving Typeable
-#endif
-
--- | A deprecated synonym for 'BiTranslate'.
-type BiTranslate c m a b = BiTransform c m a b
+                           deriving Typeable
 
 -- | A 'BiTransform' that shares the same source and target type.
 type BiRewrite c m a = BiTransform c m a a

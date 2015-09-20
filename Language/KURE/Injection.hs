@@ -40,9 +40,7 @@ module Language.KURE.Injection
 import Control.Arrow
 import Control.Monad.Catch
 
-#if __GLASGOW_HASKELL__ >= 708
 import Data.Typeable
-#endif
 
 import Language.KURE.Exceptions
 import Language.KURE.Transform
@@ -58,9 +56,7 @@ class Injection a u where
   inject  :: a -> u
   project :: u -> Maybe a
 
-#if __GLASGOW_HASKELL__ >= 708
 deriving instance Typeable Injection
-#endif
 
 -- | There is an identity injection for all types.
 instance Injection a a where

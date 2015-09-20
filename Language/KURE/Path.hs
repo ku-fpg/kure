@@ -43,10 +43,6 @@ module Language.KURE.Path
        )
 where
 
-#if __GLASGOW_HASKELL__ <= 708
-import Data.Monoid
-#endif
-
 import Control.Arrow ((>>^))
 import Control.Monad.Catch
 
@@ -116,9 +112,7 @@ class ExtendPath c crumb | c -> crumb where
   -- | Extend the current 'AbsolutePath' by one crumb.
   (@@) :: c -> crumb -> c
 
-#if __GLASGOW_HASKELL__ >= 708
 deriving instance Typeable ExtendPath
-#endif
 
 -- | A 'SnocPath' from the root.
 type AbsolutePath = SnocPath
@@ -131,9 +125,7 @@ class ReadPath c crumb | c -> crumb where
   -- | Read the current absolute path.
   absPath :: c -> AbsolutePath crumb
 
-#if __GLASGOW_HASKELL__ >= 708
 deriving instance Typeable ReadPath
-#endif
 
 -- | Lifted version of 'absPath'.
 absPathT :: (ReadPath c crumb, Monad m) => Transform c m a (AbsolutePath crumb)

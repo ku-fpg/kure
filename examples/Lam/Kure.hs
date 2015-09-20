@@ -54,15 +54,3 @@ appOneR :: (ExtendPath c Crumb, MonadCatch m) => Rewrite c m Exp -> Rewrite c m 
 appOneR r1 r2 = unwrapOneR $ appAllR (wrapOneR r1) (wrapOneR r2)
 
 -------------------------------------------------------------------------------
-
-#if __GLASGOW_HASKELL__ <= 708
-(<$>) :: Monad m => (a -> b) -> m a -> m b
-(<$>) = liftM
-{-# INLINE (<$>) #-}
-
-(<*>) :: Monad m => m (a -> b) -> m a -> m b
-(<*>) = ap
-{-# INLINE (<*>) #-}
-#endif
-
--------------------------------------------------------------------------------

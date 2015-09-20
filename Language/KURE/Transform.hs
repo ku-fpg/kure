@@ -23,10 +23,10 @@
 
 module Language.KURE.Transform
        (-- * Transformations and Rewrites
-          Transform, Translate
+          Transform
         , Rewrite
-        , applyT, applyR, apply
-        , transform, translate
+        , applyT, applyR
+        , transform
         , rewrite
         , contextfreeT
         , contextonlyT
@@ -43,12 +43,7 @@ import Control.Monad.IO.Class
 import Control.Category
 import Control.Arrow
 
-#if __GLASGOW_HASKELL__ <= 708
-import Data.Monoid
-#endif
-#if __GLASGOW_HASKELL__ >= 708
 import Data.Typeable
-#endif
 
 ------------------------------------------------------------------------------------------
 
@@ -56,23 +51,12 @@ import Data.Typeable
 --   The 'Transform' type is the basis of the entire KURE library.
 newtype Transform c m a b = Transform { -- | Apply a transformation to a value and its context.
                                         applyT :: c -> a -> m b}
-#if __GLASGOW_HASKELL__ >= 708
-  deriving Typeable
-#endif
-
--- | A deprecated synonym for 'Transform'.
-type Translate c m a b = Transform c m a b
+                            deriving Typeable
 
 -- | The primitive way of building a transformation.
 transform :: (c -> a -> m b) -> Transform c m a b
 transform = Transform
 {-# INLINE transform #-}
-
--- | A deprecated synonym for 'transform'.
-translate :: (c -> a -> m b) -> Translate c m a b
-translate = transform
-{-# INLINE translate #-}
-{-# DEPRECATED translate "Please use 'transform' instead." #-}
 
 -- | A transformation that shares the same source and target type.
 type Rewrite c m a = Transform c m a a
@@ -86,12 +70,6 @@ rewrite = transform
 applyR :: Rewrite c m a -> c -> a -> m a
 applyR = applyT
 {-# INLINE applyR #-}
-
--- | A deprecated synonym for 'applyT'.
-apply :: Transform c m a b -> c -> a -> m b
-apply = applyT
-{-# INLINE apply #-}
-{-# DEPRECATED apply "Please use 'applyT' instead." #-}
 
 ------------------------------------------------------------------------------------------
 
