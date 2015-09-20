@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -43,15 +41,12 @@ import Control.Monad.IO.Class
 import Control.Category
 import Control.Arrow
 
-import Data.Typeable
-
 ------------------------------------------------------------------------------------------
 
 -- | An abstract representation of a transformation from a value of type @a@ in a context @c@ to a monadic value of type @m b@.
 --   The 'Transform' type is the basis of the entire KURE library.
 newtype Transform c m a b = Transform { -- | Apply a transformation to a value and its context.
                                         applyT :: c -> a -> m b}
-                            deriving Typeable
 
 -- | The primitive way of building a transformation.
 transform :: (c -> a -> m b) -> Transform c m a b

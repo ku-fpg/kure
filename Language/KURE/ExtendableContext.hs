@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -25,8 +24,6 @@ module Language.KURE.ExtendableContext
         , extraContext
 ) where
 
-import Data.Typeable
-
 import Language.KURE.Path
 
 ------------------------------------------------------------------------------------------------
@@ -38,7 +35,6 @@ data ExtendContext c e = ExtendContext
                              -- | Retrieve the extra contextual information.
                            , extraContext  :: e
                            }
-  deriving Typeable
 
 -- | Extend a context with some additional information.
 extendContext :: e -> c -> ExtendContext c e

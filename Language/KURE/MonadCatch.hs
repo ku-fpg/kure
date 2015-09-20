@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -50,7 +48,6 @@ import Control.Monad.Catch
 import Control.Monad.IO.Class
 
 import Data.Foldable
-import Data.Typeable
 
 import Language.KURE.Combinators.Monad
 import Language.KURE.Exceptions
@@ -64,7 +61,7 @@ infixl 3 <+>
 --   The KURE user is free to either use 'KureM' or provide their own monad.
 --
 --   'KureM' is essentially the same as @'Either' 'SomeException'@.
-data KureM a = Failure SomeException | Success a deriving (Show, Typeable)
+data KureM a = Failure SomeException | Success a deriving Show
 
 -- | Eliminator for 'KureM'.
 runKureM :: (a -> b) -> (SomeException -> b) -> KureM a -> b

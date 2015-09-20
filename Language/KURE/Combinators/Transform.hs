@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE RankNTypes #-}
 -- |
@@ -58,7 +56,6 @@ import Control.Monad (liftM,ap)
 import Control.Monad.Catch
 
 import Data.Traversable
-import Data.Typeable
 
 import Language.KURE.Combinators.Arrow
 import Language.KURE.Combinators.Monad
@@ -206,7 +203,6 @@ checkSuccessPBool e m = do PBool b a <- m
 --   causes a sequence of rewrites to succeed if at least one succeeds, converting failures to
 --   identity rewrites.
 newtype AnyR m a = AnyR (m (PBool a))
-                   deriving Typeable
 
 unAnyR :: AnyR m a -> m (PBool a)
 unAnyR (AnyR mba) = mba
@@ -284,7 +280,6 @@ unwrapAnyR = resultT (checkSuccessPBool (strategyFailure "anyR") . unAnyR)
 -- | The 'OneR' transformer, in combination with 'wrapOneR' and 'unwrapOneR',
 --   causes a sequence of rewrites to only apply the first success, converting the remainder (and failures) to identity rewrites.
 newtype OneR m a = OneR (Bool -> m (PBool a))
-                   deriving Typeable
 
 unOneR :: OneR m a -> Bool -> m (PBool a)
 unOneR (OneR mba) = mba

@@ -1,10 +1,7 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StandaloneDeriving #-}
 -- |
 -- Module: Language.KURE.Path
 -- Copyright: (c) 2012--2015 The University of Kansas
@@ -46,8 +43,6 @@ where
 import Control.Arrow ((>>^))
 import Control.Monad.Catch
 
-import Data.Typeable
-
 import Language.KURE.Combinators.Transform
 import Language.KURE.Exceptions
 import Language.KURE.Injection
@@ -62,7 +57,7 @@ type Path crumb = [crumb]
 -------------------------------------------------------------------------------
 
 -- | A 'SnocPath' is a list stored in reverse order.
-newtype SnocPath crumb = SnocPath [crumb] deriving (Eq, Typeable)
+newtype SnocPath crumb = SnocPath [crumb] deriving Eq
 
 instance Monoid (SnocPath crumb) where
    mempty :: SnocPath crumb
@@ -112,8 +107,6 @@ class ExtendPath c crumb | c -> crumb where
   -- | Extend the current 'AbsolutePath' by one crumb.
   (@@) :: c -> crumb -> c
 
-deriving instance Typeable ExtendPath
-
 -- | A 'SnocPath' from the root.
 type AbsolutePath = SnocPath
 
@@ -124,8 +117,6 @@ type LocalPath = SnocPath
 class ReadPath c crumb | c -> crumb where
   -- | Read the current absolute path.
   absPath :: c -> AbsolutePath crumb
-
-deriving instance Typeable ReadPath
 
 -- | Lifted version of 'absPath'.
 absPathT :: (ReadPath c crumb, Monad m) => Transform c m a (AbsolutePath crumb)

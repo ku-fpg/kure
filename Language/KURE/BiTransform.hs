@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 -- |
 -- Module: Language.KURE.BiTransform
@@ -39,8 +37,6 @@ import Prelude hiding (id, (.))
 import Control.Category
 import Control.Monad.Catch
 
-import Data.Typeable
-
 import Language.KURE.Exceptions
 import Language.KURE.Injection
 import Language.KURE.MonadCatch
@@ -52,7 +48,6 @@ import Language.KURE.Transform
 data BiTransform c m a b = BiTransform {forwardT :: Transform c m a b, -- ^ Extract the forward 'Transform' from a 'BiTransform'.
                                         backwardT :: Transform c m b a  -- ^ Extract the backward 'Transform' from a 'BiTransform'.
                                        }
-                           deriving Typeable
 
 -- | A 'BiTransform' that shares the same source and target type.
 type BiRewrite c m a = BiTransform c m a a

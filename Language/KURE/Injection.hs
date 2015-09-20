@@ -1,9 +1,6 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StandaloneDeriving #-}
 -- |
 -- Module: Language.KURE.Injection
 -- Copyright: (c) 2012--2015 The University of Kansas
@@ -40,8 +37,6 @@ module Language.KURE.Injection
 import Control.Arrow
 import Control.Monad.Catch
 
-import Data.Typeable
-
 import Language.KURE.Exceptions
 import Language.KURE.Transform
 
@@ -55,8 +50,6 @@ import Language.KURE.Transform
 class Injection a u where
   inject  :: a -> u
   project :: u -> Maybe a
-
-deriving instance Typeable Injection
 
 -- | There is an identity injection for all types.
 instance Injection a a where

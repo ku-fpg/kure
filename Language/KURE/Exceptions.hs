@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 
 -- |
@@ -28,12 +26,11 @@ module Language.KURE.Exceptions
         ) where
 
 import Control.Exception (Exception(..), SomeException(..))
-import Data.Typeable (Typeable)
 
 -- | A node mismatch exception type, containing the name of the node that
 --   was mismatched.
 newtype NodeMismatch = NodeMismatch String
-  deriving (Eq, Show, Typeable)
+  deriving (Eq, Show)
 
 instance Exception NodeMismatch where
   displayException :: NodeMismatch -> String
@@ -53,7 +50,7 @@ displayNodeMismatch (NodeMismatch n) = "the node was not a " ++ n ++ "."
 -- | A strategy failure exception type, containing the name of the failed
 --   strategy and, if possible, the reason why it failed.
 data StrategyFailure = StrategyFailure String (Maybe SomeException)
-  deriving (Show, Typeable)
+  deriving Show
 
 instance Exception StrategyFailure where
   displayException :: StrategyFailure -> String
@@ -82,7 +79,7 @@ displayStrategyFailure (StrategyFailure s (Just e)) =
 -- | A conditional test (other than a 'NodeMismatch') failure exception type,
 --   containing an explanation of what failed and why.
 data ConditionalFailure = ConditionalFailure String
-  deriving (Eq, Show, Typeable)
+  deriving (Eq, Show)
 
 instance Exception ConditionalFailure where
   displayException :: ConditionalFailure -> String

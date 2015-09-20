@@ -1,11 +1,8 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
 -- |
 -- Module: Language.KURE.Walker
 -- Copyright: (c) 2012--2015 The University of Kansas
@@ -84,7 +81,6 @@ import Prelude hiding (id)
 import Data.Maybe (isJust)
 import Data.Monoid
 import Data.DList (singleton, toList)
-import Data.Typeable
 
 import Control.Arrow
 import Control.Category hiding ((.))
@@ -139,8 +135,6 @@ class Walker c u where
   childL :: (ReadPath c crumb, Eq crumb, MonadCatch m) => crumb -> Lens c m u u
   childL = childL_default
   {-# INLINE childL #-}
-
-deriving instance Typeable Walker
 
 ------------------------------------------------------------------------------------------
 
