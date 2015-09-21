@@ -1,8 +1,6 @@
 {-# LANGUAGE InstanceSigs, MultiParamTypeClasses #-}
 module Lam.Context where
 
-import Data.Monoid (mempty)
-
 import Language.KURE
 
 import Lam.AST (Name)

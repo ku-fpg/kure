@@ -1,10 +1,9 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE RankNTypes #-}
 -- |
 -- Module: Language.KURE.Transform
--- Copyright: (c) 2012--2014 The University of Kansas
+-- Copyright: (c) 2012--2015 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
@@ -22,10 +21,10 @@
 
 module Language.KURE.Transform
        (-- * Transformations and Rewrites
-          Transform, Translate
+          Transform
         , Rewrite
-        , applyT, applyR, apply
-        , transform, translate
+        , applyT, applyR
+        , transform
         , rewrite
         , contextfreeT
         , contextonlyT
@@ -37,18 +36,10 @@ import Prelude hiding (id, (.))
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Category
 import Control.Arrow
-
-#if __GLASGOW_HASKELL__ <= 708
-import Data.Monoid
-#endif
-#if __GLASGOW_HASKELL__ >= 708
-import Data.Typeable
-#endif
-
-import Language.KURE.MonadCatch
 
 ------------------------------------------------------------------------------------------
 
@@ -56,23 +47,11 @@ import Language.KURE.MonadCatch
 --   The 'Transform' type is the basis of the entire KURE library.
 newtype Transform c m a b = Transform { -- | Apply a transformation to a value and its context.
                                         applyT :: c -> a -> m b}
-#if __GLASGOW_HASKELL__ >= 708
-  deriving Typeable
-#endif
-
--- | A deprecated synonym for 'Transform'.
-type Translate c m a b = Transform c m a b
 
 -- | The primitive way of building a transformation.
 transform :: (c -> a -> m b) -> Transform c m a b
 transform = Transform
 {-# INLINE transform #-}
-
--- | A deprecated synonym for 'transform'.
-translate :: (c -> a -> m b) -> Translate c m a b
-translate = transform
-{-# INLINE translate #-}
-{-# DEPRECATED translate "Please use 'transform' instead." #-}
 
 -- | A transformation that shares the same source and target type.
 type Rewrite c m a = Transform c m a a
@@ -86,12 +65,6 @@ rewrite = transform
 applyR :: Rewrite c m a -> c -> a -> m a
 applyR = applyT
 {-# INLINE applyR #-}
-
--- | A deprecated synonym for 'applyT'.
-apply :: Transform c m a b -> c -> a -> m b
-apply = applyT
-{-# INLINE apply #-}
-{-# DEPRECATED apply "Please use 'applyT' instead." #-}
 
 ------------------------------------------------------------------------------------------
 
@@ -163,11 +136,34 @@ instance Monad m => Monad (Transform c m a) where
    {-# INLINE fail #-}
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
+instance MonadThrow m => MonadThrow (Transform c m a) where
+
+    throwM :: Exception e => e -> Transform c m a b
+    throwM = constT . throwM
+    {-# INLINE throwM #-}
+
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadCatch m => MonadCatch (Transform c m a) where
 
-   catchM :: Transform c m a b -> (String -> Transform c m a b) -> Transform c m a b
-   catchM t1 t2 = transform $ \ c a -> applyT t1 c a `catchM` \ msg -> applyT (t2 msg) c a
-   {-# INLINE catchM #-}
+   catch :: Exception e => Transform c m a b -> (e -> Transform c m a b) -> Transform c m a b
+   catch t1 t2 = transform $ \ c a -> applyT t1 c a `catch` \ e -> applyT (t2 e) c a
+   {-# INLINE catch #-}
+
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
+instance MonadMask m => MonadMask (Transform c m a) where
+
+   mask :: ((forall d. Transform c m a d -> Transform c m a d) -> Transform c m a b) -> Transform c m a b
+   mask f = transform $ \c a -> mask $ \u -> applyT (f $ q u) c a
+     where q :: (m b -> m b) -> Transform c m a b -> Transform c m a b
+           q u t = transform $ \c a -> u (applyT t c a)
+   {-# INLINE mask #-}
+
+   uninterruptibleMask :: ((forall d. Transform c m a d -> Transform c m a d) -> Transform c m a b) -> Transform c m a b
+   uninterruptibleMask f = transform $ \c a -> uninterruptibleMask $ \u -> applyT (f $ q u) c a
+     where q :: (m b -> m b) -> Transform c m a b -> Transform c m a b
+           q u t = transform $ \c a -> u (applyT t c a)
+   {-# INLINE uninterruptibleMask #-}
+
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadPlus m => MonadPlus (Transform c m a) where

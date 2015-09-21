@@ -1,6 +1,6 @@
 -- |
 -- Module: Language.KURE
--- Copyright: (c) 2012--2014 The University of Kansas
+-- Copyright: (c) 2012--2015 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
@@ -15,12 +15,14 @@ module Language.KURE
         ( module Language.KURE.Transform
         , module Language.KURE.Walker
         , module Language.KURE.Combinators
+        , module Language.KURE.Exceptions
         , module Language.KURE.MonadCatch
         , module Language.KURE.Injection
         , module Language.KURE.Path
 ) where
 
 import Language.KURE.Combinators
+import Language.KURE.Exceptions
 import Language.KURE.MonadCatch
 import Language.KURE.Transform
 import Language.KURE.Injection

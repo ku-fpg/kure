@@ -1,11 +1,10 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
 -- |
 -- Module: Language.KURE.ExtendableContext
--- Copyright: (c) 2012--2014 The University of Kansas
+-- Copyright: (c) 2012--2015 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
@@ -25,8 +24,6 @@ module Language.KURE.ExtendableContext
         , extraContext
 ) where
 
-import Data.Typeable
-
 import Language.KURE.Path
 
 ------------------------------------------------------------------------------------------------
@@ -38,7 +35,6 @@ data ExtendContext c e = ExtendContext
                              -- | Retrieve the extra contextual information.
                            , extraContext  :: e
                            }
-  deriving Typeable
 
 -- | Extend a context with some additional information.
 extendContext :: e -> c -> ExtendContext c e

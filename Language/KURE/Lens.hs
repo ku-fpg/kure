@@ -1,9 +1,7 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 -- |
 -- Module: Language.KURE.Lens
--- Copyright: (c) 2012--2014 The University of Kansas
+-- Copyright: (c) 2012--2015 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
@@ -31,27 +29,22 @@ module Language.KURE.Lens
 import Prelude hiding (id, (.))
 
 import Control.Monad
+import Control.Monad.Catch
 import Control.Category
 import Control.Arrow
 
-#if __GLASGOW_HASKELL__ >= 708
-import Data.Typeable
-#endif
-
+import Language.KURE.BiTransform
+import Language.KURE.Combinators.Transform
+import Language.KURE.Exceptions
+import Language.KURE.Injection
 import Language.KURE.MonadCatch
 import Language.KURE.Transform
-import Language.KURE.BiTransform
-import Language.KURE.Injection
-import Language.KURE.Combinators.Transform
 
 ------------------------------------------------------------------------------------------
 
 -- | A 'Lens' is a way to focus on a sub-structure of type @b@ from a structure of type @a@.
 newtype Lens c m a b = Lens { -- | Convert a 'Lens' into a 'Transform' that produces a sub-structure (and its context) and an unfocussing function.
                               lensT :: Transform c m a ((c,b), b -> m a)}
-#if __GLASGOW_HASKELL__ >= 708
-  deriving Typeable
-#endif
 
 -- | The primitive way of building a 'Lens'.
 --   If the unfocussing function is applied to the value focussed on then it should succeed,
@@ -90,15 +83,15 @@ instance Monad m => Category (Lens c m) where
    {-# INLINE (.) #-}
 
 -- | The failing 'Lens'.
-failL :: Monad m => String -> Lens c m a b
-failL = lens . fail
+failL :: MonadThrow m => Lens c m a b
+failL = lens (constT $ throwM $ strategyFailure "failL")
 {-# INLINE failL #-}
 
 -- | A 'Lens' is deemed to have failed (and thus can be caught) if either it fails on the way down, or,
 --   crucially, if it would fail on the way up for an unmodified value.  However, actual failure on the way up is not caught
---   (as by then it is too late to use an alternative 'Lens').  This means that, in theory, a use of 'catchL' could cause a succeeding 'Lens' application to fail.
---   But provided 'lens' is used correctly, this should never happen.
-catchL :: MonadCatch m => Lens c m a b -> (String -> Lens c m a b) -> Lens c m a b
+--   (as by then it is too late to use an alternative 'Lens').  This means that, in theory, a use of 'catchL' could cause a succeeding 'Lens' application to
+--   fail. But provided 'lens' is used correctly, this should never happen.
+catchL :: (Exception e, MonadCatch m) => Lens c m a b -> (e -> Lens c m a b) -> Lens c m a b
 l1 `catchL` l2 = lens (attemptM (focusR l1 idR) >>= either (lensT . l2) (const (lensT l1)))
 {-# INLINE catchL #-}
 
@@ -117,12 +110,12 @@ pureL f g = bidirectionalL $ bidirectional (arr f) (arr g)
 ------------------------------------------------------------------------------------------
 
 -- | A 'Lens' to the injection of a value.
-injectL  :: (Monad m, Injection a g) => Lens c m a g
+injectL  :: (MonadThrow m, Injection a g) => Lens c m a g
 injectL = lens $ transform $ \ c a -> return ((c, inject a), projectM)
 {-# INLINE injectL #-}
 
 -- | A 'Lens' to the projection of a value.
-projectL :: (Monad m, Injection a g) => Lens c m g a
+projectL :: (MonadThrow m, Injection a g) => Lens c m g a
 projectL = lens $ transform $ \ c -> projectM >=> (\ a -> return ((c,a), injectM))
 {-# INLINE projectL #-}
 

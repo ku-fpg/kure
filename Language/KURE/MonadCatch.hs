@@ -1,10 +1,9 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE RankNTypes #-}
+
 -- |
 -- Module: Language.KURE.MonadCatch
--- Copyright: (c) 2012--2014 The University of Kansas
+-- Copyright: (c) 2012--2015 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
@@ -15,86 +14,82 @@
 
 module Language.KURE.MonadCatch
            ( -- * Monads with a Catch
-             MonadCatch(..)
+             MonadThrow(..)
+           , MonadCatch(..)
+           , MonadMask(..)
              -- ** The KURE Monad
            , KureM
            , runKureM
+           , runAndShowKureM
            , fromKureM
            , liftKureM
+           , throwKureM
              -- ** The IO Monad
            , liftAndCatchIO
              -- ** Combinators
            , (<+)
+           , (<+>)
            , catchesM
            , tryM
            , mtryM
            , attemptM
            , testM
            , notM
-           , modFailMsg
-           , setFailMsg
-           , prefixFailMsg
-           , withPatFailMsg
+           , modExc
+           , setExc
+           , withPatFailExc
 ) where
 
 import Prelude hiding (foldr)
 
-import Control.Exception (catch, SomeException)
+import Control.Exception (PatternMatchFail(..))
 import Control.Monad
+import Control.Monad.Catch
 import Control.Monad.IO.Class
 
 import Data.Foldable
-import Data.List (isPrefixOf)
-import Data.Typeable
 
 import Language.KURE.Combinators.Monad
-
-#if __GLASGOW_HASKELL__ <= 708
-import Control.Applicative
-import Data.Monoid
-#endif
+import Language.KURE.Exceptions
 
 infixl 3 <+
-
-------------------------------------------------------------------------------------------
-
--- | 'Monad's with a catch for 'fail'.
---   The following laws are expected to hold:
---
--- > fail msg `catchM` f == f msg
--- > return a `catchM` f == return a
-
-class Monad m => MonadCatch m where
-  -- | Catch a failing monadic computation.
-  catchM :: m a -> (String -> m a) -> m a
-
-#if __GLASGOW_HASKELL__ >= 708
-deriving instance Typeable MonadCatch
-#endif
+infixl 3 <+>
 
 ------------------------------------------------------------------------------------------
 
 -- | 'KureM' is the minimal structure that can be an instance of 'MonadCatch'.
 --   The KURE user is free to either use 'KureM' or provide their own monad.
---   'KureM' is essentially the same as 'Either' 'String', except that it supports a 'MonadCatch' instance which 'Either' 'String' does not (because its 'fail' method calls 'error')
---   A major advantage of this is that monadic pattern match failures are caught safely.
-data KureM a = Failure String | Success a deriving (Eq, Show, Typeable)
+--
+--   'KureM' is essentially the same as @'Either' 'SomeException'@.
+data KureM a = Failure SomeException | Success a deriving Show
 
 -- | Eliminator for 'KureM'.
-runKureM :: (a -> b) -> (String -> b) -> KureM a -> b
-runKureM _ f (Failure msg) = f msg
-runKureM s _ (Success a)   = s a
+runKureM :: (a -> b) -> (SomeException -> b) -> KureM a -> b
+runKureM _ f (Failure e) = f e
+runKureM s _ (Success a) = s a
 {-# INLINE runKureM #-}
 
--- | Get the value from a 'KureM', providing a function to handle the error case.
-fromKureM :: (String -> a) -> KureM a -> a
-fromKureM = runKureM id
-{-# INLINE fromKureM #-}
+-- | Eliminator for 'KureM' which 'show's the result if successful, and uses
+--   'showKureExc' if unsuccessful.
+runAndShowKureM :: Show a => KureM a -> String
+runAndShowKureM = runKureM (\a -> "KURE Success: " ++ show a)
+                           (\e -> "KURE Failure: " ++ showKureExc e)
+{-# INLINE runAndShowKureM #-}
 
 -- | Lift a 'KureM' computation to any other monad.
 liftKureM :: Monad m => KureM a -> m a
-liftKureM = runKureM return fail
+liftKureM = runKureM return (fail . showKureExc)
 {-# INLINE liftKureM #-}
+
+-- | Lift a 'KureM' computation to any monad which supports throwing exceptions.
+throwKureM :: MonadThrow m => KureM a -> m a
+throwKureM = runKureM return throwM
+{-# INLINE throwKureM #-}
+
+-- | Get the value from a 'KureM', given a function to handle the exception case.
+fromKureM :: (SomeException -> a) -> KureM a -> a
+fromKureM = runKureM id
+{-# INLINE fromKureM #-}
 
 instance Monad KureM where
    return :: a -> KureM a
@@ -102,19 +97,38 @@ instance Monad KureM where
    {-# INLINE return #-}
 
    (>>=) :: KureM a -> (a -> KureM b) -> KureM b
-   (Success a)   >>= f = f a
-   (Failure msg) >>= _ = Failure msg
+   Failure e >>= _ = Failure e
+   Success a >>= f = f a
    {-# INLINE (>>=) #-}
 
+   -- | Produces a 'Failure' containing a 'PatternMatchFail'.
    fail :: String -> KureM a
-   fail = Failure
+   fail = Failure . SomeException . PatternMatchFail
    {-# INLINE fail #-}
 
+-- | Produces a 'Failure' containing the exception.
+instance MonadThrow KureM where
+   throwM :: Exception e => e -> KureM a
+   throwM = Failure . toException
+   {-# INLINE throwM #-}
+
 instance MonadCatch KureM where
-   catchM :: KureM a -> (String -> KureM a) -> KureM a
-   (Success a)   `catchM` _ = Success a
-   (Failure msg) `catchM` f = f msg
-   {-# INLINE catchM #-}
+   catch :: Exception e => KureM a -> (e -> KureM a) -> KureM a
+   m@(Failure e) `catch` f =
+       case fromException e of
+            Just ex -> f ex
+            Nothing -> m
+   Success a `catch` _ = Success a
+   {-# INLINE catch #-}
+
+instance MonadMask KureM where
+   mask :: ((forall a. KureM a -> KureM a) -> KureM b) -> KureM b
+   mask f = f id
+   {-# INLINE mask #-}
+
+   uninterruptibleMask :: ((forall a. KureM a -> KureM a) -> KureM b) -> KureM b
+   uninterruptibleMask f = f id
+   {-# INLINE uninterruptibleMask #-}
 
 instance Functor KureM where
    fmap :: (a -> b) -> KureM a -> KureM b
@@ -134,27 +148,33 @@ instance Applicative KureM where
 
 -- | A monadic catch that ignores the error message.
 (<+) :: MonadCatch m => m a -> m a -> m a
-ma <+ mb = ma `catchM` (\_ -> mb)
+ma <+ mb = ma `catch` \SomeException{} -> mb
 {-# INLINE (<+) #-}
+
+-- | Catches a monadic action only if it throws a 'NodeMismatch'.
+--   Intended for combining mutually exclusive congruence combinators.
+(<+>) :: MonadCatch m => m a -> m a -> m a
+ma <+> mb = ma `catch` \NodeMismatch{} -> mb
+{-# INLINE (<+>) #-}
 
 -- | Select the first monadic computation that succeeds, discarding any thereafter.
 catchesM :: (Foldable f, MonadCatch m) => f (m a) -> m a
-catchesM = foldr (<+) (fail "catchesM failed")
+catchesM = foldr (<+) (throwM $ strategyFailure "catchesM")
 {-# INLINE catchesM #-}
 
--- | Catch a failing monadic computation, making it succeed with a constant value.
+-- | Catch a exception-throwing monadic computation, making it succeed with a constant value.
 tryM :: MonadCatch m => a -> m a -> m a
 tryM a ma = ma <+ return a
 {-# INLINE tryM #-}
 
--- | Catch a failing monadic computation, making it succeed with 'mempty'.
+-- | Catch an exception-throwing monadic computation, making it succeed with 'mempty'.
 mtryM :: (MonadCatch m, Monoid a) => m a -> m a
 mtryM = tryM mempty
 {-# INLINE mtryM #-}
 
--- | Catch a failing monadic computation, making it succeed with an error message.
-attemptM :: MonadCatch m => m a -> m (Either String a)
-attemptM ma = liftM Right ma `catchM` (return . Left)
+-- | Catch an exception-throwing monadic computation, making it succeed with an error message.
+attemptM :: (Exception e, MonadCatch m) => m a -> m (Either e a)
+attemptM ma = liftM Right ma `catch` (return . Left)
 {-# INLINE attemptM #-}
 
 -- | Determine if a monadic computation succeeds.
@@ -164,43 +184,30 @@ testM ma = liftM (const True) ma <+ return False
 
 -- | Fail if the monadic computation succeeds; succeed with @()@ if it fails.
 notM :: MonadCatch m => m a -> m ()
-notM ma = ifM (testM ma) (fail "notM of success") (return ())
+notM ma = ifM (testM ma)
+              (throwM $ strategyFailure "notM")
+              (return ())
 {-# INLINE notM #-}
 
--- | Modify the error message of a failing monadic computation.
+-- | Modify the exception of an exception-throwing monadic computation.
 --   Successful computations are unaffected.
-modFailMsg :: MonadCatch m => (String -> String) -> m a -> m a
-modFailMsg f ma = ma `catchM` (fail . f)
-{-# INLINE modFailMsg #-}
+modExc :: (Exception e1, Exception e2, MonadCatch m) => (e1 -> e2) -> m a -> m a
+modExc f ma = ma `catch` (throwM . f)
+{-# INLINE modExc #-}
 
--- | Set the error message of a failing monadic computation.
+-- | Set the exception of an exception-throwing monadic computation.
 --   Successful computations are unaffected.
-setFailMsg :: MonadCatch m => String -> m a -> m a
-setFailMsg msg = modFailMsg (const msg)
-{-# INLINE setFailMsg #-}
+setExc :: (Exception e, MonadCatch m) => e -> m a -> m a
+setExc e = modExc $ \SomeException{} -> e
+{-# INLINE setExc #-}
 
--- | Add a prefix to the error message of a failing monadic computation.
---   Successful computations are unaffected.
-prefixFailMsg :: MonadCatch m => String -> m a -> m a
-prefixFailMsg msg = modFailMsg (msg ++)
-{-# INLINE prefixFailMsg #-}
-
--- | Use the given error message whenever a monadic pattern match failure occurs.
-withPatFailMsg :: MonadCatch m => String -> m a -> m a
-withPatFailMsg msg = modFailMsg (\ e -> if "Pattern match failure" `isPrefixOf` e then msg else e)
-{-# INLINE withPatFailMsg #-}
+-- | Use the given exception whenever a monadic pattern-match failure occurs.
+withPatFailExc :: (Exception e, MonadCatch m) => e -> m a -> m a
+withPatFailExc e = modExc $ \PatternMatchFail{} -> e
 
 ------------------------------------------------------------------------------------------
 
--- | The String is generated by 'show'ing the exception.
-instance MonadCatch IO where
-  catchM :: IO a -> (String -> IO a) -> IO a
-  catchM io f = io `catch` (\ e -> f $ show (e :: SomeException))
-  {-# INLINE catchM #-}
-
--- | Lift a computation from the 'IO' monad, catching failures in the target monad.
+-- | Lift a computation from the 'IO' monad, catching exceptions in the target monad.
 liftAndCatchIO :: (MonadCatch m, MonadIO m) => IO a -> m a
-liftAndCatchIO io = join $ liftIO (liftM return io `catchM` (return . fail))
+liftAndCatchIO io = join $ liftIO (liftM return io `catch` \(SomeException e) -> return (throwM e))
 {-# INLINE liftAndCatchIO #-}
-
-------------------------------------------------------------------------------------------

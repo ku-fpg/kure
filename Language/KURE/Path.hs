@@ -1,13 +1,10 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StandaloneDeriving #-}
 -- |
 -- Module: Language.KURE.Path
--- Copyright: (c) 2012--2014 The University of Kansas
+-- Copyright: (c) 2012--2015 The University of Kansas
 -- License: BSD3
 --
 -- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
@@ -43,17 +40,13 @@ module Language.KURE.Path
        )
 where
 
-#if __GLASGOW_HASKELL__ <= 708
-import Data.Monoid
-#endif
-
 import Control.Arrow ((>>^))
+import Control.Monad.Catch
 
-import Data.Typeable
-
-import Language.KURE.Transform
 import Language.KURE.Combinators.Transform
+import Language.KURE.Exceptions
 import Language.KURE.Injection
+import Language.KURE.Transform
 
 -------------------------------------------------------------------------------
 
@@ -64,7 +57,7 @@ type Path crumb = [crumb]
 -------------------------------------------------------------------------------
 
 -- | A 'SnocPath' is a list stored in reverse order.
-newtype SnocPath crumb = SnocPath [crumb] deriving (Eq, Typeable)
+newtype SnocPath crumb = SnocPath [crumb] deriving Eq
 
 instance Monoid (SnocPath crumb) where
    mempty :: SnocPath crumb
@@ -114,10 +107,6 @@ class ExtendPath c crumb | c -> crumb where
   -- | Extend the current 'AbsolutePath' by one crumb.
   (@@) :: c -> crumb -> c
 
-#if __GLASGOW_HASKELL__ >= 708
-deriving instance Typeable ExtendPath
-#endif
-
 -- | A 'SnocPath' from the root.
 type AbsolutePath = SnocPath
 
@@ -129,18 +118,14 @@ class ReadPath c crumb | c -> crumb where
   -- | Read the current absolute path.
   absPath :: c -> AbsolutePath crumb
 
-#if __GLASGOW_HASKELL__ >= 708
-deriving instance Typeable ReadPath
-#endif
-
 -- | Lifted version of 'absPath'.
 absPathT :: (ReadPath c crumb, Monad m) => Transform c m a (AbsolutePath crumb)
 absPathT = contextT >>^ absPath
 {-# INLINE absPathT #-}
 
 -- | Lifted version of 'lastCrumb'.
-lastCrumbT :: (ReadPath c crumb, Monad m) => Transform c m a crumb
-lastCrumbT = contextonlyT (projectWithFailMsgM (fail "lastCrumbT failed: at the root, no crumbs yet.") . lastCrumb . absPath)
+lastCrumbT :: (ReadPath c crumb, MonadThrow m) => Transform c m a crumb
+lastCrumbT = contextonlyT (projectWithFailExcM (strategyFailure "lastCrumbT") . lastCrumb . absPath)
 {-# INLINE lastCrumbT #-}
 
 -------------------------------------------------------------------------------
