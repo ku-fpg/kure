@@ -88,6 +88,7 @@ instance Show crumb => Show (SnocPath crumb) where
    show = show . snocPathToPath
    {-# INLINE show #-}
 
+-- | Create a 'SnocPath' containing a single crumb. O(1).
 singletonSnocPath :: crumb -> SnocPath crumb
 singletonSnocPath cr = SnocPath [cr]
 {-# INLINE singletonSnocPath #-}
