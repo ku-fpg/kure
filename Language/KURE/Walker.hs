@@ -131,7 +131,7 @@ class Walker c u where
   oneR = unwrapOneR . allR . wrapOneR
   {-# INLINE oneR #-}
 
-  -- | Construct a 'Lens' to the n-th child node.
+  -- | Construct a 'Lens' to the child node indicated by a crumb.
   childL :: (ReadPath c crumb, Eq crumb, MonadCatch m) => crumb -> Lens c m u u
   childL = childL_default
   {-# INLINE childL #-}
