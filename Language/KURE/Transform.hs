@@ -1,6 +1,7 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TupleSections #-}
 -- |
 -- Module: Language.KURE.Transform
 -- Copyright: (c) 2012--2015 The University of Kansas
@@ -34,8 +35,8 @@ module Language.KURE.Transform
 
 import Prelude hiding (id, (.))
 
-import Control.Applicative
-import Control.Monad
+import Control.Applicative(Alternative(..),liftA2)
+import Control.Monad(MonadPlus(..),(>=>))
 import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Category
@@ -84,22 +85,20 @@ constT = contextfreeT . const
 {-# INLINE constT #-}
 
 -- | Build a 'Transform' that doesn't perform any monadic effects.
-effectfreeT :: Monad m => (c -> a -> b) -> Transform c m a b
-effectfreeT f = transform ( \ c a -> return (f c a))
+effectfreeT :: Applicative m => (c -> a -> b) -> Transform c m a b
+effectfreeT f = transform ( \ c a -> pure (f c a))
 {-# INLINE effectfreeT #-}
 
 ------------------------------------------------------------------------------------------
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Functor m => Functor (Transform c m a) where
-
    fmap :: (b -> d) -> Transform c m a b -> Transform c m a d
    fmap f t = transform (\ c -> fmap f . applyT t c)
    {-# INLINE fmap #-}
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Applicative m => Applicative (Transform c m a) where
-
    pure :: b -> Transform c m a b
    pure = constT . pure
    {-# INLINE pure #-}
@@ -110,7 +109,6 @@ instance Applicative m => Applicative (Transform c m a) where
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Alternative m => Alternative (Transform c m a) where
-
    empty :: Transform c m a b
    empty = constT empty
    {-# INLINE empty #-}
@@ -121,11 +119,6 @@ instance Alternative m => Alternative (Transform c m a) where
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Monad m => Monad (Transform c m a) where
-
-   return :: b -> Transform c m a b
-   return = constT . return
-   {-# INLINE return #-}
-
    (>>=) :: Transform c m a b -> (b -> Transform c m a d) -> Transform c m a d
    t >>= f = transform $ \ c a -> do b <- applyT t c a
                                      applyT (f b) c a
@@ -136,22 +129,23 @@ instance Monad m => Monad (Transform c m a) where
    {-# INLINE fail #-}
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
-instance MonadThrow m => MonadThrow (Transform c m a) where
+instance MonadPlus m => MonadPlus (Transform c m a) where
 
+
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
+instance MonadThrow m => MonadThrow (Transform c m a) where
     throwM :: Exception e => e -> Transform c m a b
     throwM = constT . throwM
     {-# INLINE throwM #-}
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadCatch m => MonadCatch (Transform c m a) where
-
    catch :: Exception e => Transform c m a b -> (e -> Transform c m a b) -> Transform c m a b
-   catch t1 t2 = transform $ \ c a -> applyT t1 c a `catch` \ e -> applyT (t2 e) c a
+   catch t1 t2 = transform (\ c a -> applyT t1 c a `catch` \ e -> applyT (t2 e) c a)
    {-# INLINE catch #-}
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadMask m => MonadMask (Transform c m a) where
-
    mask :: ((forall d. Transform c m a d -> Transform c m a d) -> Transform c m a b) -> Transform c m a b
    mask f = transform $ \c a -> mask $ \u -> applyT (f $ q u) c a
      where q :: (m b -> m b) -> Transform c m a b -> Transform c m a b
@@ -164,21 +158,8 @@ instance MonadMask m => MonadMask (Transform c m a) where
            q u t = transform $ \c a -> u (applyT t c a)
    {-# INLINE uninterruptibleMask #-}
 
-
--- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
-instance MonadPlus m => MonadPlus (Transform c m a) where
-
-   mzero :: Transform c m a b
-   mzero = constT mzero
-   {-# INLINE mzero #-}
-
-   mplus :: Transform c m a b -> Transform c m a b -> Transform c m a b
-   mplus t1 t2 = transform $ \ c a -> applyT t1 c a `mplus` applyT t2 c a
-   {-# INLINE mplus #-}
-
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadIO m => MonadIO (Transform c m a) where
-
    liftIO :: IO b -> Transform c m a b
    liftIO = constT . liftIO
    {-# INLINE liftIO #-}
@@ -187,9 +168,8 @@ instance MonadIO m => MonadIO (Transform c m a) where
 
 -- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance Monad m => Category (Transform c m) where
-
    id :: Transform c m a a
-   id = contextfreeT return
+   id = contextfreeT pure
    {-# INLINE id #-}
 
    (.) :: Transform c m b d -> Transform c m a b -> Transform c m a d
@@ -199,44 +179,40 @@ instance Monad m => Category (Transform c m) where
 
 -- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance Monad m => Arrow (Transform c m) where
-
    arr :: (a -> b) -> Transform c m a b
-   arr f = contextfreeT (return . f)
+   arr f = contextfreeT (pure . f)
    {-# INLINE arr #-}
 
    first :: Transform c m a b -> Transform c m (a,z) (b,z)
-   first t = transform $ \ c (a,z) -> liftM (\ b -> (b,z)) (applyT t c a)
+   first t = transform (\ c (a,z) -> (,z) <$> applyT t c a)
    {-# INLINE first #-}
 
    second :: Transform c m a b -> Transform c m (z,a) (z,b)
-   second t = transform $ \ c (z,a) -> liftM (\ b -> (z,b)) (applyT t c a)
+   second t = transform (\ c (z,a) -> (z,) <$> applyT t c a)
    {-# INLINE second #-}
 
    (***) :: Transform c m a1 b1 -> Transform c m a2 b2 -> Transform c m (a1,a2) (b1,b2)
-   t1 *** t2 = transform $ \ c (a,b) -> liftM2 (,) (applyT t1 c a) (applyT t2 c b)
+   t1 *** t2 = transform (\ c (a,b) -> (,) <$> applyT t1 c a <*> applyT t2 c b)
    {-# INLINE (***) #-}
 
    (&&&) :: Transform c m a b1 -> Transform c m a b2 -> Transform c m a (b1,b2)
-   t1 &&& t2 = transform $ \ c a -> liftM2 (,) (applyT t1 c a) (applyT t2 c a)
+   t1 &&& t2 = transform (\ c a -> (,) <$> applyT t1 c a <*> applyT t2 c a)
    {-# INLINE (&&&) #-}
 
 -- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance MonadPlus m => ArrowZero (Transform c m) where
-
    zeroArrow :: Transform c m a b
-   zeroArrow = mzero
+   zeroArrow = empty
    {-# INLINE zeroArrow #-}
 
 -- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance MonadPlus m => ArrowPlus (Transform c m) where
-
    (<+>) :: Transform c m a b -> Transform c m a b -> Transform c m a b
-   (<+>) = mplus
+   (<+>) = (<|>)
    {-# INLINE (<+>) #-}
 
 -- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
-instance Monad m => ArrowApply (Transform c m) where
-
+instance MonadPlus m => ArrowApply (Transform c m) where
    app :: Transform c m (Transform c m a b, a) b
    app = transform (\ c (t,a) -> applyT t c a)
    {-# INLINE app #-}
@@ -244,14 +220,13 @@ instance Monad m => ArrowApply (Transform c m) where
 ------------------------------------------------------------------------------------------
 
 -- | Lifting through the 'Monad' and a Reader transformer, where (c,a) is the read-only environment.
-instance (Monad m, Monoid b) => Monoid (Transform c m a b) where
-
+instance (Applicative m, Monoid b) => Monoid (Transform c m a b) where
    mempty :: Transform c m a b
-   mempty = return mempty
+   mempty = pure mempty
    {-# INLINE mempty #-}
 
    mappend :: Transform c m a b -> Transform c m a b -> Transform c m a b
-   mappend = liftM2 mappend
+   mappend = liftA2 mappend
    {-# INLINE mappend #-}
 
 ------------------------------------------------------------------------------------------

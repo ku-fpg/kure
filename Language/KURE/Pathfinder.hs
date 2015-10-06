@@ -36,9 +36,6 @@ module Language.KURE.Pathfinder
 
 import Control.Category hiding ((.))
 import Control.Arrow
-#if !(MIN_VERSION_base(4,8,0))
-import Data.Monoid (mempty)
-#endif
 
 import Language.KURE.Combinators.Transform
 import Language.KURE.Exceptions

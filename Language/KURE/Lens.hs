@@ -71,9 +71,8 @@ testLensT l = testM (focusR l id)
 {-# INLINE testLensT #-}
 
 instance Monad m => Category (Lens c m) where
-
    id :: Lens c m a a
-   id = lens $ transform $ \ c a -> return ((c,a), return)
+   id = lens $ transform $ \ c a -> pure ((c,a), pure)
    {-# INLINE id #-}
 
    (.) :: Lens c m b d -> Lens c m a b -> Lens c m a d

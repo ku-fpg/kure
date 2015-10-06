@@ -33,7 +33,7 @@ guardExc b e = unless b (throwM e)
 
 -- | As 'guardExc', but with a default exception.
 guardM ::  MonadThrow m => Bool -> m ()
-guardM b = guardExc b $ strategyFailure "guardM"
+guardM b = guardExc b (strategyFailure "guardM")
 {-# INLINE guardM #-}
 
 -- | As 'guardExc', but with an @m Bool@ as argument.

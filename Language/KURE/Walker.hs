@@ -106,7 +106,6 @@ import Language.KURE.Transform
 --   but they may be overridden for efficiency.
 
 class Walker c u where
-
   -- | Apply a rewrite to all immediate children, succeeding if they all succeed.
   allR :: MonadCatch m => Rewrite c m u -> Rewrite c m u
 
@@ -415,7 +414,7 @@ instance (Monoid w, Monad m) => Functor (AllT w m) where
 
 instance (Monoid w, Monad m) => Applicative (AllT w m) where
    pure :: a -> AllT w m a
-   pure = return
+   pure a = AllT $ pure (P a mempty)
    {-# INLINE pure #-}
 
    (<*>) :: AllT w m (a -> b) -> AllT w m a -> AllT w m b
@@ -423,10 +422,6 @@ instance (Monoid w, Monad m) => Applicative (AllT w m) where
    {-# INLINE (<*>) #-}
 
 instance (Monoid w, Monad m) => Monad (AllT w m) where
-   return :: a -> AllT w m a
-   return a = AllT $ return (P a mempty)
-   {-# INLINE return #-}
-
    fail :: String -> AllT w m a
    fail = AllT . fail
    {-# INLINE fail #-}
@@ -490,7 +485,7 @@ instance Monad m => Functor (OneT w m) where
 
 instance Monad m => Applicative (OneT w m) where
    pure :: a -> OneT w m a
-   pure = return
+   pure a = OneT $ \ mw -> pure (P a mw)
    {-# INLINE pure #-}
 
    (<*>) :: OneT w m (a -> b) -> OneT w m a -> OneT w m b
@@ -498,10 +493,6 @@ instance Monad m => Applicative (OneT w m) where
    {-# INLINE (<*>) #-}
 
 instance Monad m => Monad (OneT w m) where
-   return :: a -> OneT w m a
-   return a = OneT $ \ mw -> return (P a mw)
-   {-# INLINE return #-}
-
    fail :: String -> OneT w m a
    fail msg = OneT (\ _ -> fail msg)
    {-# INLINE fail #-}
@@ -567,7 +558,7 @@ instance Functor (GetChild c u) where
 
 instance Applicative (GetChild c u) where
    pure :: a -> GetChild c u a
-   pure = return
+   pure a = GetChild (pure a) Nothing
    {-# INLINE pure #-}
 
    (<*>) :: GetChild c u (a -> b) -> GetChild c u a -> GetChild c u b
@@ -575,10 +566,6 @@ instance Applicative (GetChild c u) where
    {-# INLINE (<*>) #-}
 
 instance Monad (GetChild c u) where
-   return :: a -> GetChild c u a
-   return a = GetChild (return a) Nothing
-   {-# INLINE return #-}
-
    fail :: String -> GetChild c u a
    fail msg = GetChild (fail msg) Nothing
    {-# INLINE fail #-}

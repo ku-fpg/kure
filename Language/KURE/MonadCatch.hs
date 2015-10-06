@@ -91,11 +91,21 @@ fromKureM :: (SomeException -> a) -> KureM a -> a
 fromKureM = runKureM id
 {-# INLINE fromKureM #-}
 
-instance Monad KureM where
-   return :: a -> KureM a
-   return = Success
-   {-# INLINE return #-}
+instance Functor KureM where
+   fmap :: (a -> b) -> KureM a -> KureM b
+   fmap = liftM
+   {-# INLINE fmap #-}
 
+instance Applicative KureM where
+   pure :: a -> KureM a
+   pure = Success
+   {-# INLINE pure #-}
+
+   (<*>) :: KureM (a -> b) -> KureM a -> KureM b
+   (<*>) = ap
+   {-# INLINE (<*>) #-}
+
+instance Monad KureM where
    (>>=) :: KureM a -> (a -> KureM b) -> KureM b
    Failure e >>= _ = Failure e
    Success a >>= f = f a
@@ -129,20 +139,6 @@ instance MonadMask KureM where
    uninterruptibleMask :: ((forall a. KureM a -> KureM a) -> KureM b) -> KureM b
    uninterruptibleMask f = f id
    {-# INLINE uninterruptibleMask #-}
-
-instance Functor KureM where
-   fmap :: (a -> b) -> KureM a -> KureM b
-   fmap = liftM
-   {-# INLINE fmap #-}
-
-instance Applicative KureM where
-   pure :: a -> KureM a
-   pure = return
-   {-# INLINE pure #-}
-
-   (<*>) :: KureM (a -> b) -> KureM a -> KureM b
-   (<*>) = ap
-   {-# INLINE (<*>) #-}
 
 -------------------------------------------------------------------------------
 
@@ -198,12 +194,13 @@ modExc f ma = ma `catch` (throwM . f)
 -- | Set the exception of an exception-throwing monadic computation.
 --   Successful computations are unaffected.
 setExc :: (Exception e, MonadCatch m) => e -> m a -> m a
-setExc e = modExc $ \SomeException{} -> e
+setExc e = modExc (\SomeException{} -> e)
 {-# INLINE setExc #-}
 
 -- | Use the given exception whenever a monadic pattern-match failure occurs.
 withPatFailExc :: (Exception e, MonadCatch m) => e -> m a -> m a
-withPatFailExc e = modExc $ \PatternMatchFail{} -> e
+withPatFailExc e = modExc (\PatternMatchFail{} -> e)
+{-# INLINE withPatFailExc #-}
 
 ------------------------------------------------------------------------------------------
 

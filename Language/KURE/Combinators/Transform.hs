@@ -52,10 +52,8 @@ module Language.KURE.Combinators.Transform
 import Prelude hiding (id, map, foldr, mapM)
 
 import Control.Category ((>>>),id)
-import Control.Monad (liftM,ap)
+import Control.Monad(ap,liftM)
 import Control.Monad.Catch
-
-import Data.Traversable
 
 import Language.KURE.Combinators.Arrow
 import Language.KURE.Combinators.Monad
@@ -71,22 +69,23 @@ idR = id
 {-# INLINE idR #-}
 
 -- | An always successful transformation.
-successT :: Monad m => Transform c m a ()
-successT = return ()
+successT :: Applicative m => Transform c m a ()
+successT = pure ()
 {-# INLINE successT #-}
 
 -- | An always failing tranformation.
 failT :: MonadThrow m => Transform c m a b
 failT = constT (throwM $ strategyFailure "failT")
+{-# INLINE failT #-}
 
 -- | Extract the current context.
-contextT :: Monad m => Transform c m a c
-contextT = transform (\ c _ -> return c)
+contextT :: Applicative m => Transform c m a c
+contextT = contextonlyT pure
 {-# INLINE contextT #-}
 
 -- | Expose the current context and value.
-exposeT :: Monad m => Transform c m a (c,a)
-exposeT = transform (curry return)
+exposeT :: Applicative m => Transform c m a (c,a)
+exposeT = transform (curry pure)
 {-# INLINE exposeT #-}
 
 -- | Lift a transformation to operate on a derived context.
@@ -95,8 +94,8 @@ liftContext f t = transform (applyT t . f)
 {-# INLINE liftContext #-}
 
 -- | Map a transformation over a list.
-mapT :: (Traversable t, Monad m) => Transform c m a b -> Transform c m (t a) (t b)
-mapT t = transform (mapM . applyT t)
+mapT :: (Traversable t, Applicative m) => Transform c m a b -> Transform c m (t a) (t b)
+mapT t = transform (traverse . applyT t)
 {-# INLINE mapT #-}
 
 -- | An identity rewrite with side-effects.
@@ -189,7 +188,7 @@ instance Functor PBool where
 checkSuccessPBool :: (Exception e, MonadThrow m) => e -> m (PBool a) -> m a
 checkSuccessPBool e m = do PBool b a <- m
                            if b
-                             then return a
+                             then pure a
                              else throwM e
 {-# INLINE checkSuccessPBool #-}
 
@@ -215,7 +214,7 @@ instance Monad m => Functor (AnyR m) where
 
 instance Monad m => Applicative (AnyR m) where
    pure :: a -> AnyR m a
-   pure = return
+   pure = AnyR . pure . PBool False
    {-# INLINE pure #-}
 
    (<*>) :: AnyR m (a -> b) -> AnyR m a -> AnyR m b
@@ -223,10 +222,6 @@ instance Monad m => Applicative (AnyR m) where
    {-# INLINE (<*>) #-}
 
 instance Monad m => Monad (AnyR m) where
-   return :: a -> AnyR m a
-   return = AnyR . return . PBool False
-   {-# INLINE return #-}
-
    fail :: String -> AnyR m a
    fail = AnyR . fail
    {-# INLINE fail #-}
@@ -262,7 +257,7 @@ instance MonadMask m => MonadMask (AnyR m) where
 
 -- | Wrap a 'Rewrite' using the 'AnyR' monad transformer.
 wrapAnyR :: MonadCatch m => Rewrite c m a -> Rewrite c (AnyR m) a
-wrapAnyR r = rewrite $ \ c a -> AnyR $ (PBool True `liftM` applyR r c a) <+ return (PBool False a)
+wrapAnyR r = rewrite $ \ c a -> AnyR $ (PBool True <$> applyR r c a) <+ return (PBool False a)
 {-# INLINE wrapAnyR #-}
 
 -- | Unwrap a 'Rewrite' from the 'AnyR' monad transformer.
@@ -292,7 +287,7 @@ instance Monad m => Functor (OneR m) where
 
 instance Monad m => Applicative (OneR m) where
    pure :: a -> OneR m a
-   pure = return
+   pure a = OneR (\ b -> pure (PBool b a))
    {-# INLINE pure #-}
 
    (<*>) :: OneR m (a -> b) -> OneR m a -> OneR m b
@@ -300,10 +295,6 @@ instance Monad m => Applicative (OneR m) where
    {-# INLINE (<*>) #-}
 
 instance Monad m => Monad (OneR m) where
-   return :: a -> OneR m a
-   return a = OneR (\ b -> return (PBool b a))
-   {-# INLINE return #-}
-
    fail :: String -> OneR m a
    fail msg = OneR (\ _ -> fail msg)
    {-# INLINE fail #-}
@@ -340,7 +331,7 @@ instance MonadMask m => MonadMask (OneR m) where
 wrapOneR :: MonadCatch m => Rewrite c m g -> Rewrite c (OneR m) g
 wrapOneR r = rewrite $ \ c a -> OneR $ \ b -> if b
                                                 then return (PBool True a)
-                                                else (PBool True `liftM` applyR r c a) <+ return (PBool False a)
+                                                else (PBool True <$> applyR r c a) <+ return (PBool False a)
 {-# INLINE wrapOneR #-}
 
 -- | Unwrap a 'Rewrite' from the 'OneR' monad transformer.
