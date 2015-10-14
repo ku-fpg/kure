@@ -22,7 +22,7 @@ instance (ExtendPath c Crumb, AddBoundVar c) => Walker c Exp where
 
 varT :: MonadThrow m => (Name -> b) -> Transform c m Exp b
 varT f = contextfreeT $ \case
-                           Var n -> return (f n)
+                           Var n -> pure (f n)
                            _     -> throwM (nodeMismatch "Var")
 
 -------------------------------------------------------------------------------

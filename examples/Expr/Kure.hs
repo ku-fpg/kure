@@ -68,14 +68,14 @@ assignR r = assignT r Assign
 
 varT :: MonadThrow m => (Name -> b) -> Transform c m Expr b
 varT f = contextfreeT $ \case
-                           Var v -> return (f v)
+                           Var v -> pure (f v)
                            _     -> throwM (nodeMismatch "Var")
 
 ---------------------------------------------------------------------------
 
 litT :: MonadThrow m => (Int -> b) -> Transform c m Expr b
 litT f = contextfreeT $ \case
-                           Lit v -> return (f v)
+                           Lit v -> pure (f v)
                            _     -> throwM (nodeMismatch "Lit")
 
 ---------------------------------------------------------------------------

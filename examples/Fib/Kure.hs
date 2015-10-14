@@ -17,7 +17,7 @@ instance ExtendPath c Crumb => Walker c Arith where
    allR :: MonadCatch m => Rewrite c m Arith -> Rewrite c m Arith
    allR r = modExc (stackStrategyFailure "allR") $
      rewrite $ \ c -> \case
-                         Lit n      ->  Lit <$> return n
+                         Lit n      ->  Lit <$> pure n
                          Add e0 e1  ->  Add <$> applyR r (c @@ LeftChild) e0 <*> applyR r (c @@ RightChild) e1
                          Sub e0 e1  ->  Sub <$> applyR r (c @@ LeftChild) e0 <*> applyR r (c @@ RightChild) e1
                          Fib e0     ->  Fib <$> applyR r (c @@ OnlyChild) e0

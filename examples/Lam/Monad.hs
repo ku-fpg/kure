@@ -15,10 +15,18 @@ newtype LamM a = LamM {lamM :: Int -> (Int, Either SomeException a)}
 runLamM :: LamM a -> Either SomeException a
 runLamM m = snd (lamM m 0)
 
-instance Monad LamM where
-  return :: a -> LamM a
-  return a = LamM (\n -> (n,Right a))
+instance Functor LamM where
+  fmap :: (a -> b) -> LamM a -> LamM b
+  fmap = liftM
 
+instance Applicative LamM where
+  pure :: a -> LamM a
+  pure a = LamM (\n -> (n,Right a))
+
+  (<*>) :: LamM (a -> b) -> LamM a -> LamM b
+  (<*>) = ap
+
+instance Monad LamM where
   fail :: String -> LamM a
   fail msg = LamM (\ n -> (n, Left (SomeException $ PatternMatchFail msg)))
 
@@ -40,16 +48,5 @@ instance MonadCatch LamM where
                                   Nothing -> l
                             ) n'
       (n', Right a) -> (n', Right a)
-
-instance Functor LamM where
-  fmap :: (a -> b) -> LamM a -> LamM b
-  fmap = liftM
-
-instance Applicative LamM where
-  pure :: a -> LamM a
-  pure  = return
-
-  (<*>) :: LamM (a -> b) -> LamM a -> LamM b
-  (<*>) = ap
 
 -------------------------------------------------------------------------------

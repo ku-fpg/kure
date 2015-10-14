@@ -47,6 +47,6 @@ initialContext = Context mempty []
 
 lookupDef :: MonadThrow m => Name -> Context -> m Expr
 lookupDef v (Context _ defs) =
-    maybe (throwM . conditionalFailure $ v ++ " not found in context") return (lookup v defs)
+    maybe (throwM . conditionalFailure $ v ++ " not found in context") pure (lookup v defs)
 
 ---------------------------------------------------------------------------
