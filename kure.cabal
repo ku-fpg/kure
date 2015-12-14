@@ -21,9 +21,10 @@ Author:              Neil Sculthorpe, Andy Gill and Ryan Scott
 Maintainer:          Neil Sculthorpe <N.A.Sculthorpe@swansea.ac.uk>
 Copyright:           (c) 2006--2015 The University of Kansas
 Homepage:            http://www.ittc.ku.edu/csdl/fpg/software/kure.html
-Stability:	     beta
+Stability:           beta
 build-type: 	     Simple
 Cabal-Version:       >= 1.16
+tested-with:         GHC == 7.10.3
 Extra-Source-Files:
     README.md
     CHANGELOG.md
