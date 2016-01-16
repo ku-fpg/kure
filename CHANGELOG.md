@@ -4,6 +4,7 @@
  * Added `StrategyFailure`
  * Added `NodeMismatch` (for congruence combinator failures)
  * Added `ConditionalFailure` (a `String` plus `SomeException`)
+* Added `Semigroup` instance for `Transform` (GHC 8.0+)
 
 ## 2.16.12
 * Derive `Typeable` instances
