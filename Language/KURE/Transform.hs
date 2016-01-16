@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -41,6 +42,10 @@ import Control.Monad.Catch
 import Control.Monad.IO.Class
 import Control.Category
 import Control.Arrow
+
+#if __GLASGOW_HASKELL__ >= 800
+import Data.Semigroup (Semigroup(..))
+#endif
 
 ------------------------------------------------------------------------------------------
 
@@ -218,6 +223,14 @@ instance MonadPlus m => ArrowApply (Transform c m) where
    {-# INLINE app #-}
 
 ------------------------------------------------------------------------------------------
+
+#if __GLASGOW_HASKELL__ >= 800
+-- | Lifting through the 'Monad' and a Reader transformer, where (c,a) is the read-only environment.
+instance (Applicative m, Semigroup b) => Semigroup (Transform c m a b) where
+   (<>) :: Transform c m a b -> Transform c m a b -> Transform c m a b
+   (<>) = liftA2 (<>)
+   {-# INLINE (<>) #-}
+#endif
 
 -- | Lifting through the 'Monad' and a Reader transformer, where (c,a) is the read-only environment.
 instance (Applicative m, Monoid b) => Monoid (Transform c m a b) where
