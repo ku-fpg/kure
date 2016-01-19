@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE InstanceSigs #-}
 
 module Lam.Monad where
@@ -7,6 +8,9 @@ import Language.KURE
 import Control.Exception (PatternMatchFail(..))
 import Control.Monad
 import Control.Monad.Catch
+#if __GLASGOW_HASKELL__ >= 800
+import Control.Monad.Fail (MonadFail(..))
+#endif
 
 -------------------------------------------------------------------------------
 
@@ -34,6 +38,12 @@ instance Monad LamM where
   (LamM f) >>= gg = LamM $ \ n -> case f n of
                                     (n', Left e)  -> (n', Left e)
                                     (n', Right a) -> lamM (gg a) n'
+
+#if __GLASGOW_HASKELL__ >= 800
+instance MonadFail LamM where
+  fail :: String -> LamM a
+  fail msg = LamM (\ n -> (n, Left (SomeException $ PatternMatchFail msg)))
+#endif
 
 instance MonadThrow LamM where
   throwM :: Exception e => e -> LamM a

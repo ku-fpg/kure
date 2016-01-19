@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -45,6 +46,10 @@ import Prelude hiding (foldr)
 import Control.Exception (PatternMatchFail(..))
 import Control.Monad
 import Control.Monad.Catch
+#if __GLASGOW_HASKELL__ >= 800
+import qualified Control.Monad.Fail as Fail (fail)
+import Control.Monad.Fail (MonadFail)
+#endif
 import Control.Monad.IO.Class
 
 import Data.Foldable
@@ -115,6 +120,14 @@ instance Monad KureM where
    fail :: String -> KureM a
    fail = Failure . SomeException . PatternMatchFail
    {-# INLINE fail #-}
+
+#if __GLASGOW_HASKELL__ >= 800
+instance MonadFail KureM where
+   -- | Produces a 'Failure' containing a 'PatternMatchFail'.
+   fail :: String -> KureM a
+   fail = Failure . SomeException . PatternMatchFail
+   {-# INLINE fail #-}
+#endif
 
 -- | Produces a 'Failure' containing the exception.
 instance MonadThrow KureM where
