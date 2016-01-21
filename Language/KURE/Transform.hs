@@ -39,13 +39,12 @@ import Prelude hiding (id, (.))
 import Control.Applicative(Alternative(..),liftA2)
 import Control.Monad(MonadPlus(..),(>=>))
 import Control.Monad.Catch
+import qualified Control.Monad.Fail as Fail
 import Control.Monad.IO.Class
 import Control.Category
 import Control.Arrow
 
 #if __GLASGOW_HASKELL__ >= 800
-import qualified Control.Monad.Fail as Fail (fail)
-import Control.Monad.Fail (MonadFail)
 import Data.Semigroup (Semigroup(..))
 #endif
 
@@ -135,12 +134,10 @@ instance Monad m => Monad (Transform c m a) where
    fail = constT . fail
    {-# INLINE fail #-}
 
-#if __GLASGOW_HASKELL__ >= 800
-instance MonadFail m => MonadFail (Transform c m a) where
+instance Fail.MonadFail m => Fail.MonadFail (Transform c m a) where
    fail :: String -> Transform c m a b
    fail = constT . Fail.fail
    {-# INLINE fail #-}
-#endif
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadPlus m => MonadPlus (Transform c m a) where

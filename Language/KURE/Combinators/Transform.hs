@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE RankNTypes #-}
 -- |
@@ -55,10 +54,7 @@ import Prelude hiding (id, map, foldr, mapM)
 import Control.Category ((>>>),id)
 import Control.Monad(ap,liftM)
 import Control.Monad.Catch
-#if __GLASGOW_HASKELL__ >= 800
-import qualified Control.Monad.Fail as Fail (fail)
-import Control.Monad.Fail (MonadFail)
-#endif
+import qualified Control.Monad.Fail as Fail
 
 import Language.KURE.Combinators.Arrow
 import Language.KURE.Combinators.Monad
@@ -237,12 +233,10 @@ instance Monad m => Monad (AnyR m) where
                         return (PBool (b1 || b2) d)
    {-# INLINE (>>=) #-}
 
-#if __GLASGOW_HASKELL__ >= 800
-instance MonadFail m => MonadFail (AnyR m) where
+instance Fail.MonadFail m => Fail.MonadFail (AnyR m) where
    fail :: String -> AnyR m a
    fail = AnyR . Fail.fail
    {-# INLINE fail #-}
-#endif
 
 instance MonadThrow m => MonadThrow (AnyR m) where
    throwM :: Exception e => e -> AnyR m a
@@ -316,12 +310,10 @@ instance Monad m => Monad (OneR m) where
                                 unOneR (f a) b2
    {-# INLINE (>>=) #-}
 
-#if __GLASGOW_HASKELL__ >= 800
-instance MonadFail m => MonadFail (OneR m) where
+instance Fail.MonadFail m => Fail.MonadFail (OneR m) where
    fail :: String -> OneR m a
    fail msg = OneR (\ _ -> Fail.fail msg)
    {-# INLINE fail #-}
-#endif
 
 instance MonadThrow m => MonadThrow (OneR m) where
    throwM :: Exception e => e -> OneR m a

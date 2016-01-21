@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -87,10 +86,7 @@ import Control.Arrow
 import Control.Category hiding ((.))
 import Control.Monad
 import Control.Monad.Catch
-#if __GLASGOW_HASKELL__ >= 800
-import qualified Control.Monad.Fail as Fail (fail)
-import Control.Monad.Fail (MonadFail)
-#endif
+import qualified Control.Monad.Fail as Fail
 
 import Language.KURE.Combinators
 import Language.KURE.Exceptions
@@ -437,12 +433,10 @@ instance (Monoid w, Monad m) => Monad (AllT w m) where
                         return (P d (w1 <> w2))
    {-# INLINE (>>=) #-}
 
-#if __GLASGOW_HASKELL__ >= 800
-instance (Monoid w, MonadFail m) => MonadFail (AllT w m) where
+instance (Monoid w, Fail.MonadFail m) => Fail.MonadFail (AllT w m) where
    fail :: String -> AllT w m a
    fail = AllT . Fail.fail
    {-# INLINE fail #-}
-#endif
 
 instance (Monoid w, MonadThrow m) => MonadThrow (AllT w m) where
    throwM :: Exception e => e -> AllT w m a
@@ -514,12 +508,10 @@ instance Monad m => Monad (OneT w m) where
                                     unOneT (f a) mw2
    {-# INLINE (>>=) #-}
 
-#if __GLASGOW_HASKELL__ >= 800
-instance MonadFail m => MonadFail (OneT w m) where
+instance Fail.MonadFail m => Fail.MonadFail (OneT w m) where
    fail :: String -> OneT w m a
    fail msg = OneT (\ _ -> Fail.fail msg)
    {-# INLINE fail #-}
-#endif
 
 instance MonadThrow m => MonadThrow (OneT w m) where
    throwM :: Exception e => e -> OneT w m a
@@ -595,12 +587,10 @@ instance Monad (GetChild c u) where
                                        kma
    {-# INLINE (>>=) #-}
 
-#if __GLASGOW_HASKELL__ >= 800
-instance MonadFail (GetChild c u) where
+instance Fail.MonadFail (GetChild c u) where
    fail :: String -> GetChild c u a
    fail msg = GetChild (Fail.fail msg) Nothing
    {-# INLINE fail #-}
-#endif
 
 instance MonadThrow (GetChild c u) where
    throwM :: Exception e => e -> GetChild c u a
