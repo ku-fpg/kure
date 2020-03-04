@@ -59,6 +59,9 @@ type Path crumb = [crumb]
 -- | A 'SnocPath' is a list stored in reverse order.
 newtype SnocPath crumb = SnocPath [crumb] deriving Eq
 
+instance Semigroup (SnocPath crumb) where
+  (<>) = mappend
+
 instance Monoid (SnocPath crumb) where
    mempty :: SnocPath crumb
    mempty = SnocPath []

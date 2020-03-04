@@ -37,6 +37,8 @@ module Language.KURE.MonadCatch
            , notM
            , modExc
            , setExc
+           , prefixFailMsg
+           , setFailMsg
            , withPatFailExc
 ) where
 
@@ -78,7 +80,7 @@ runAndShowKureM = runKureM (\a -> "KURE Success: " ++ show a)
 {-# INLINE runAndShowKureM #-}
 
 -- | Lift a 'KureM' computation to any other monad.
-liftKureM :: Monad m => KureM a -> m a
+liftKureM :: (MonadFail m, Monad m) => KureM a -> m a
 liftKureM = runKureM return (fail . showKureExc)
 {-# INLINE liftKureM #-}
 
@@ -112,10 +114,10 @@ instance Monad KureM where
    Success a >>= f = f a
    {-# INLINE (>>=) #-}
 
-   -- | Produces a 'Failure' containing a 'PatternMatchFail'.
-   fail :: String -> KureM a
-   fail = Failure . SomeException . PatternMatchFail
-   {-# INLINE fail #-}
+   -- -- | Produces a 'Failure' containing a 'PatternMatchFail'.
+   -- fail :: String -> KureM a
+   -- fail = Failure . SomeException . PatternMatchFail
+   -- {-# INLINE fail #-}
 
 -- | Produces a 'Failure' containing a 'PatternMatchFail'.
 instance Fail.MonadFail KureM where
@@ -203,6 +205,13 @@ modExc f ma = ma `catch` (throwM . f)
 setExc :: (Exception e, MonadCatch m) => e -> m a -> m a
 setExc e = modExc (\SomeException{} -> e)
 {-# INLINE setExc #-}
+
+prefixFailMsg :: MonadCatch m => String -> m a -> m a
+prefixFailMsg msg ma = modExc (stackStrategyFailure msg) ma
+
+setFailMsg :: MonadCatch m => String -> m a -> m a
+setFailMsg msg ma = setExc (strategyFailure msg) ma
+
 
 -- | Use the given exception whenever a monadic pattern-match failure occurs.
 withPatFailExc :: (Exception e, MonadCatch m) => e -> m a -> m a

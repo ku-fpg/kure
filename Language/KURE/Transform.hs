@@ -130,14 +130,15 @@ instance Monad m => Monad (Transform c m a) where
                                      applyT (f b) c a
    {-# INLINE (>>=) #-}
 
+instance MonadFail m => MonadFail (Transform c m a) where
    fail :: String -> Transform c m a b
    fail = constT . fail
    {-# INLINE fail #-}
 
-instance Fail.MonadFail m => Fail.MonadFail (Transform c m a) where
-   fail :: String -> Transform c m a b
-   fail = constT . Fail.fail
-   {-# INLINE fail #-}
+-- instance Fail.MonadFail m => Fail.MonadFail (Transform c m a) where
+--    fail :: String -> Transform c m a b
+--    fail = constT . Fail.fail
+--    {-# INLINE fail #-}
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadPlus m => MonadPlus (Transform c m a) where

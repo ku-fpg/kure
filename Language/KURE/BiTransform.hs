@@ -30,6 +30,7 @@ module Language.KURE.BiTransform
         , promoteWithFailExcBiT
         , extractWithFailExcBiR
         , promoteWithFailExcBiR
+        , promoteWithFailMsgBiR
 ) where
 
 import Prelude hiding (id, (.))
@@ -138,5 +139,8 @@ promoteWithFailExcBiR e (BiTransform r1 r2) = BiTransform (promoteWithFailExcR e
 promoteBiR :: (MonadThrow m, Injection a u) => BiRewrite c m a -> BiRewrite c m u
 promoteBiR = promoteWithFailExcBiR $ strategyFailure "promoteBiR"
 {-# INLINE promoteBiR #-}
+
+promoteWithFailMsgBiR :: (MonadThrow m, Injection a u) => String -> BiRewrite c m a -> BiRewrite c m u
+promoteWithFailMsgBiR msg = promoteWithFailExcBiR (strategyFailure msg)
 
 ------------------------------------------------------------------------------------------

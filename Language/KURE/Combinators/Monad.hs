@@ -17,6 +17,7 @@ module Language.KURE.Combinators.Monad
            , ifM
            , whenM
            , unlessM
+           , guardMsg
 ) where
 
 import Control.Monad (unless)
@@ -57,5 +58,10 @@ whenM mb ma = ifM mb ma (throwM $ strategyFailure "whenM")
 unlessM ::  MonadThrow m => m Bool -> m a -> m a
 unlessM mb ma = ifM mb (throwM $ strategyFailure "unlessM") ma
 {-# INLINE unlessM #-}
+
+
+guardMsg ::  (MonadFail m, Monad m) => Bool -> String -> m ()
+guardMsg b msg = unless b (fail msg)
+
 
 ------------------------------------------------------------------------------------------

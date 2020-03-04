@@ -223,10 +223,6 @@ instance Monad m => Applicative (AnyR m) where
    {-# INLINE (<*>) #-}
 
 instance Monad m => Monad (AnyR m) where
-   fail :: String -> AnyR m a
-   fail = AnyR . fail
-   {-# INLINE fail #-}
-
    (>>=) :: AnyR m a -> (a -> AnyR m d) -> AnyR m d
    ma >>= f = AnyR $ do PBool b1 a <- unAnyR ma
                         PBool b2 d <- unAnyR (f a)
@@ -301,10 +297,6 @@ instance Monad m => Applicative (OneR m) where
    {-# INLINE (<*>) #-}
 
 instance Monad m => Monad (OneR m) where
-   fail :: String -> OneR m a
-   fail msg = OneR (\ _ -> fail msg)
-   {-# INLINE fail #-}
-
    (>>=) :: OneR m a -> (a -> OneR m d) -> OneR m d
    ma >>= f = OneR $ \ b1 -> do PBool b2 a <- unOneR ma b1
                                 unOneR (f a) b2

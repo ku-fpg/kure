@@ -132,7 +132,7 @@ class Walker c u where
   {-# INLINE oneR #-}
 
   -- | Construct a 'Lens' to the child node indicated by a crumb.
-  childL :: (ReadPath c crumb, Eq crumb, MonadCatch m) => crumb -> Lens c m u u
+  childL :: (ReadPath c crumb, Eq crumb, MonadCatch m, MonadFail m) => crumb -> Lens c m u u
   childL = childL_default
   {-# INLINE childL #-}
 
@@ -146,12 +146,12 @@ childrenT = allT (lastCrumbT >>^ return)
 -------------------------------------------------------------------------------
 
 -- | Apply a transformation to a specified child.
-childT :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m) => crumb -> Transform c m u b -> Transform c m u b
+childT :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m, MonadFail m) => crumb -> Transform c m u b -> Transform c m u b
 childT n = focusT (childL n)
 {-# INLINE childT #-}
 
 -- | Apply a rewrite to a specified child.
-childR :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m) => crumb -> Rewrite c m u -> Rewrite c m u
+childR :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m, MonadFail m) => crumb -> Rewrite c m u -> Rewrite c m u
 childR n = focusR (childL n)
 {-# INLINE childR #-}
 
@@ -293,22 +293,22 @@ tryL l = l `catchL` (\SomeException{} -> id)
 {-# INLINE tryL #-}
 
 -- | Construct a 'Lens' by following a 'Path'.
-pathL :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m) => Path crumb -> Lens c m u u
+pathL :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m, MonadFail m) => Path crumb -> Lens c m u u
 pathL = serialise . map childL
 {-# INLINE pathL #-}
 
 -- | Build a 'Lens' from the root to a point specified by a 'LocalPath'.
-localPathL :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m) => LocalPath crumb -> Lens c m u u
+localPathL :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m, MonadFail m) => LocalPath crumb -> Lens c m u u
 localPathL = pathL . snocPathToPath
 {-# INLINE localPathL #-}
 
 -- | Construct a 'Lens' that points to the last node at which the 'Path' can be followed.
-exhaustPathL :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m) => Path crumb -> Lens c m u u
+exhaustPathL :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m, MonadFail m) => Path crumb -> Lens c m u u
 exhaustPathL = foldr (\ n l -> tryL (childL n >>> l)) id
 {-# INLINE exhaustPathL #-}
 
 -- | Repeat as many iterations of the 'Path' as possible.
-repeatPathL :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m) => Path crumb -> Lens c m u u
+repeatPathL :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m, MonadFail m) => Path crumb -> Lens c m u u
 repeatPathL p = let go = tryL (pathL p >>> go)
                  in go
 {-# INLINE repeatPathL #-}
@@ -316,64 +316,64 @@ repeatPathL p = let go = tryL (pathL p >>> go)
 -------------------------------------------------------------------------------
 
 -- | Apply a rewrite at a point specified by a 'Path'.
-pathR :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m) => Path crumb -> Rewrite c m u -> Rewrite c m u
+pathR :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m, MonadFail m) => Path crumb -> Rewrite c m u -> Rewrite c m u
 pathR = focusR . pathL
 {-# INLINE pathR #-}
 
 -- | Apply a transformation at a point specified by a 'Path'.
-pathT :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m) => Path crumb -> Transform c m u b -> Transform c m u b
+pathT :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m, MonadFail m) => Path crumb -> Transform c m u b -> Transform c m u b
 pathT = focusT . pathL
 {-# INLINE pathT #-}
 
 -- | Apply a rewrite at a point specified by a 'LocalPath'.
-localPathR :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m) => LocalPath crumb -> Rewrite c m u -> Rewrite c m u
+localPathR :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m, MonadFail m) => LocalPath crumb -> Rewrite c m u -> Rewrite c m u
 localPathR = focusR . localPathL
 {-# INLINE localPathR #-}
 
 -- | Apply a transformation at a point specified by a 'LocalPath'.
-localPathT :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m) => LocalPath crumb -> Transform c m u b -> Transform c m u b
+localPathT :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m, MonadFail m) => LocalPath crumb -> Transform c m u b -> Transform c m u b
 localPathT = focusT . localPathL
 {-# INLINE localPathT #-}
 
 -------------------------------------------------------------------------------
 
 -- | Check if it is possible to construct a 'Lens' along this path from the current node.
-testPathT :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m) => Path crumb -> Transform c m u Bool
+testPathT :: (ReadPath c crumb, Eq crumb, Walker c u, MonadCatch m, MonadFail m) => Path crumb -> Transform c m u Bool
 testPathT = testLensT . pathL
 {-# INLINE testPathT #-}
 
 -------------------------------------------------------------------------------
 
 -- | Apply a rewrite to the largest node(s) that satisfy the predicate, requiring all to succeed.
-allLargestR :: (Walker c u, MonadCatch m) => Transform c m u Bool -> Rewrite c m u -> Rewrite c m u
+allLargestR :: (Walker c u, MonadCatch m, MonadFail m) => Transform c m u Bool -> Rewrite c m u -> Rewrite c m u
 allLargestR p r = modExc (stackStrategyFailure "allLargestR") $
                   let go = ifM p r (allR go)
                    in go
 {-# INLINE allLargestR #-}
 
 -- | Apply a rewrite to the largest node(s) that satisfy the predicate, succeeding if any succeed.
-anyLargestR :: (Walker c u, MonadCatch m) => Transform c m u Bool -> Rewrite c m u -> Rewrite c m u
+anyLargestR :: (Walker c u, MonadCatch m, MonadFail m) => Transform c m u Bool -> Rewrite c m u -> Rewrite c m u
 anyLargestR p r = setExc (strategyFailure "anyLargestR") $
                   let go = ifM p r (anyR go)
                    in go
 {-# INLINE anyLargestR #-}
 
 -- | Apply a rewrite to the first node for which it can succeed among the largest node(s) that satisfy the predicate.
-oneLargestR :: (Walker c u, MonadCatch m) => Transform c m u Bool -> Rewrite c m u -> Rewrite c m u
+oneLargestR :: (Walker c u, MonadCatch m, MonadFail m) => Transform c m u Bool -> Rewrite c m u -> Rewrite c m u
 oneLargestR p r = setExc (strategyFailure "oneLargestR") $
                   let go = ifM p r (oneR go)
                    in go
 {-# INLINE oneLargestR #-}
 
 -- | Apply a transformation to the largest node(s) that satisfy the predicate, combining the results in a monoid.
-allLargestT :: (Walker c u, MonadCatch m, Monoid b) => Transform c m u Bool -> Transform c m u b -> Transform c m u b
+allLargestT :: (Walker c u, MonadCatch m, Monoid b, MonadFail m) => Transform c m u Bool -> Transform c m u b -> Transform c m u b
 allLargestT p t = modExc (stackStrategyFailure "allLargestT") $
                   let go = ifM p t (allT go)
                    in go
 {-# INLINE allLargestT #-}
 
 -- | Apply a transformation to the first node for which it can succeed among the largest node(s) that satisfy the predicate.
-oneLargestT :: (Walker c u, MonadCatch m) => Transform c m u Bool -> Transform c m u b -> Transform c m u b
+oneLargestT :: (Walker c u, MonadCatch m, MonadFail m) => Transform c m u Bool -> Transform c m u b -> Transform c m u b
 oneLargestT p t = setExc (strategyFailure "oneLargestT") $
                   let go = ifM p t (oneT go)
                    in go
@@ -423,10 +423,6 @@ instance (Monoid w, Monad m) => Applicative (AllT w m) where
    {-# INLINE (<*>) #-}
 
 instance (Monoid w, Monad m) => Monad (AllT w m) where
-   fail :: String -> AllT w m a
-   fail = AllT . fail
-   {-# INLINE fail #-}
-
    (>>=) :: AllT w m a -> (a -> AllT w m d) -> AllT w m d
    ma >>= f = AllT $ do P a w1 <- unAllT ma
                         P d w2 <- unAllT (f a)
@@ -499,10 +495,6 @@ instance Monad m => Applicative (OneT w m) where
    {-# INLINE (<*>) #-}
 
 instance Monad m => Monad (OneT w m) where
-   fail :: String -> OneT w m a
-   fail msg = OneT (\ _ -> fail msg)
-   {-# INLINE fail #-}
-
    (>>=) :: OneT w m a -> (a -> OneT w m d) -> OneT w m d
    ma >>= f = OneT $ do \ mw1 -> do P a mw2 <- unOneT ma mw1
                                     unOneT (f a) mw2
@@ -577,10 +569,6 @@ instance Applicative (GetChild c u) where
    {-# INLINE (<*>) #-}
 
 instance Monad (GetChild c u) where
-   fail :: String -> GetChild c u a
-   fail msg = GetChild (fail msg) Nothing
-   {-# INLINE fail #-}
-
    (>>=) :: GetChild c u a -> (a -> GetChild c u b) -> GetChild c u b
    (GetChild kma mcu) >>= k = runKureM (\ a -> getChildSecond (mplus mcu) (k a))
                                        (\ e -> GetChild (throwM e) mcu)
@@ -630,17 +618,17 @@ wrapSetChild cr u = do cr' <- lastCrumbT
                        if cr == cr' then return u else idR
 {-# INLINE wrapSetChild #-}
 
-unwrapSetChild :: Monad m => Rewrite c SetChild u -> Rewrite c m u
+unwrapSetChild :: (MonadFail m, Monad m) => Rewrite c SetChild u -> Rewrite c m u
 unwrapSetChild = resultT liftKureM
 {-# INLINE unwrapSetChild #-}
 
-setChild :: (ReadPath c crumb, Eq crumb, Walker c u, Monad m) => crumb -> u -> Rewrite c m u
+setChild :: (ReadPath c crumb, Eq crumb, Walker c u, MonadFail m, Monad m) => crumb -> u -> Rewrite c m u
 setChild cr = unwrapSetChild . allR . wrapSetChild cr
 {-# INLINE setChild #-}
 
 -------------------------------------------------------------------------------
 
-childL_default :: forall c crumb m u. (ReadPath c crumb, Eq crumb) => (Walker c u, MonadCatch m) => crumb -> Lens c m u u
+childL_default :: forall c crumb m u. (ReadPath c crumb, Eq crumb) => (Walker c u, MonadCatch m, MonadFail m) => crumb -> Lens c m u u
 childL_default cr = lens $ modExc (stackStrategyFailure "childL") $
                            do cu <- getter
                               k  <- setter

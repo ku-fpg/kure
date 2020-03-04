@@ -32,6 +32,9 @@ module Language.KURE.Injection
        , promoteR
        , extractWithFailExcR
        , promoteWithFailExcR
+
+       , promoteWithFailMsgT
+       , promoteWithFailMsgR
 ) where
 
 import Control.Arrow
@@ -141,5 +144,11 @@ promoteWithFailExcR e r = projectWithFailExcT e >>> r >>> injectT
 promoteR  :: (MonadThrow m, Injection a u) => Rewrite c m a -> Rewrite c m u
 promoteR = promoteWithFailExcR $ strategyFailure "promoteR"
 {-# INLINE promoteR #-}
+
+promoteWithFailMsgT :: (MonadThrow m, Injection a u) => String -> Transform c m a b -> Transform c m u b
+promoteWithFailMsgT str = promoteWithFailExcT (strategyFailure str)
+
+promoteWithFailMsgR :: (MonadThrow m, Injection a u) => String -> Rewrite c m a -> Rewrite c m u
+promoteWithFailMsgR str = promoteWithFailExcR (strategyFailure str)
 
 -------------------------------------------------------------------------------
