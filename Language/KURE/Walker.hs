@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -81,15 +79,9 @@ module Language.KURE.Walker
 import Prelude hiding (id)
 
 import Data.Maybe (isJust)
-import Data.Monoid
+import Data.Monoid ()
 import Data.DList (singleton, toList)
-#if __GLASGOW_HASKELL__ >= 708
-import Data.Typeable
-#endif
 
-#if __GLASGOW_HASKELL__ <= 708
-import Control.Applicative
-#endif
 import Control.Arrow
 import Control.Category hiding ((.))
 import Control.Monad
@@ -141,10 +133,6 @@ class Walker c u where
   childL :: (ReadPath c crumb, Eq crumb, MonadCatch m) => crumb -> Lens c m u u
   childL = childL_default
   {-# INLINE childL #-}
-
-#if __GLASGOW_HASKELL__ >= 708
-deriving instance Typeable Walker
-#endif
 
 ------------------------------------------------------------------------------------------
 

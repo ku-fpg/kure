@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 -- |
 -- Module: Language.KURE.BiTransform
@@ -38,10 +36,6 @@ import Prelude hiding (id, (.))
 
 import Control.Category
 
-#if __GLASGOW_HASKELL__ >= 708
-import Data.Typeable
-#endif
-
 import Language.KURE.MonadCatch
 import Language.KURE.Transform
 import Language.KURE.Injection
@@ -52,9 +46,6 @@ import Language.KURE.Injection
 data BiTransform c m a b = BiTransform {forwardT :: Transform c m a b, -- ^ Extract the forward 'Transform' from a 'BiTransform'.
                                         backwardT :: Transform c m b a  -- ^ Extract the backward 'Transform' from a 'BiTransform'.
                                        }
-#if __GLASGOW_HASKELL__ >= 708
-  deriving Typeable
-#endif
 
 -- | A deprecated synonym for 'BiTranslate'.
 type BiTranslate c m a b = BiTransform c m a b

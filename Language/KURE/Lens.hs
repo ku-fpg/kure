@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 -- |
 -- Module: Language.KURE.Lens
@@ -34,10 +32,6 @@ import Control.Monad
 import Control.Category
 import Control.Arrow
 
-#if __GLASGOW_HASKELL__ >= 708
-import Data.Typeable
-#endif
-
 import Language.KURE.MonadCatch
 import Language.KURE.Transform
 import Language.KURE.BiTransform
@@ -49,9 +43,6 @@ import Language.KURE.Combinators.Transform
 -- | A 'Lens' is a way to focus on a sub-structure of type @b@ from a structure of type @a@.
 newtype Lens c m a b = Lens { -- | Convert a 'Lens' into a 'Transform' that produces a sub-structure (and its context) and an unfocussing function.
                               lensT :: Transform c m a ((c,b), b -> m a)}
-#if __GLASGOW_HASKELL__ >= 708
-  deriving Typeable
-#endif
 
 -- | The primitive way of building a 'Lens'.
 --   If the unfocussing function is applied to the value focussed on then it should succeed,

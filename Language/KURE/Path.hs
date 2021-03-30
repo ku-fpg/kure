@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE InstanceSigs #-}
@@ -43,13 +41,7 @@ module Language.KURE.Path
        )
 where
 
-#if __GLASGOW_HASKELL__ <= 708
-import Data.Monoid
-#endif
-
 import Control.Arrow ((>>^))
-
-import Data.Typeable
 
 import Language.KURE.Transform
 import Language.KURE.Combinators.Transform
@@ -64,16 +56,17 @@ type Path crumb = [crumb]
 -------------------------------------------------------------------------------
 
 -- | A 'SnocPath' is a list stored in reverse order.
-newtype SnocPath crumb = SnocPath [crumb] deriving (Eq, Typeable)
+newtype SnocPath crumb = SnocPath [crumb] deriving Eq
+
+instance Semigroup (SnocPath crumb) where
+  (<>) :: SnocPath crumb -> SnocPath crumb -> SnocPath crumb
+  (SnocPath p1) <> (SnocPath p2) = SnocPath (p2 ++ p1)
+  {-# INLINE (<>) #-}
 
 instance Monoid (SnocPath crumb) where
    mempty :: SnocPath crumb
    mempty = SnocPath []
    {-# INLINE mempty #-}
-
-   mappend :: SnocPath crumb -> SnocPath crumb -> SnocPath crumb
-   mappend (SnocPath p1) (SnocPath p2) = SnocPath (p2 ++ p1)
-   {-# INLINE mappend #-}
 
 instance Functor SnocPath where
    fmap :: (a -> b) -> SnocPath a -> SnocPath b
@@ -114,10 +107,6 @@ class ExtendPath c crumb | c -> crumb where
   -- | Extend the current 'AbsolutePath' by one crumb.
   (@@) :: c -> crumb -> c
 
-#if __GLASGOW_HASKELL__ >= 708
-deriving instance Typeable ExtendPath
-#endif
-
 -- | A 'SnocPath' from the root.
 type AbsolutePath = SnocPath
 
@@ -128,10 +117,6 @@ type LocalPath = SnocPath
 class ReadPath c crumb | c -> crumb where
   -- | Read the current absolute path.
   absPath :: c -> AbsolutePath crumb
-
-#if __GLASGOW_HASKELL__ >= 708
-deriving instance Typeable ReadPath
-#endif
 
 -- | Lifted version of 'absPath'.
 absPathT :: (ReadPath c crumb, Monad m) => Transform c m a (AbsolutePath crumb)

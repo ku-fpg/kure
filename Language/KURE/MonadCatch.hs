@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE StandaloneDeriving #-}
 -- |
@@ -45,14 +43,8 @@ import Control.Monad.IO.Class
 
 import Data.Foldable
 import Data.List (isPrefixOf)
-import Data.Typeable
 
 import Language.KURE.Combinators.Monad
-
-#if __GLASGOW_HASKELL__ <= 708
-import Control.Applicative
-import Data.Monoid
-#endif
 
 infixl 3 <+
 
@@ -68,17 +60,13 @@ class Monad m => MonadCatch m where
   -- | Catch a failing monadic computation.
   catchM :: m a -> (String -> m a) -> m a
 
-#if __GLASGOW_HASKELL__ >= 708
-deriving instance Typeable MonadCatch
-#endif
-
 ------------------------------------------------------------------------------------------
 
 -- | 'KureM' is the minimal structure that can be an instance of 'MonadCatch'.
 --   The KURE user is free to either use 'KureM' or provide their own monad.
 --   'KureM' is essentially the same as 'Either' 'String', except that it supports a 'MonadCatch' instance which 'Either' 'String' does not (because its 'fail' method calls 'error')
 --   A major advantage of this is that monadic pattern match failures are caught safely.
-data KureM a = Failure String | Success a deriving (Eq, Show, Typeable)
+data KureM a = Failure String | Success a deriving (Eq, Show)
 
 -- | Eliminator for 'KureM'.
 runKureM :: (a -> b) -> (String -> b) -> KureM a -> b

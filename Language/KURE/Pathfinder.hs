@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -36,9 +35,6 @@ module Language.KURE.Pathfinder
 
 import Control.Category hiding ((.))
 import Control.Arrow
-#if !(MIN_VERSION_base(4,8,0))
-import Data.Monoid (mempty)
-#endif
 
 import Language.KURE.MonadCatch
 import Language.KURE.Transform

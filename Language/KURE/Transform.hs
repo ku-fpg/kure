@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
 -- |
@@ -41,13 +39,6 @@ import Control.Monad.IO.Class
 import Control.Category
 import Control.Arrow
 
-#if __GLASGOW_HASKELL__ <= 708
-import Data.Monoid
-#endif
-#if __GLASGOW_HASKELL__ >= 708
-import Data.Typeable
-#endif
-
 import Language.KURE.MonadCatch
 
 ------------------------------------------------------------------------------------------
@@ -56,9 +47,6 @@ import Language.KURE.MonadCatch
 --   The 'Transform' type is the basis of the entire KURE library.
 newtype Transform c m a b = Transform { -- | Apply a transformation to a value and its context.
                                         applyT :: c -> a -> m b}
-#if __GLASGOW_HASKELL__ >= 708
-  deriving Typeable
-#endif
 
 -- | A deprecated synonym for 'Transform'.
 type Translate c m a b = Transform c m a b
@@ -248,14 +236,16 @@ instance Monad m => ArrowApply (Transform c m) where
 ------------------------------------------------------------------------------------------
 
 -- | Lifting through the 'Monad' and a Reader transformer, where (c,a) is the read-only environment.
+instance (Applicative m, Semigroup b) => Semigroup (Transform c m a b) where
+   (<>) :: Transform c m a b -> Transform c m a b -> Transform c m a b
+   (<>) = liftA2 (<>)
+   {-# INLINE (<>) #-}
+
+-- | Lifting through the 'Monad' and a Reader transformer, where (c,a) is the read-only environment.
 instance (Monad m, Monoid b) => Monoid (Transform c m a b) where
 
    mempty :: Transform c m a b
    mempty = return mempty
    {-# INLINE mempty #-}
-
-   mappend :: Transform c m a b -> Transform c m a b -> Transform c m a b
-   mappend = liftM2 mappend
-   {-# INLINE mappend #-}
 
 ------------------------------------------------------------------------------------------

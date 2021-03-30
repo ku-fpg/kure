@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, InstanceSigs, LambdaCase, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE InstanceSigs, LambdaCase, MultiParamTypeClasses, FlexibleContexts, FlexibleInstances, UndecidableInstances #-}
 
 module Expr.Kure where
 
@@ -117,17 +117,5 @@ eseqAnyR r1 r2 = unwrapAnyR $ eseqAllR (wrapAnyR r1) (wrapAnyR r2)
 
 eseqOneR :: (ExtendPath c Int, AddDef c, MonadCatch m) => Rewrite c m Cmd -> Rewrite c m Expr -> Rewrite c m Expr
 eseqOneR r1 r2 = unwrapOneR $ eseqAllR (wrapOneR r1) (wrapOneR r2)
-
----------------------------------------------------------------------------
-
-#if __GLASGOW_HASKELL__ <= 708
-(<$>) :: Monad m => (a -> b) -> m a -> m b
-(<$>) = liftM
-{-# INLINE (<$>) #-}
-
-(<*>) :: Monad m => m (a -> b) -> m a -> m b
-(<*>) = ap
-{-# INLINE (<*>) #-}
-#endif
 
 ---------------------------------------------------------------------------

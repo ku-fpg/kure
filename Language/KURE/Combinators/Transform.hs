@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE InstanceSigs #-}
 -- |
 -- Module: Language.KURE.Combinators.Transform
@@ -52,17 +50,11 @@ module Language.KURE.Combinators.Transform
 
 import Prelude hiding (id, map, foldr, mapM)
 
-#if __GLASGOW_HASKELL__ <= 708
-import Control.Applicative
-#endif
 import Control.Category ((>>>),id)
 import Control.Monad (liftM,ap)
 
-import Data.Foldable
+import Data.Foldable ()
 import Data.Traversable
-#if __GLASGOW_HASKELL__ >= 708
-import Data.Typeable
-#endif
 
 import Language.KURE.Combinators.Arrow
 import Language.KURE.Combinators.Monad
@@ -212,9 +204,6 @@ checkSuccessPBool msg m = do PBool b a <- m
 --   causes a sequence of rewrites to succeed if at least one succeeds, converting failures to
 --   identity rewrites.
 newtype AnyR m a = AnyR (m (PBool a))
-#if __GLASGOW_HASKELL__ >= 708
-  deriving Typeable
-#endif
 
 unAnyR :: AnyR m a -> m (PBool a)
 unAnyR (AnyR mba) = mba
@@ -274,9 +263,6 @@ unwrapAnyR = resultT (checkSuccessPBool "anyR failed" . unAnyR)
 -- | The 'OneR' transformer, in combination with 'wrapOneR' and 'unwrapOneR',
 --   causes a sequence of rewrites to only apply the first success, converting the remainder (and failures) to identity rewrites.
 newtype OneR m a = OneR (Bool -> m (PBool a))
-#if __GLASGOW_HASKELL__ >= 708
-  deriving Typeable
-#endif
 
 unOneR :: OneR m a -> Bool -> m (PBool a)
 unOneR (OneR mba) = mba
