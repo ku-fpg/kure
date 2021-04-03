@@ -35,6 +35,8 @@ import Prelude hiding (id, (.))
 
 import Control.Applicative
 import Control.Monad
+import qualified Control.Monad.Fail as MF
+import Control.Monad.Fail (MonadFail)
 import Control.Monad.IO.Class
 import Control.Category
 import Control.Arrow
@@ -151,15 +153,19 @@ instance Monad m => Monad (Transform c m a) where
    {-# INLINE fail #-}
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
-instance MonadCatch m => MonadCatch (Transform c m a) where
+instance MonadFail m => MonadFail (Transform c m a) where
+   fail :: String -> Transform c m a b
+   fail = constT . fail
+   {-# INLINE fail #-}
 
+-- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
+instance MonadCatch m => MonadCatch (Transform c m a) where
    catchM :: Transform c m a b -> (String -> Transform c m a b) -> Transform c m a b
    catchM t1 t2 = transform $ \ c a -> applyT t1 c a `catchM` \ msg -> applyT (t2 msg) c a
    {-# INLINE catchM #-}
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadPlus m => MonadPlus (Transform c m a) where
-
    mzero :: Transform c m a b
    mzero = constT mzero
    {-# INLINE mzero #-}
@@ -170,7 +176,6 @@ instance MonadPlus m => MonadPlus (Transform c m a) where
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadIO m => MonadIO (Transform c m a) where
-
    liftIO :: IO b -> Transform c m a b
    liftIO = constT . liftIO
    {-# INLINE liftIO #-}
@@ -179,7 +184,6 @@ instance MonadIO m => MonadIO (Transform c m a) where
 
 -- | The 'Kleisli' 'Category' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance Monad m => Category (Transform c m) where
-
    id :: Transform c m a a
    id = contextfreeT return
    {-# INLINE id #-}
@@ -188,10 +192,8 @@ instance Monad m => Category (Transform c m) where
    t2 . t1 = transform (\ c -> applyT t1 c >=> applyT t2 c)
    {-# INLINE (.) #-}
 
-
 -- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance Monad m => Arrow (Transform c m) where
-
    arr :: (a -> b) -> Transform c m a b
    arr f = contextfreeT (return . f)
    {-# INLINE arr #-}
@@ -214,21 +216,18 @@ instance Monad m => Arrow (Transform c m) where
 
 -- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance MonadPlus m => ArrowZero (Transform c m) where
-
    zeroArrow :: Transform c m a b
    zeroArrow = mzero
    {-# INLINE zeroArrow #-}
 
 -- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance MonadPlus m => ArrowPlus (Transform c m) where
-
    (<+>) :: Transform c m a b -> Transform c m a b -> Transform c m a b
    (<+>) = mplus
    {-# INLINE (<+>) #-}
 
 -- | The 'Kleisli' 'Arrow' induced by @m@, lifting through a Reader transformer, where @c@ is the read-only environment.
 instance Monad m => ArrowApply (Transform c m) where
-
    app :: Transform c m (Transform c m a b, a) b
    app = transform (\ c (t,a) -> applyT t c a)
    {-# INLINE app #-}
@@ -243,7 +242,6 @@ instance (Applicative m, Semigroup b) => Semigroup (Transform c m a b) where
 
 -- | Lifting through the 'Monad' and a Reader transformer, where (c,a) is the read-only environment.
 instance (Monad m, Monoid b) => Monoid (Transform c m a b) where
-
    mempty :: Transform c m a b
    mempty = return mempty
    {-# INLINE mempty #-}

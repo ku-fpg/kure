@@ -33,8 +33,11 @@ module Language.KURE.Pathfinder
         , uniquePrunePathToT
 ) where
 
+import Prelude
+
 import Control.Category hiding ((.))
 import Control.Arrow
+import Control.Monad.Fail (MonadFail)
 
 import Language.KURE.MonadCatch
 import Language.KURE.Transform
@@ -59,7 +62,7 @@ exposeLocalPathT = contextT >>^ extraContext
 {-# INLINE exposeLocalPathT #-}
 
 -- | Return the current 'LocalPath' if the predicate transformation succeeds.
-acceptLocalPathT :: Monad m => Transform c m u Bool -> Transform (WithLocalPath c crumb) m u (LocalPath crumb)
+acceptLocalPathT :: MonadFail m => Transform c m u Bool -> Transform (WithLocalPath c crumb) m u (LocalPath crumb)
 acceptLocalPathT q = accepterR (liftContext baseContext q) >>> exposeLocalPathT
 {-# INLINE acceptLocalPathT #-}
 
@@ -89,7 +92,7 @@ oneNonEmptyPathToT q = setFailMsg "No matching nodes found." $
 
 
 -- local function used by uniquePathToT and uniquePrunePathToT
-requireUniquePath :: Monad m => Transform c m [LocalPath crumb] (LocalPath crumb)
+requireUniquePath :: MonadFail m => Transform c m [LocalPath crumb] (LocalPath crumb)
 requireUniquePath = contextfreeT $ \ ps -> case ps of
                                              []  -> fail "No matching nodes found."
                                              [p] -> return p

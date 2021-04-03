@@ -13,6 +13,7 @@ module Language.KURE.Debug (
         debugR
 ) where
 
+import Control.Monad.Fail
 import Debug.Trace
 
 import Language.KURE.Combinators.Transform
@@ -20,5 +21,5 @@ import Language.KURE.Transform
 
 
 -- | Trace output of the value being rewritten; use for debugging only.
-debugR :: (Monad m, Show a) => Int -> String -> Rewrite c m a
+debugR :: (MonadFail m, Show a) => Int -> String -> Rewrite c m a
 debugR n msg = acceptR (\ a -> trace (msg ++ " : " ++ take n (show a)) True)

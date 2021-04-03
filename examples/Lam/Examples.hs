@@ -82,7 +82,7 @@ eta_reduce = withPatFailMsg "Cannot eta-reduce, not lambda-app-var." $
                   return f
 
 -- This might not actually be normal order evaluation
--- Contact the  KURE maintainer if you can correct this definition.
+-- Contact the KURE maintainer if you can correct this definition.
 normal_order_eval :: RewriteE
 normal_order_eval = anytdR (repeatR beta_reduce)
 

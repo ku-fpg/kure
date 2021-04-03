@@ -52,6 +52,8 @@ import Prelude hiding (id, map, foldr, mapM)
 
 import Control.Category ((>>>),id)
 import Control.Monad (liftM,ap)
+import Control.Monad.Fail (MonadFail)
+import qualified Control.Monad.Fail
 
 import Data.Foldable ()
 import Data.Traversable
@@ -124,17 +126,17 @@ orR = unwrapAnyR . andR . fmap wrapAnyR
 {-# INLINE orR #-}
 
 -- | As 'acceptR', but takes a custom failure message.
-acceptWithFailMsgR :: Monad m => (a -> Bool) -> String -> Rewrite c m a
+acceptWithFailMsgR :: MonadFail m => (a -> Bool) -> String -> Rewrite c m a
 acceptWithFailMsgR p msg = readerT $ \ a -> if p a then id else fail msg
 {-# INLINE acceptWithFailMsgR #-}
 
 -- | Look at the argument to a rewrite, and choose to be either 'idR' or a failure.
-acceptR :: Monad m => (a -> Bool) -> Rewrite c m a
+acceptR :: MonadFail m => (a -> Bool) -> Rewrite c m a
 acceptR p = acceptWithFailMsgR p "acceptR: predicate failed"
 {-# INLINE acceptR #-}
 
 -- | A generalisation of 'acceptR' where the predicate is a 'Transform'.
-accepterR :: Monad m => Transform c m a Bool -> Rewrite c m a
+accepterR :: MonadFail m => Transform c m a Bool -> Rewrite c m a
 accepterR t = ifM t idR (fail "accepterR: predicate failed")
 {-# INLINE accepterR #-}
 
@@ -175,7 +177,7 @@ joinT = contextfreeT id
 {-# INLINE joinT #-}
 
 -- | Fail if the Boolean is False, succeed if the Boolean is True.
-guardT :: Monad m => Transform c m Bool ()
+guardT :: MonadFail m => Transform c m Bool ()
 guardT = contextfreeT guardM
 {-# INLINE guardT #-}
 
@@ -187,7 +189,7 @@ instance Functor PBool where
   fmap :: (a -> b) -> PBool a -> PBool b
   fmap f (PBool b a) = PBool b (f a)
 
-checkSuccessPBool :: Monad m => String -> m (PBool a) -> m a
+checkSuccessPBool :: MonadFail m => String -> m (PBool a) -> m a
 checkSuccessPBool msg m = do PBool b a <- m
                              if b
                                then return a
@@ -228,15 +230,20 @@ instance Monad m => Monad (AnyR m) where
    return = AnyR . return . PBool False
    {-# INLINE return #-}
 
-   fail :: String -> AnyR m a
-   fail = AnyR . fail
-   {-# INLINE fail #-}
-
    (>>=) :: AnyR m a -> (a -> AnyR m d) -> AnyR m d
    ma >>= f = AnyR $ do PBool b1 a <- unAnyR ma
                         PBool b2 d <- unAnyR (f a)
                         return (PBool (b1 || b2) d)
    {-# INLINE (>>=) #-}
+
+   fail :: String -> AnyR m a
+   fail = AnyR . fail
+   {-# INLINE fail #-}
+
+instance MonadFail m => MonadFail (AnyR m) where
+   fail :: String -> AnyR m a
+   fail = AnyR . fail
+   {-# INLINE fail #-}
 
 instance MonadCatch m => MonadCatch (AnyR m) where
    catchM :: AnyR m a -> (String -> AnyR m a) -> AnyR m a
@@ -249,7 +256,7 @@ wrapAnyR r = rewrite $ \ c a -> AnyR $ (PBool True `liftM` applyR r c a) <+ retu
 {-# INLINE wrapAnyR #-}
 
 -- | Unwrap a 'Rewrite' from the 'AnyR' monad transformer.
-unwrapAnyR :: Monad m => Rewrite c (AnyR m) a -> Rewrite c m a
+unwrapAnyR :: MonadFail m => Rewrite c (AnyR m) a -> Rewrite c m a
 unwrapAnyR = resultT (checkSuccessPBool "anyR failed" . unAnyR)
 {-# INLINE unwrapAnyR #-}
 
@@ -287,14 +294,19 @@ instance Monad m => Monad (OneR m) where
    return a = OneR (\ b -> return (PBool b a))
    {-# INLINE return #-}
 
-   fail :: String -> OneR m a
-   fail msg = OneR (\ _ -> fail msg)
-   {-# INLINE fail #-}
-
    (>>=) :: OneR m a -> (a -> OneR m d) -> OneR m d
    ma >>= f = OneR $ \ b1 -> do PBool b2 a <- unOneR ma b1
                                 unOneR (f a) b2
    {-# INLINE (>>=) #-}
+
+   fail :: String -> OneR m a
+   fail msg = OneR (\ _ -> fail msg)
+   {-# INLINE fail #-}
+
+instance MonadFail m => MonadFail (OneR m) where
+   fail :: String -> OneR m a
+   fail msg = OneR (\ _ -> fail msg)
+   {-# INLINE fail #-}
 
 instance MonadCatch m => MonadCatch (OneR m) where
    catchM :: OneR m a -> (String -> OneR m a) -> OneR m a
@@ -309,7 +321,7 @@ wrapOneR r = rewrite $ \ c a -> OneR $ \ b -> if b
 {-# INLINE wrapOneR #-}
 
 -- | Unwrap a 'Rewrite' from the 'OneR' monad transformer.
-unwrapOneR :: Monad m => Rewrite c (OneR m) a -> Rewrite c m a
+unwrapOneR :: MonadFail m => Rewrite c (OneR m) a -> Rewrite c m a
 unwrapOneR = resultT (checkSuccessPBool "oneR failed" . ($ False) . unOneR)
 {-# INLINE unwrapOneR #-}
 

@@ -84,7 +84,9 @@ import Data.DList (singleton, toList)
 
 import Control.Arrow
 import Control.Category hiding ((.))
-import Control.Monad
+import Control.Monad (liftM, ap, mplus)
+import Control.Monad.Fail (MonadFail)
+import qualified Control.Monad.Fail
 
 import Language.KURE.MonadCatch
 import Language.KURE.Transform
@@ -104,7 +106,6 @@ import Language.KURE.Path
 --   but they may be overridden for efficiency.
 
 class Walker c u where
-
   -- | Apply a rewrite to all immediate children, succeeding if they all succeed.
   allR :: MonadCatch m => Rewrite c m u -> Rewrite c m u
 
@@ -391,7 +392,7 @@ pSnd :: P a b -> b
 pSnd (P _ b) = b
 {-# INLINE pSnd #-}
 
-checkSuccessPMaybe :: Monad m => String -> m (Maybe a) -> m a
+checkSuccessPMaybe :: MonadFail m => String -> m (Maybe a) -> m a
 checkSuccessPMaybe msg ma = ma >>= projectWithFailMsgM msg
 {-# INLINE checkSuccessPMaybe #-}
 
@@ -425,15 +426,20 @@ instance (Monoid w, Monad m) => Monad (AllT w m) where
    return a = AllT $ return (P a mempty)
    {-# INLINE return #-}
 
-   fail :: String -> AllT w m a
-   fail = AllT . fail
-   {-# INLINE fail #-}
-
    (>>=) :: AllT w m a -> (a -> AllT w m d) -> AllT w m d
    ma >>= f = AllT $ do P a w1 <- unAllT ma
                         P d w2 <- unAllT (f a)
                         return (P d (w1 <> w2))
    {-# INLINE (>>=) #-}
+
+   fail :: String -> AllT w m a
+   fail = AllT . fail
+   {-# INLINE fail #-}
+
+instance (Monoid w, MonadFail m) => MonadFail (AllT w m) where
+   fail :: String -> AllT w m a
+   fail = AllT . fail
+   {-# INLINE fail #-}
 
 instance (Monoid w, MonadCatch m) => MonadCatch (AllT w m) where
    catchM :: AllT w m a -> (String -> AllT w m a) -> AllT w m a
@@ -483,14 +489,19 @@ instance Monad m => Monad (OneT w m) where
    return a = OneT $ \ mw -> return (P a mw)
    {-# INLINE return #-}
 
-   fail :: String -> OneT w m a
-   fail msg = OneT (\ _ -> fail msg)
-   {-# INLINE fail #-}
-
    (>>=) :: OneT w m a -> (a -> OneT w m d) -> OneT w m d
    ma >>= f = OneT $ do \ mw1 -> do P a mw2 <- unOneT ma mw1
                                     unOneT (f a) mw2
    {-# INLINE (>>=) #-}
+
+   fail :: String -> OneT w m a
+   fail msg = OneT (\ _ -> fail msg)
+   {-# INLINE fail #-}
+
+instance MonadFail m => MonadFail (OneT w m) where
+   fail :: String -> OneT w m a
+   fail msg = OneT (\ _ -> fail msg)
+   {-# INLINE fail #-}
 
 instance MonadCatch m => MonadCatch (OneT w m) where
    catchM :: OneT w m a -> (String -> OneT w m a) -> OneT w m a
@@ -506,7 +517,7 @@ wrapOneT t = rewrite $ \ c a -> OneT $ \ mw -> case mw of
 {-# INLINE wrapOneT #-}
 
 -- | Unwrap a 'Transform' from the 'OneT' monad transformer.
-unwrapOneT :: Monad m => Rewrite c (OneT b m) u -> Transform c m u b
+unwrapOneT :: MonadFail m => Rewrite c (OneT b m) u -> Transform c m u b
 unwrapOneT = resultT (checkSuccessPMaybe "oneT failed" . liftM pSnd . ($ Nothing) . unOneT)
 {-# INLINE unwrapOneT #-}
 
@@ -543,15 +554,20 @@ instance Monad (GetChild c u) where
    return a = GetChild (return a) Nothing
    {-# INLINE return #-}
 
-   fail :: String -> GetChild c u a
-   fail msg = GetChild (fail msg) Nothing
-   {-# INLINE fail #-}
-
    (>>=) :: GetChild c u a -> (a -> GetChild c u b) -> GetChild c u b
    (GetChild kma mcu) >>= k = runKureM (\ a   -> getChildSecond (mplus mcu) (k a))
                                        (\ msg -> GetChild (fail msg) mcu)
                                        kma
    {-# INLINE (>>=) #-}
+
+   fail :: String -> GetChild c u a
+   fail msg = GetChild (fail msg) Nothing
+   {-# INLINE fail #-}
+
+instance MonadFail (GetChild c u) where
+   fail :: String -> GetChild c u a
+   fail msg = GetChild (fail msg) Nothing
+   {-# INLINE fail #-}
 
 instance MonadCatch (GetChild c u) where
    catchM :: GetChild c u a -> (String -> GetChild c u a) -> GetChild c u a
@@ -583,11 +599,11 @@ wrapSetChild cr u = do cr' <- lastCrumbT
                        if cr == cr' then return u else idR
 {-# INLINE wrapSetChild #-}
 
-unwrapSetChild :: Monad m => Rewrite c SetChild u -> Rewrite c m u
+unwrapSetChild :: MonadFail m => Rewrite c SetChild u -> Rewrite c m u
 unwrapSetChild = resultT liftKureM
 {-# INLINE unwrapSetChild #-}
 
-setChild :: (ReadPath c crumb, Eq crumb, Walker c u, Monad m) => crumb -> u -> Rewrite c m u
+setChild :: (ReadPath c crumb, Eq crumb, Walker c u, MonadFail m) => crumb -> u -> Rewrite c m u
 setChild cr = unwrapSetChild . allR . wrapSetChild cr
 {-# INLINE setChild #-}
 

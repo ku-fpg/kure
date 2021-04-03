@@ -38,7 +38,9 @@ module Language.KURE.MonadCatch
 import Prelude hiding (foldr)
 
 import Control.Exception (catch, SomeException)
-import Control.Monad
+import Control.Monad.Fail (MonadFail)
+import qualified Control.Monad.Fail
+import Control.Monad (liftM, ap, join)
 import Control.Monad.IO.Class
 
 import Data.Foldable
@@ -56,7 +58,7 @@ infixl 3 <+
 -- > fail msg `catchM` f == f msg
 -- > return a `catchM` f == return a
 
-class Monad m => MonadCatch m where
+class MonadFail m => MonadCatch m where
   -- | Catch a failing monadic computation.
   catchM :: m a -> (String -> m a) -> m a
 
@@ -80,7 +82,7 @@ fromKureM = runKureM id
 {-# INLINE fromKureM #-}
 
 -- | Lift a 'KureM' computation to any other monad.
-liftKureM :: Monad m => KureM a -> m a
+liftKureM :: MonadFail m => KureM a -> m a
 liftKureM = runKureM return fail
 {-# INLINE liftKureM #-}
 
@@ -94,6 +96,11 @@ instance Monad KureM where
    (Failure msg) >>= _ = Failure msg
    {-# INLINE (>>=) #-}
 
+   fail :: String -> KureM a
+   fail = Failure
+   {-# INLINE fail #-}
+
+instance MonadFail KureM where
    fail :: String -> KureM a
    fail = Failure
    {-# INLINE fail #-}

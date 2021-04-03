@@ -6,6 +6,7 @@ import Language.KURE
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Fail
 
 -------------------------------------------------------------------------------
 
@@ -26,8 +27,12 @@ instance Monad LamM where
                                     (n', Left msg) -> (n', Left msg)
                                     (n', Right a)  -> lamM (gg a) n'
 
-instance MonadCatch LamM where
+instance MonadFail LamM where
+  fail :: String -> LamM a
+  fail msg = LamM (\ n -> (n, Left msg))
 
+
+instance MonadCatch LamM where
   catchM :: LamM a -> (String -> LamM a) -> LamM a
   (LamM st) `catchM` f = LamM $ \ n -> case st n of
                                         (n', Left msg) -> lamM (f msg) n'

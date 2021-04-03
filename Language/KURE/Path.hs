@@ -42,6 +42,7 @@ module Language.KURE.Path
 where
 
 import Control.Arrow ((>>^))
+import Control.Monad.Fail (MonadFail)
 
 import Language.KURE.Transform
 import Language.KURE.Combinators.Transform
@@ -124,7 +125,7 @@ absPathT = contextT >>^ absPath
 {-# INLINE absPathT #-}
 
 -- | Lifted version of 'lastCrumb'.
-lastCrumbT :: (ReadPath c crumb, Monad m) => Transform c m a crumb
+lastCrumbT :: (ReadPath c crumb, MonadFail m) => Transform c m a crumb
 lastCrumbT = contextonlyT (projectWithFailMsgM (fail "lastCrumbT failed: at the root, no crumbs yet.") . lastCrumb . absPath)
 {-# INLINE lastCrumbT #-}
 

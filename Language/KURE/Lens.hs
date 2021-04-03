@@ -29,6 +29,7 @@ module Language.KURE.Lens
 import Prelude hiding (id, (.))
 
 import Control.Monad
+import Control.Monad.Fail (MonadFail)
 import Control.Category
 import Control.Arrow
 
@@ -81,7 +82,7 @@ instance Monad m => Category (Lens c m) where
    {-# INLINE (.) #-}
 
 -- | The failing 'Lens'.
-failL :: Monad m => String -> Lens c m a b
+failL :: MonadFail m => String -> Lens c m a b
 failL = lens . fail
 {-# INLINE failL #-}
 
@@ -108,12 +109,12 @@ pureL f g = bidirectionalL $ bidirectional (arr f) (arr g)
 ------------------------------------------------------------------------------------------
 
 -- | A 'Lens' to the injection of a value.
-injectL  :: (Monad m, Injection a g) => Lens c m a g
+injectL  :: (MonadFail m, Injection a g) => Lens c m a g
 injectL = lens $ transform $ \ c a -> return ((c, inject a), projectM)
 {-# INLINE injectL #-}
 
 -- | A 'Lens' to the projection of a value.
-projectL :: (Monad m, Injection a g) => Lens c m g a
+projectL :: (MonadFail m, Injection a g) => Lens c m g a
 projectL = lens $ transform $ \ c -> projectM >=> (\ a -> return ((c,a), injectM))
 {-# INLINE projectL #-}
 
