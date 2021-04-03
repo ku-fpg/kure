@@ -2,13 +2,12 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StandaloneDeriving #-}
 -- |
 -- Module: Language.KURE.Path
--- Copyright: (c) 2012--2014 The University of Kansas
+-- Copyright: (c) 2012--2021 The University of Kansas
 -- License: BSD3
 --
--- Maintainer: Neil Sculthorpe <neil@ittc.ku.edu>
+-- Maintainer: Neil Sculthorpe <neil.sculthorpe@ntu.ac.uk>
 -- Stability: beta
 -- Portability: ghc
 --
