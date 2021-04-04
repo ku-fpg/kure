@@ -23,8 +23,9 @@ Copyright:           (c) 2006--2021 The University of Kansas
 Homepage:            https://ku-fpg.github.io/software/kure/
 Stability:           beta
 build-type:          Simple
-Cabal-Version:       >= 1.16
+Cabal-Version:       1.16
 Extra-Source-Files:
+    CHANGELOG.md
     examples/Examples.hs
     examples/Fib/AST.hs
     examples/Fib/Kure.hs

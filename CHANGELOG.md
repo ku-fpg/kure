@@ -1,3 +1,6 @@
+## 2.18.6
+* Maintenance update for GHC and base library changes involving Typeable, SemiGroup and MonadFail
+
 ## 2.16.12
 * Derive `Typeable` instances
 
