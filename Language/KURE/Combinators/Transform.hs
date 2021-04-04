@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE InstanceSigs #-}
 -- |
 -- Module: Language.KURE.Combinators.Transform
@@ -52,8 +53,11 @@ import Prelude hiding (id, map, foldr, mapM)
 
 import Control.Category ((>>>),id)
 import Control.Monad (liftM,ap)
+
+#if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail (MonadFail)
 import qualified Control.Monad.Fail
+#endif
 
 import Data.Foldable ()
 import Data.Traversable
@@ -236,9 +240,11 @@ instance Monad m => Monad (AnyR m) where
                         return (PBool (b1 || b2) d)
    {-# INLINE (>>=) #-}
 
+#if !MIN_VERSION_base(4,13,0)
    fail :: String -> AnyR m a
    fail = AnyR . fail
    {-# INLINE fail #-}
+#endif
 
 instance MonadFail m => MonadFail (AnyR m) where
    fail :: String -> AnyR m a
@@ -299,9 +305,11 @@ instance Monad m => Monad (OneR m) where
                                 unOneR (f a) b2
    {-# INLINE (>>=) #-}
 
+#if !MIN_VERSION_base(4,13,0)
    fail :: String -> OneR m a
    fail msg = OneR (\ _ -> fail msg)
    {-# INLINE fail #-}
+#endif
 
 instance MonadFail m => MonadFail (OneR m) where
    fail :: String -> OneR m a

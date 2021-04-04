@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE InstanceSigs #-}
@@ -41,7 +42,10 @@ module Language.KURE.Path
 where
 
 import Control.Arrow ((>>^))
+
+#if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail (MonadFail)
+#endif
 
 import Language.KURE.Transform
 import Language.KURE.Combinators.Transform

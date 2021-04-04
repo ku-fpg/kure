@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE InstanceSigs #-}
 -- |
 -- Module: Language.KURE.Lens
@@ -29,7 +30,11 @@ module Language.KURE.Lens
 import Prelude hiding (id, (.))
 
 import Control.Monad
+
+#if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail (MonadFail)
+#endif
+
 import Control.Category
 import Control.Arrow
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -85,8 +86,11 @@ import Data.DList (singleton, toList)
 import Control.Arrow
 import Control.Category hiding ((.))
 import Control.Monad (liftM, ap, mplus)
+
+#if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail (MonadFail)
 import qualified Control.Monad.Fail
+#endif
 
 import Language.KURE.MonadCatch
 import Language.KURE.Transform
@@ -432,9 +436,11 @@ instance (Monoid w, Monad m) => Monad (AllT w m) where
                         return (P d (w1 <> w2))
    {-# INLINE (>>=) #-}
 
+#if !MIN_VERSION_base(4,13,0)
    fail :: String -> AllT w m a
    fail = AllT . fail
    {-# INLINE fail #-}
+#endif
 
 instance (Monoid w, MonadFail m) => MonadFail (AllT w m) where
    fail :: String -> AllT w m a
@@ -494,9 +500,11 @@ instance Monad m => Monad (OneT w m) where
                                     unOneT (f a) mw2
    {-# INLINE (>>=) #-}
 
+#if !MIN_VERSION_base(4,13,0)
    fail :: String -> OneT w m a
    fail msg = OneT (\ _ -> fail msg)
    {-# INLINE fail #-}
+#endif
 
 instance MonadFail m => MonadFail (OneT w m) where
    fail :: String -> OneT w m a
@@ -560,9 +568,11 @@ instance Monad (GetChild c u) where
                                        kma
    {-# INLINE (>>=) #-}
 
+#if !MIN_VERSION_base(4,13,0)
    fail :: String -> GetChild c u a
    fail msg = GetChild (fail msg) Nothing
    {-# INLINE fail #-}
+#endif
 
 instance MonadFail (GetChild c u) where
    fail :: String -> GetChild c u a

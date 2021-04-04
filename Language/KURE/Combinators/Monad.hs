@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -- |
 -- Module: Language.KURE.Combinators.Monad
 -- Copyright: (c) 2012--2021 The University of Kansas
@@ -20,7 +21,10 @@ module Language.KURE.Combinators.Monad
 ) where
 
 import Control.Monad (unless)
-import Control.Monad.Fail (MonadFail)
+
+#if !MIN_VERSION_base(4,13,0)
+import Control.Monad.Fail(MonadFail)
+#endif
 
 ------------------------------------------------------------------------------------------
 

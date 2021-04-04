@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE InstanceSigs #-}
 -- |
 -- Module: Language.KURE.MonadCatch
@@ -37,8 +38,12 @@ module Language.KURE.MonadCatch
 import Prelude hiding (foldr)
 
 import Control.Exception (catch, SomeException)
+
+#if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail (MonadFail)
 import qualified Control.Monad.Fail
+#endif
+
 import Control.Monad (liftM, ap, join)
 import Control.Monad.IO.Class
 
@@ -95,9 +100,11 @@ instance Monad KureM where
    (Failure msg) >>= _ = Failure msg
    {-# INLINE (>>=) #-}
 
+#if !MIN_VERSION_base(4,13,0)
    fail :: String -> KureM a
    fail = Failure
    {-# INLINE fail #-}
+#endif
 
 instance MonadFail KureM where
    fail :: String -> KureM a

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 -- |
@@ -36,7 +37,10 @@ import Prelude
 
 import Control.Category hiding ((.))
 import Control.Arrow
+
+#if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail (MonadFail)
+#endif
 
 import Language.KURE.MonadCatch
 import Language.KURE.Transform

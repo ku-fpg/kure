@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE PolyKinds #-}
 -- |
@@ -35,8 +36,12 @@ import Prelude hiding (id, (.))
 
 import Control.Applicative
 import Control.Monad
-import qualified Control.Monad.Fail as MF
+
+#if !MIN_VERSION_base(4,13,0)
+import qualified Control.Monad.Fail
 import Control.Monad.Fail (MonadFail)
+#endif
+
 import Control.Monad.IO.Class
 import Control.Category
 import Control.Arrow
@@ -109,14 +114,12 @@ effectfreeT f = transform ( \ c a -> return (f c a))
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Functor m => Functor (Transform c m a) where
-
    fmap :: (b -> d) -> Transform c m a b -> Transform c m a d
    fmap f t = transform (\ c -> fmap f . applyT t c)
    {-# INLINE fmap #-}
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Applicative m => Applicative (Transform c m a) where
-
    pure :: b -> Transform c m a b
    pure = constT . pure
    {-# INLINE pure #-}
@@ -127,7 +130,6 @@ instance Applicative m => Applicative (Transform c m a) where
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Alternative m => Alternative (Transform c m a) where
-
    empty :: Transform c m a b
    empty = constT empty
    {-# INLINE empty #-}
@@ -138,7 +140,6 @@ instance Alternative m => Alternative (Transform c m a) where
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance Monad m => Monad (Transform c m a) where
-
    return :: b -> Transform c m a b
    return = constT . return
    {-# INLINE return #-}
@@ -148,9 +149,11 @@ instance Monad m => Monad (Transform c m a) where
                                      applyT (f b) c a
    {-# INLINE (>>=) #-}
 
+#if !MIN_VERSION_base(4,13,0)
    fail :: String -> Transform c m a b
    fail = constT . fail
    {-# INLINE fail #-}
+#endif
 
 -- | Lifting through a Reader transformer, where (c,a) is the read-only environment.
 instance MonadFail m => MonadFail (Transform c m a) where

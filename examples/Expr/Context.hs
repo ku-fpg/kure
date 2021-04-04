@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE InstanceSigs, MultiParamTypeClasses #-}
 
 module Expr.Context where
@@ -6,6 +7,10 @@ import Data.Monoid (mempty)
 
 import Language.KURE
 import Language.KURE.ExtendableContext
+
+#if !MIN_VERSION_base(4,13,0)
+import Control.Monad.Fail (MonadFail)
+#endif
 
 import Expr.AST
 
@@ -47,7 +52,7 @@ instance (AddDef c, AddDef e) => AddDef (ExtendContext c e) where
 initialContext :: Context
 initialContext = Context mempty []
 
-lookupDef :: Monad m => Name -> Context -> m Expr
+lookupDef :: MonadFail m => Name -> Context -> m Expr
 lookupDef v (Context _ defs) = maybe (fail $ v ++ " not found in context") return (lookup v defs)
 
 ---------------------------------------------------------------------------
